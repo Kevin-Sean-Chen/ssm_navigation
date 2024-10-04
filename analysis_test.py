@@ -50,6 +50,35 @@ for ii in n_tracks:
             # stats.append(np.array([len(pos)]))
 stats = np.concatenate(stats)
 
+# %%
+def angle_between_vectors(v1, v2):
+    # Compute the dot product between the vectors
+    dot_product = np.dot(v1, v2)
+    
+    # Compute the magnitudes (norms) of the vectors
+    norm_v1 = np.linalg.norm(v1)
+    norm_v2 = np.linalg.norm(v2)
+    
+    # Compute the cosine of the angle
+    cos_theta = dot_product / (norm_v1 * norm_v2)
+    
+    # Ensure the value is within the valid range for arccos due to floating point errors
+    cos_theta = np.clip(cos_theta, -1.0, 1.0)
+    
+    # Compute the angle in radians
+    angle = np.arccos(cos_theta)
+    
+    # Optionally convert the angle to degrees
+    angle_degrees = np.degrees(angle)
+    
+    return angle_degrees
+
+def ang_t(vecs):
+    angs = np.zeros(vecs.shape[1])
+    for tt in range(len(angs)):
+        angs[tt] = angle_between_vectors(vecs[:,tt], np.array([0,1]))
+    return angs
+
 # %% concatenate across files in a folder
 stats = []
 stats_signal = []
@@ -73,7 +102,7 @@ for ff in range(nf):
                 # stats.append( data['signal'][pos] )
                 # stats.append( data['vx_smooth'][pos] )  # smoothed speed
                 # stats.append(np.array([len(pos)]))  # checking the track lengths
-                stats.append(data['theta_smooth'][pos] - 180)  # theta angle to wind
+                # stats.append(data['theta_smooth'][pos] - 180)  # theta angle to wind
                 
                 ### compute velocity
                 v_xy = np.sqrt(data['vx_smooth'][pos]**2 + data['vy_smooth'][pos]**2)
@@ -81,7 +110,10 @@ for ff in range(nf):
                 # stats.append(v_xy)
                 # stats.append( data['theta'][pos] )   # raw signal
                 
-                ### compute on top of signal conditions
+                ### compute angles
+                vec_xy = np.diff(np.vstack((data['x_smooth'][pos],data['y_smooth'][pos])),0)
+                ang_ = ang_t(vec_xy)
+                stats.append(ang_)
 stats = np.concatenate(stats)
 stats_signal = np.concatenate(stats_signal)
 

@@ -17,6 +17,10 @@ import ssm
 import numpy.random as npr
 import seaborn as sns
 
+import seaborn as sns
+sns.set_style("white")
+sns.set_context("talk")
+
 # %% make a list of data
 # list with tracks vx,vy
 # future can include theta and the sensory input...
@@ -38,9 +42,10 @@ for file in pkl_files:
 # %% concatenate across files in a folder
 data4fit = []  # list of tracks with its vx,vy,theta signal recorded;  conditioned on behavior and long-tracks
 nf = len(pkl_files)
-masks = []
-track_id = []
-rec_tracks = []
+masks = []   # where there is nan
+track_id = []  # record track id (file and track)
+rec_tracks = []  # record the full track x,y
+rec_signal = []
 cond_id = 0
 
 for ff in range(nf):
@@ -70,8 +75,10 @@ for ff in range(nf):
                     data4fit.append(temp)  # get data for ssm fit
                     rec_tracks.append(temp_xy)  # get raw tracks
                     track_id.append(np.array([ff,ii]))  # get track id
+                    rec_signal.append(data['signal'][pos])
                     cond_id += 1
                 masks.append(mask_i)
+                
 # %%
 # %% quick ssm test
 ###############################################################################
@@ -96,7 +103,7 @@ plt.legend(loc="lower right")
 plt.show()
 
 # %% filtering!
-pick_id = 25
+pick_id = 0
 most_likely_states = hmm.most_likely_states(data4fit[pick_id])
 track_i = rec_tracks[pick_id]
 
@@ -126,7 +133,96 @@ plt.xlabel("X")
 plt.ylabel("Y")
 
 
-# %% state analysis upon stim
+# %% state of states??
 ###############################################################################
 # %%
+ltr = len(data4fit)
+post_z = []
+for ll in range(ltr):
+    most_likely_states = hmm.most_likely_states(data4fit[ll])
+    post_z.append(most_likely_states[:,None])
+
+# %%
+# # %% then cluster them
+# n_state2 = 3
+# hmm2 = ssm.HMM(n_state2, 1, observations="categorical", observation_kwargs=dict(C=num_states), transitions="sticky")
+
+# hmm_lls = hmm2.fit(post_z, method="em", num_iters=N_iters, init_method="kmeans")
+
+# # %% L2 filtering
+# pick_id = 15
+# most_likely_states2 = hmm2.most_likely_states(post_z[pick_id])
+# track_i = rec_tracks[pick_id]
+
+# most_likely_states2 = most_likely_states2[::6]
+# track_i = track_i[::6]
+
+# # Create a colormap for the two states
+# colors = ['red', 'blue']  # You can choose different colors for the two states
+# unique_states = np.unique(most_likely_states2)
+# cmap = plt.get_cmap('tab10')
+
+# plt.figure(figsize=(8, 6))
+
+# # Loop over the unique states and plot the corresponding segments
+# # for i, state in enumerate(unique_states):
+# for ii in range(len(unique_states)):
+#     state_mask = np.where(most_likely_states2==ii)[0]
+#     # Find where the trajectory is in the current state
+#     # state_mask = (state==most_likely_states)
+    
+#     # Plot the trajectory segment with a different color
+#     plt.plot(track_i[state_mask,0], track_i[state_mask,1], 'o', color=cmap(ii), alpha=0.5)
+    
+# # Add labels and legends
+# plt.title("state-code trajectories")
+# plt.xlabel("X")
+# plt.ylabel("Y")
+
+# %%
+###############################################################################
+# %% state conditional analysis
+###############################################################################
+# ex: condition on stimuli, plot states evolution
+# ex: condition on stimuli, plot post-stim states
+
+# %% vectorize for simpliciy
+vec_signal = np.concatenate(rec_signal)
+vec_states = np.concatenate(post_z)
+
+# %% state occupency conditioned on signal
+threshold_within = 5
+pos = np.where(vec_signal < threshold_within)[0]  ### set stats_signal for concatenating the full signal vector
+win_stats = vec_states[pos]
+
+counts, bin_edges = np.histogram(win_stats, bins=num_states)
+bin_edge = np.arange(num_states)
+
+plt.figure(figsize=(8, 6))
+
+for i in range(len(counts)):
+    plt.bar(bin_edge[i], counts[i], width=bin_edges[i+1] - bin_edges[i], color=cmap(i), edgecolor='black')
+plt.title('without signal detection', fontsize=20)
+
+# %% condition on past! signal
+threshold_within = 5  # threhold for detection
+threshold_cont = 60*15  # threshold for continuos detection
+post_wind = 60*20  # post detection window
+
+pos = np.where(vec_signal > threshold_within)[0]  ### set stats_signal for concatenating the full signal vector
+bined_sig = vec_states*0
+bined_sig[pos] = 1
+
+conved_signal = np.convolve(bined_sig[:,0], np.ones(threshold_cont), mode='same')
+pos = np.where(conved_signal[:-post_wind] > 0.8*threshold_cont)[0]
+bin_stats = vec_states[pos+post_wind]
+
+counts, bin_edges = np.histogram(bin_stats, bins=num_states)
+bin_edge = np.arange(num_states)
+
+plt.figure(figsize=(8, 6))
+
+for i in range(len(counts)):
+    plt.bar(bin_edge[i], counts[i], width=bin_edges[i+1] - bin_edges[i], color=cmap(i), edgecolor='black')
+plt.title('post signal detection', fontsize=20)
 
