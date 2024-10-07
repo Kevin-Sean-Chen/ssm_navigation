@@ -73,13 +73,22 @@ def compute_autocorrelation(data, max_lag):
     
     return np.arange(1, max_lag + 1), autocorr_values
 
-intensities, binned_int = OU_intensity(1, 1/60, 0, 1, 30, 0.5, .5)
+intensities, binned_int = OU_intensity(2, 1/60, 0, 1, 30, 0.5, .5)
+time_vec = np.arange(len(intensities))*1/60
 plt.figure()
-plt.plot(intensities)
-plt.plot(binned_int)
+plt.plot(time_vec, intensities, label='continuous')
+plt.plot(time_vec, binned_int, label='binned')
+plt.legend()
+plt.ylabel('ribbon intensity')
+plt.xlabel('time (s)')
 
-lags,acf = compute_autocorrelation(binned_int, 1000)
+# %%
+lags,acf_i = compute_autocorrelation(intensities, 1000)
+lags,acf_b = compute_autocorrelation(binned_int, 1000)
 plt.figure()
-plt.plot(lags, acf)
-
+plt.plot(lags*1/60, acf_i,  label='continuous')
+plt.plot(lags*1/60, acf_b, label='binned')
+plt.ylabel('acf')
+plt.xlabel('lag (s)')
+plt.legend()
 
