@@ -377,3 +377,152 @@ posterior_probs = compute_posterior_log(log_alpha, log_beta)
 # Plot the true hidden states and the posterior probabilities
 plot_hmm_inference(true_states[:seq_length], posterior_probs, seq_length, emissions)
 
+# %% for p-step and d-dim observation
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Generate the AR-HMM sequence with multidimensional observations
+def generate_arhmm_sequence(transition_matrix, means, covariances, weights, seq_length, dim):
+    num_states = transition_matrix.shape[0]
+    
+    states = []
+    emissions = []
+    
+    # Start from a random state
+    current_state = np.random.choice(num_states)
+    states.append(current_state)
+    
+    # Generate the first emission independently (no autoregression at t=0)
+    first_emission = np.random.multivariate_normal(means[current_state], covariances[current_state])
+    emissions.append(first_emission)
+    
+    # Generate the rest of the sequence
+    for t in range(1, seq_length):
+        # Transition to the next state
+        current_state = np.random.choice(num_states, p=transition_matrix[current_state])
+        states.append(current_state)
+        
+        # Emit values based on autoregressive model: mean + weight * past_emission + noise
+        autoregressive_term = np.dot(weights[current_state], emissions[-1])
+        emission = (means[current_state] + autoregressive_term + 
+                    np.random.multivariate_normal(np.zeros(dim), covariances[current_state]))  # Multidimensional noise
+        emissions.append(emission)
+    
+    return states, np.array(emissions)
+
+# Log-sum-exp trick for numerical stability
+def log_sum_exp(log_probs):
+    max_log_prob = np.max(log_probs)
+    return max_log_prob + np.log(np.sum(np.exp(log_probs - max_log_prob)))
+
+# Forward algorithm using log probabilities for AR-HMM with multidimensional emissions
+def forward_algorithm_log_ar(transition_matrix, initial_probs, emissions, means, weights, covariances):
+    num_states = len(initial_probs)
+    seq_length = len(emissions)
+    log_alpha = np.zeros((seq_length, num_states))
+    
+    # Initialize log alpha at time t=0
+    for j in range(num_states):
+        emission_mean = means[j]
+        emission_cov = covariances[j]
+        emission_prob = multivariate_gaussian(emissions[0], emission_mean, emission_cov)
+        log_alpha[0, j] = np.log(initial_probs[j]) + np.log(emission_prob)
+    
+    # Recursion: compute log alpha for t = 1 to seq_length-1
+    for t in range(1, seq_length):
+        for j in range(num_states):
+            # Compute the mean and covariance of the emission based on AR model
+            emission_mean = means[j] + np.dot(weights[j], emissions[t-1])
+            emission_cov = covariances[j]
+            emission_prob = multivariate_gaussian(emissions[t], emission_mean, emission_cov)
+            
+            log_alpha[t, j] = (log_sum_exp(log_alpha[t-1, :] + np.log(transition_matrix[:, j])) +
+                               np.log(emission_prob))
+    
+    return log_alpha
+
+# Backward algorithm using log probabilities for AR-HMM with multidimensional emissions
+def backward_algorithm_log_ar(transition_matrix, emissions, means, weights, covariances):
+    num_states = transition_matrix.shape[0]
+    seq_length = len(emissions)
+    log_beta = np.zeros((seq_length, num_states))
+    
+    # Initialize log beta at the last time step t = T-1
+    log_beta[seq_length - 1, :] = 0  # log(1) = 0 since the probability of the final state is 1
+    
+    # Recursion: compute log beta for t = T-2 down to 0
+    for t in range(seq_length - 2, -1, -1):
+        for i in range(num_states):
+            log_emission_probs = np.zeros(num_states)
+            for j in range(num_states):
+                emission_mean = means[j] + np.dot(weights[j], emissions[t])
+                emission_cov = covariances[j]
+                emission_prob = multivariate_gaussian(emissions[t+1], emission_mean, emission_cov)
+                log_emission_probs[j] = np.log(emission_prob)
+            
+            log_beta[t, i] = log_sum_exp(np.log(transition_matrix[i, :]) + log_emission_probs + log_beta[t+1, :])
+    
+    return log_beta
+
+# Multivariate Gaussian probability density function
+def multivariate_gaussian(x, mean, cov):
+    size = len(x)
+    det = np.linalg.det(cov)
+    norm_const = 1.0 / (np.power((2 * np.pi), float(size) / 2) * np.power(det, 1.0 / 2))
+    x_mu = x - mean
+    inv = np.linalg.inv(cov)
+    result = np.dot(x_mu.T, np.dot(inv, x_mu))
+    return norm_const * np.exp(-0.5 * result)
+
+# Plotting function for multidimensional emissions
+def plot_hmm_inference(true_states, posterior_probs, seq_length, emissions, dim):
+    time_steps = np.arange(seq_length)
+    
+    plt.figure(figsize=(12, 8))
+    
+    # Plot multidimensional emissions
+    for d in range(dim):
+        plt.subplot(dim + 2, 1, d + 1)
+        plt.plot(time_steps, emissions[:, d])
+        plt.title(f'Emission Dimension {d+1}')
+        plt.ylabel('Value')
+    
+    # Plot true hidden states
+    plt.subplot(dim + 2, 1, dim + 1)
+    plt.step(time_steps, true_states, where='mid', label="True States", color='r')
+    plt.title('True Hidden States')
+    plt.ylabel('State')
+    
+    # Plot posterior probabilities for both states
+    plt.subplot(dim + 2, 1, dim + 2)
+    plt.plot(time_steps, posterior_probs[:, 0], label="P(State=0)", color='b')
+    plt.plot(time_steps, posterior_probs[:, 1], label="P(State=1)", color='g')
+    plt.title('Posterior Probabilities of States (Log Forward-Backward AR-HMM)')
+    plt.ylabel('Probability')
+    plt.xlabel('Time')
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.show()
+
+# Example parameters
+dim = 2  # Number of dimensions in emissions
+transition_matrix = np.array([[0.8, 0.2], [0.3, 0.7]])  # State transition matrix
+means = [np.array([0, 0]), np.array([3, 3])]             # Means of emissions for states 0 and 1
+covariances = [np.eye(dim) * 0.5, np.eye(dim) * 1.0]     # Covariance matrices for states
+weights = [np.eye(dim) * 0.7, np.eye(dim) * 0.4]         # Autoregressive weights for states
+seq_length = 100                                          # Length of the sequence
+
+# Generate a sequence of states and emissions using AR-HMM
+true_states, emissions = generate_arhmm_sequence(transition_matrix, means, covariances, weights, seq_length, dim)
+
+# Initial HMM parameters
+initial_probs = np.array([0.6, 0.4])  # Initial probabilities for states
+
+# Run the Forward-Backward algorithm using log probabilities for AR-HMM
+log_alpha = forward_algorithm_log_ar(transition_matrix, initial_probs, emissions, means, weights, covariances)
+log_beta = backward_algorithm_log_ar(transition_matrix, emissions, means, weights, covariances)
+posterior_probs = compute_posterior_log(log_alpha, log_beta)
+
+# Plot the true hidden states and the posterior probabilities
+plot_hmm_inference(true_states[:seq_length], posterior_probs, seq_length, emissions, dim)
