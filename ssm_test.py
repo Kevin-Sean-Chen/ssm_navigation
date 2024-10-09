@@ -27,7 +27,7 @@ sns.set_context("talk")
 
 # %% for Kiri's data
 ### cutoff for short tracks
-threshold_track_l = 60 * 20  # look at long-enough tracks
+threshold_track_l = 60 * 20  # 20 # look at long-enough tracks
 
 # Define the folder path
 folder_path = 'C:/Users/ksc75/Downloads/ribbon_data_kc/'
@@ -40,22 +40,22 @@ for file in pkl_files:
     print(file)
 
 # %% for perturbed data
-root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/10042024/'
-target_file = "exp_matrix.pklz"
+# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'
+# target_file = "exp_matrix.pklz"
 
-# List all subfolders in the root directory
-subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
-pkl_files = []
+# # List all subfolders in the root directory
+# subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
+# pkl_files = []
 
-# Loop through each subfolder to search for the target file
-for subfolder in subfolders:
-    for dirpath, dirnames, filenames in os.walk(subfolder):
-        if target_file in filenames:
-            full_path = os.path.join(dirpath, target_file)
-            pkl_files.append(full_path)
-            print(full_path)
+# # Loop through each subfolder to search for the target file
+# for subfolder in subfolders:
+#     for dirpath, dirnames, filenames in os.walk(subfolder):
+#         if target_file in filenames:
+#             full_path = os.path.join(dirpath, target_file)
+#             pkl_files.append(full_path)
+#             print(full_path)
 
-pkl_files = pkl_files[9:]
+# pkl_files = pkl_files[:8]
 
 # %% concatenate across files in a folder
 data4fit = []  # list of tracks with its vx,vy,theta signal recorded;  conditioned on behavior and long-tracks
@@ -63,7 +63,8 @@ nf = len(pkl_files)
 masks = []   # where there is nan
 track_id = []  # record track id (file and track)
 rec_tracks = []  # record the full track x,y
-rec_signal = []
+rec_signal = []  # record opto signal
+times = []   # record time in epoch
 cond_id = 0
 
 for ff in range(nf):
@@ -89,16 +90,37 @@ for ff in range(nf):
                 temp_xy = np.column_stack((data['x'][pos] , data['y'][pos]))
                 
                 
+                ### criteria
                 mask_i = np.where(np.isnan(temp), 0, 1)
                 mask_j = np.where(np.isnan(thetas), 0, 1)
-                if np.prod(mask_i)==1 and np.prod(mask_j)==1:  ###################################### removing nan for now
+                mean_v = np.nanmean(np.sum(temp**2,1)**0.5)
+                # print(mean_v)
+                if np.prod(mask_i)==1 and np.prod(mask_j)==1 and mean_v>1:  ###################################### removing nan for now
                     data4fit.append(temp)  # get data for ssm fit
                     rec_tracks.append(temp_xy)  # get raw tracks
                     track_id.append(np.array([ff,ii]))  # get track id
                     rec_signal.append(data['signal'][pos])
                     cond_id += 1
-                masks.append(mask_i)
-                
+                    masks.append(thetas)
+                    times.append(data['t'][pos])
+                # masks.append(mask_i)
+
+# %%
+# pick_one = 7
+# plt.plot(rec_tracks[pick_one][:,0], rec_tracks[pick_one][:,1])
+vec_signal = np.concatenate(rec_signal)
+plt.plot(vec_signal)
+
+# %% study nans
+###############################################################################
+for tracki in range(10):#(len(data4fit)):
+    pos_nan = np.where(np.isnan(rec_signal[tracki]))[0][::10]
+    pos_tru = np.where(np.isnan(rec_signal[tracki])==0)[0][::10]
+    temp_xy = rec_tracks[tracki]
+    plt.plot(temp_xy[pos_nan,0], temp_xy[pos_nan,1],'.')
+    plt.plot(temp_xy[pos_tru,0], temp_xy[pos_tru,1],'k-',markersize=1.5)
+    # plt.plot(masks[tracki][pos_nan])
+
 # %%
 # %% quick ssm test
 ###############################################################################
@@ -115,6 +137,7 @@ hmm = ssm.HMM(num_states, obs_dim, observations="gaussian",  transitions="sticky
 
 hmm_lls = hmm.fit(data4fit, method="em", num_iters=N_iters, init_method="kmeans")
 
+plt.figure()
 plt.plot(hmm_lls, label="EM")
 plt.xlabel("EM Iteration")
 plt.ylabel("Log Probability")
@@ -122,12 +145,12 @@ plt.legend(loc="lower right")
 plt.show()
 
 # %% filtering!
-pick_id = 15
+pick_id = 68  # 0,7
 most_likely_states = hmm.most_likely_states(data4fit[pick_id])
 track_i = rec_tracks[pick_id]
 
-most_likely_states = most_likely_states[::6]
-track_i = track_i[::6]
+most_likely_states = most_likely_states[:] #:6
+track_i = track_i[:] #:6
 
 # Create a colormap for the two states
 colors = ['red', 'blue']  # You can choose different colors for the two states
@@ -138,7 +161,7 @@ plt.figure(figsize=(8, 6))
 
 # Loop over the unique states and plot the corresponding segments
 # for i, state in enumerate(unique_states):
-for ii in range(len(unique_states)):
+for ii in range(num_states): #(len(unique_states)):
     state_mask = np.where(most_likely_states==ii)[0]
     # Find where the trajectory is in the current state
     # state_mask = (state==most_likely_states)
@@ -208,10 +231,12 @@ for ll in range(ltr):
 # %% vectorize for simpliciy
 vec_signal = np.concatenate(rec_signal)
 vec_states = np.concatenate(post_z)
+vec_time = np.concatenate(times)
 
 # %% state occupency conditioned on signal
 threshold_within = 5
-pos = np.where(vec_signal > threshold_within)[0]  ### set stats_signal for concatenating the full signal vector
+pos = np.where(vec_signal < threshold_within)[0]  ### set stats_signal for concatenating the full signal vector
+# pos = np.union1d(pos, np.where((vec_time>45) & (vec_time<45+30))[0])
 win_stats = vec_states[pos]
 
 counts, bin_edges = np.histogram(win_stats, bins=num_states)
@@ -226,16 +251,24 @@ plt.title('during signal detection', fontsize=20)
 
 # %% condition on past! signal
 threshold_within = 5  # threhold for detection
-threshold_cont = 60*10 #3  #20  # threshold for continuos detection
+threshold_cont = 60*30  #3  #20  # threshold for continuos detection
 post_wind = 60*30  # post detection window
 
 pos = np.where(vec_signal > threshold_within)[0]  ### set stats_signal for concatenating the full signal vector
 bined_sig = vec_states*0
 bined_sig[pos] = 1
 
-conved_signal = np.convolve(bined_sig[:,0], np.ones(threshold_cont), mode='same')
-pos = np.where(conved_signal[post_wind//2:-post_wind//2] > 0.8*threshold_cont)[0]
-bin_stats = vec_states[pos+post_wind]
+###############################################################################
+### figure out how to condition!!
+# conved_signal = np.convolve(bined_sig[:,0], np.ones(int(threshold_cont)), mode='same')
+# pos = np.where(conved_signal[post_wind//2:-post_wind//2] > 0.7*threshold_cont)[0]
+# pos = np.where(conved_signal[:] > 0.7*threshold_cont)[0] + 0
+# pos = np.union1d(pos, np.where((vec_time>45+30) & (vec_time<45+30+30))[0])
+# bin_stats = vec_states[pos+post_wind]
+
+### just post
+bin_stats = vec_states[np.where((vec_time>45+30) & (vec_time<45+30+30))[0]]
+###############################################################################
 
 counts, bin_edges = np.histogram(bin_stats, bins=num_states)
 bin_edge = np.arange(num_states)
