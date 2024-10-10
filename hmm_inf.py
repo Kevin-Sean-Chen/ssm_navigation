@@ -526,3 +526,29 @@ posterior_probs = compute_posterior_log(log_alpha, log_beta)
 
 # Plot the true hidden states and the posterior probabilities
 plot_hmm_inference(true_states[:seq_length], posterior_probs, seq_length, emissions, dim)
+
+# %%
+###############################################################################
+# %%
+import ssm
+from ssm.observations import AutoRegressiveObservations
+# %%
+K = 2
+D = 2
+M = 0
+lags = 2
+
+test_hmm = ssm.HMM(K, D, M)
+test_hmm.observations = AutoRegressiveObservations(K, D, M, lags=lags)
+
+# %%
+hmm_lls = test_hmm.fit(emissions, method="em", num_iters=50, init_method="kmeans")
+
+plt.plot(hmm_lls, label="EM")
+# %%
+hmm_z = test_hmm.most_likely_states(emissions)
+
+# %%
+plt.figure()
+plt.subplot(211); plt.plot(posterior_probs)
+plt.subplot(212); plt.plot(hmm_z)
