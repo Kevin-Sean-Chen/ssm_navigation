@@ -25,7 +25,7 @@ sns.set_context("talk")
 # list with tracks vx,vy
 # future can include theta and the sensory input...
 
-# %%
+# %% for Kiri's data
 ### cutoff for short tracks
 threshold_track_l = 60 * 20  # look at long-enough tracks
 
@@ -38,6 +38,24 @@ pkl_files = glob.glob(os.path.join(folder_path, '*.pklz'))
 # Print the list of .pkl files
 for file in pkl_files:
     print(file)
+
+# %% for perturbed data
+root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/10042024/'
+target_file = "exp_matrix.pklz"
+
+# List all subfolders in the root directory
+subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
+pkl_files = []
+
+# Loop through each subfolder to search for the target file
+for subfolder in subfolders:
+    for dirpath, dirnames, filenames in os.walk(subfolder):
+        if target_file in filenames:
+            full_path = os.path.join(dirpath, target_file)
+            pkl_files.append(full_path)
+            print(full_path)
+
+pkl_files = pkl_files[9:]
 
 # %% concatenate across files in a folder
 data4fit = []  # list of tracks with its vx,vy,theta signal recorded;  conditioned on behavior and long-tracks
@@ -64,6 +82,7 @@ for ff in range(nf):
                 ### make per track data
                 # temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos] , \
                                         # data['theta_smooth'][pos] , data['signal'][pos]))
+                thetas = data['theta'][pos]
                 temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]))
                 # temp = np.stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]),1)#######
                 
@@ -71,7 +90,8 @@ for ff in range(nf):
                 
                 
                 mask_i = np.where(np.isnan(temp), 0, 1)
-                if np.prod(mask_i)==1:  ######################################removing nan for now
+                mask_j = np.where(np.isnan(thetas), 0, 1)
+                if np.prod(mask_i)==1 and np.prod(mask_j)==1:  ###################################### removing nan for now
                     data4fit.append(temp)  # get data for ssm fit
                     rec_tracks.append(temp_xy)  # get raw tracks
                     track_id.append(np.array([ff,ii]))  # get track id
@@ -82,19 +102,18 @@ for ff in range(nf):
 # %%
 # %% quick ssm test
 ###############################################################################
-
 # %% setup
 num_states = 5
 obs_dim = 2
 
 # %%
-data = data4fit*1 # Treat observations generated above as synthetic data.
+# data = data4fit*1 # Treat observations generated above as synthetic data.
 N_iters = 100
 
 ## testing the constrained transitions class
 hmm = ssm.HMM(num_states, obs_dim, observations="gaussian",  transitions="sticky")
 
-hmm_lls = hmm.fit(data, method="em", num_iters=N_iters, init_method="kmeans")
+hmm_lls = hmm.fit(data4fit, method="em", num_iters=N_iters, init_method="kmeans")
 
 plt.plot(hmm_lls, label="EM")
 plt.xlabel("EM Iteration")
@@ -103,7 +122,7 @@ plt.legend(loc="lower right")
 plt.show()
 
 # %% filtering!
-pick_id = 0
+pick_id = 15
 most_likely_states = hmm.most_likely_states(data4fit[pick_id])
 track_i = rec_tracks[pick_id]
 
@@ -192,7 +211,7 @@ vec_states = np.concatenate(post_z)
 
 # %% state occupency conditioned on signal
 threshold_within = 5
-pos = np.where(vec_signal < threshold_within)[0]  ### set stats_signal for concatenating the full signal vector
+pos = np.where(vec_signal > threshold_within)[0]  ### set stats_signal for concatenating the full signal vector
 win_stats = vec_states[pos]
 
 counts, bin_edges = np.histogram(win_stats, bins=num_states)
@@ -202,19 +221,20 @@ plt.figure(figsize=(8, 6))
 
 for i in range(len(counts)):
     plt.bar(bin_edge[i], counts[i], width=bin_edges[i+1] - bin_edges[i], color=cmap(i), edgecolor='black')
-plt.title('without signal detection', fontsize=20)
+# plt.title('without signal detection', fontsize=20)
+plt.title('during signal detection', fontsize=20)
 
 # %% condition on past! signal
 threshold_within = 5  # threhold for detection
-threshold_cont = 60*15  # threshold for continuos detection
-post_wind = 60*20  # post detection window
+threshold_cont = 60*10 #3  #20  # threshold for continuos detection
+post_wind = 60*30  # post detection window
 
 pos = np.where(vec_signal > threshold_within)[0]  ### set stats_signal for concatenating the full signal vector
 bined_sig = vec_states*0
 bined_sig[pos] = 1
 
 conved_signal = np.convolve(bined_sig[:,0], np.ones(threshold_cont), mode='same')
-pos = np.where(conved_signal[:-post_wind] > 0.8*threshold_cont)[0]
+pos = np.where(conved_signal[post_wind//2:-post_wind//2] > 0.8*threshold_cont)[0]
 bin_stats = vec_states[pos+post_wind]
 
 counts, bin_edges = np.histogram(bin_stats, bins=num_states)
@@ -226,3 +246,53 @@ for i in range(len(counts)):
     plt.bar(bin_edge[i], counts[i], width=bin_edges[i+1] - bin_edges[i], color=cmap(i), edgecolor='black')
 plt.title('post signal detection', fontsize=20)
 
+# %% analyzing states
+###############################################################################
+from matplotlib.patches import Ellipse
+
+def plot_gaussian_ellipse(mean, cov, ax=None, n_std=2.0, **kwargs):
+    """
+    Plots a 2D Gaussian as an ellipse.
+
+    Parameters:
+    - mean: The 2D mean of the distribution [x, y].
+    - cov: 2x2 covariance matrix.
+    - ax: Matplotlib axis object. If None, a new figure and axis are created.
+    - n_std: Number of standard deviations to plot the ellipse at (default is 2).
+    - kwargs: Additional arguments passed to the Ellipse patch.
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    # Compute the eigenvalues and eigenvectors of the covariance matrix
+    eigvals, eigvecs = np.linalg.eigh(cov)
+
+    # Calculate the angle of the ellipse's orientation
+    angle = np.degrees(np.arctan2(*eigvecs[:, 0][::-1]))
+
+    # Width and height of the ellipse are 2*sqrt(eigenvalues) scaled by the number of standard deviations
+    width, height = 2 * n_std * np.sqrt(eigvals)
+
+    # Create an Ellipse patch
+    ell = Ellipse(xy=mean, width=width, height=height, angle=angle, **kwargs)
+
+    # Add the ellipse to the plot
+    ax.add_patch(ell)
+    ax.set_aspect('equal')
+
+    return ell
+
+fig, ax = plt.subplots()
+means_state, cov_states = hmm.observations.params
+for nn in range(num_states):
+    mean = means_state[nn,:]
+    cov = cov_states[nn,:]
+
+    temp = cmap(nn)
+    plot_gaussian_ellipse(mean, cov, ax=ax, n_std=2, edgecolor=temp, facecolor='none')
+    
+    # Plot the center point
+    plt.scatter(*mean, color=temp, label="Mean")
+plt.xlabel(r'$V_x$')
+plt.ylabel(r'$V_y$')
+plt.title('Gaussian emissions')

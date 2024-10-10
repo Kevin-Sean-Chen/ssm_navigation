@@ -13,6 +13,22 @@ import matplotlib.pyplot as plt
 import glob
 import os
 
+# %% test load dropbox
+root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/10042024/'
+target_file = "exp_matrix.pklz"
+
+# List all subfolders in the root directory
+subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
+pkl_files = []
+
+# Loop through each subfolder to search for the target file
+for subfolder in subfolders:
+    for dirpath, dirnames, filenames in os.walk(subfolder):
+        if target_file in filenames:
+            full_path = os.path.join(dirpath, target_file)
+            pkl_files.append(full_path)
+            print(full_path)
+
 # %% analysis conditions
 ### cutoff for short tracks
 threshold_track_l = 60 * 20  # look at long-enough tracks
@@ -84,7 +100,7 @@ stats = []
 stats_signal = []
 nf = len(pkl_files)
 
-for ff in range(nf):
+for ff in range(9,16):#(8):#(nf):
     ### load file
     with gzip.open(pkl_files[ff], 'rb') as f:
         data = pickle.load(f)
@@ -100,7 +116,7 @@ for ff in range(nf):
                 ### raw traces
                 stats_signal.append( data['signal'][pos] )   # raw signal
                 # stats.append( data['signal'][pos] )
-                # stats.append( data['vx_smooth'][pos] )  # smoothed speed
+                stats.append( data['vx_smooth'][pos] )  # smoothed speed
                 # stats.append(np.array([len(pos)]))  # checking the track lengths
                 # stats.append(data['theta_smooth'][pos] - 180)  # theta angle to wind
                 
@@ -113,7 +129,7 @@ for ff in range(nf):
                 ### compute angles
                 vec_xy = np.diff(np.vstack((data['x_smooth'][pos],data['y_smooth'][pos])),0)
                 ang_ = ang_t(vec_xy)
-                stats.append(ang_)
+                # stats.append(ang_)
 stats = np.concatenate(stats)
 stats_signal = np.concatenate(stats_signal)
 
