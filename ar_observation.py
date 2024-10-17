@@ -188,9 +188,15 @@ class AR_Observations(Observations):
         D = number of observed dimensions
         M = exogenous input dimensions
         L = delay
+        
+        E[x_t | x_{t-1}, z_t=k, u_t]
+        = \sum_{l=1}^{L} A_k^{(l)} x_{t-l} + b_k + V_k u_t.
+        
         """
-        super(InputVonMisesObservations, self).__init__(K, D, M)
-        self.mus = npr.randn(K, D, M)  #this is a kernel acting on input for vonMises mean
+        super(AR_Observations, self).__init__(K, D, M, L)
+        self.As = npr.randn(K, D, L)  # per state, map delay L to D dim signal
+        # self.Bs = npr.randn(K, D, M, L)  # per state, map input to output, with delay L
+        self.bs = npr.randn(K, D)  # per state, D dim baseline
         self.log_kappas = np.log(-1*npr.uniform(low=-1, high=0, size=(K, D)))
 
     @property
