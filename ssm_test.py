@@ -94,8 +94,9 @@ for ff in range(nf):
                 mask_i = np.where(np.isnan(temp), 0, 1)
                 mask_j = np.where(np.isnan(thetas), 0, 1)
                 mean_v = np.nanmean(np.sum(temp**2,1)**0.5)
+                max_v = np.max(np.sum(temp**2,1)**0.5)
                 # print(mean_v)
-                if np.prod(mask_i)==1 and np.prod(mask_j)==1 and mean_v>1:  ###################################### removing nan for now
+                if np.prod(mask_i)==1 and np.prod(mask_j)==1 and mean_v>1 and max_v<30:  ###################################### removing nan for now
                     data4fit.append(temp)  # get data for ssm fit
                     rec_tracks.append(temp_xy)  # get raw tracks
                     track_id.append(np.array([ff,ii]))  # get track id
@@ -145,7 +146,7 @@ plt.legend(loc="lower right")
 plt.show()
 
 # %% filtering!
-pick_id = 68  # 0,7
+pick_id = 54  # 0,7
 most_likely_states = hmm.most_likely_states(data4fit[pick_id])
 track_i = rec_tracks[pick_id]
 
@@ -232,10 +233,11 @@ for ll in range(ltr):
 vec_signal = np.concatenate(rec_signal)
 vec_states = np.concatenate(post_z)
 vec_time = np.concatenate(times)
+vec_vxy = np.concatenate(data4fit)
 
 # %% state occupency conditioned on signal
 threshold_within = 5
-pos = np.where(vec_signal < threshold_within)[0]  ### set stats_signal for concatenating the full signal vector
+pos = np.where(vec_signal > threshold_within)[0]  ### set stats_signal for concatenating the full signal vector
 # pos = np.union1d(pos, np.where((vec_time>45) & (vec_time<45+30))[0])
 win_stats = vec_states[pos]
 
@@ -329,3 +331,70 @@ for nn in range(num_states):
 plt.xlabel(r'$V_x$')
 plt.ylabel(r'$V_y$')
 plt.title('Gaussian emissions')
+
+# %% kernel densities
+from scipy.stats import gaussian_kde
+
+pos_state = np.where((vec_states!=2) & (vec_states!=1))[0]
+pos_remove = np.where((np.abs(vec_vxy[:,0])>30) | (np.abs(vec_vxy[:,1])>30))[0]
+pos =  np.setdiff1d(pos_state, pos_remove) #np.union1d(pos_state, ~pos_remove)
+vec_move = vec_vxy[pos,:][::10]
+
+# Generate random 2D data
+x = vec_move[:,0]
+y = vec_move[:,1]
+
+# Perform Kernel Density Estimation (KDE)
+data = np.vstack([x, y])  # Stack x and y into a 2D array
+kde = gaussian_kde(data)
+
+# Create a grid of points for plotting
+xmin, xmax = x.min() - 1, x.max() + 1
+ymin, ymax = y.min() - 1, y.max() + 1
+x_grid, y_grid = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]  # Create grid points
+grid_coords = np.vstack([x_grid.ravel(), y_grid.ravel()])  # Flatten the grid for evaluation
+
+# Evaluate the KDE on the grid
+z = kde(grid_coords).reshape(x_grid.shape)
+
+plt.figure()
+# Plot scatter points
+plt.scatter(x, y, s=5, color='blue', label='Data points')
+
+# Plot KDE density as a contour plot
+plt.contourf(x_grid, y_grid, z, levels=20, cmap='Blues')
+
+# Show the plot
+plt.colorbar(label='Density')
+plt.xlabel('Vx')
+plt.ylabel('Vy')
+plt.title('KDE, without stopping')
+
+# %% conditional
+plt.figure()
+for ii in range(num_states):
+    pos = np.where(vec_states==ii)[0]
+    temp_xy = vec_vxy[pos,:][::12]
+    plt.plot(temp_xy[:,0], temp_xy[:,1], '.', color=cmap(ii), alpha=.1)
+    
+# %%
+def plot_kde(x, y, label=None, cmap=None):
+    # Perform Kernel Density Estimation (KDE)
+    data = np.vstack([x, y])
+    kde = gaussian_kde(data)
+    # Create a grid for plotting
+    xmin, xmax = x.min() - 1, x.max() + 1
+    ymin, ymax = y.min() - 1, y.max() + 1
+    x_grid, y_grid = np.mgrid[xmin:xmax:100j, ymin:ymax:100j]
+    grid_coords = np.vstack([x_grid.ravel(), y_grid.ravel()])
+    # Evaluate the KDE on the grid
+    z = kde(grid_coords).reshape(x_grid.shape)
+    # Plot KDE density as a contour plot
+    plt.contourf(x_grid, y_grid, z, levels=20, cmap=cmap, alpha=0.5)
+
+color_kdes = ['Blues', 'Oranges', 'Greens','Reds','Purples']
+plt.figure()
+for nn in range(num_states):
+    pos = np.where(vec_states==nn)[0]
+    plot_kde(vec_vxy[pos,0][::12], vec_vxy[pos,1][::12], cmap=color_kdes[nn])
+plt.title('data | states')
