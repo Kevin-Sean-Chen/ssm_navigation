@@ -39,22 +39,22 @@ for file in pkl_files:
     print(file)
 
 # %% for perturbed data
-# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'
-# target_file = "exp_matrix.pklz"
+root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'
+target_file = "exp_matrix.pklz"
 
-# # List all subfolders in the root directory
-# subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
-# pkl_files = []
+# List all subfolders in the root directory
+subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
+pkl_files = []
 
-# # Loop through each subfolder to search for the target file
-# for subfolder in subfolders:
-#     for dirpath, dirnames, filenames in os.walk(subfolder):
-#         if target_file in filenames:
-#             full_path = os.path.join(dirpath, target_file)
-#             pkl_files.append(full_path)
-#             print(full_path)
+# Loop through each subfolder to search for the target file
+for subfolder in subfolders:
+    for dirpath, dirnames, filenames in os.walk(subfolder):
+        if target_file in filenames:
+            full_path = os.path.join(dirpath, target_file)
+            pkl_files.append(full_path)
+            print(full_path)
 
-# pkl_files = pkl_files[8:]
+# pkl_files = pkl_files[:8]
 
 # %% concatenate across files in a folder
 data4fit = []  # list of tracks with its vx,vy,theta signal recorded;  conditioned on behavior and long-tracks
@@ -173,7 +173,8 @@ features = 10  # Number of features
 data, labels = feature_vxy, labels
 
 # Step 2: Apply UMAP to reduce dimensionality to 2D
-reducer = umap.UMAP(n_components=3, random_state=42)
+n_dim = 10
+reducer = umap.UMAP(n_components=n_dim, random_state=42) #42
 data_2d = reducer.fit_transform(data)
 
 # Step 3: Plot the 2D data and color-code according to the labels
@@ -273,7 +274,7 @@ plt.figure()
 plt.plot(prev_odor, proj_value,'b.')
 plt.xlabel('experienced odor')
 plt.ylabel('proejction')
-plt.ylim([-6,6])
+# plt.ylim([-6,6])
 
 # %% projections conditioned on past odor!
 def last_argmin(arr):
@@ -301,7 +302,22 @@ plt.figure()
 plt.plot(prev_odor_off, proj_val_off, 'r.')
 plt.xlabel('experienced odor before off')
 plt.ylabel('proejction of off response')
-plt.ylim([-6,6])
+# plt.ylim([-6,6])
+
+# %% relaxation upon odor-off
+proj_val_offt = []
+time_since_off = []
+for tt in range(feat_time.shape[0]):
+    timei = feat_time[tt,0]
+    if (timei >= 1) & (timei<45+30+90):
+        projtt = np.dot(data_2d[tt,:]-center, lda_direction.T)
+        time_since_off.append(timei - (45+30))
+        proj_val_offt.append(projtt)
+        
+plt.figure()
+plt.plot(time_since_off, proj_val_offt, 'k.',alpha=.5)
+plt.axvline(x=-30, color='r', linestyle='--'); plt.axvline(x=0, color='r', linestyle='--')
+plt.xlabel('since odor off (s)'); plt.ylabel('projected action')
 
 # %% by fine time points...
 # # data4fit = []  # list of tracks with its vx,vy,theta signal recorded;  conditioned on behavior and long-tracks
