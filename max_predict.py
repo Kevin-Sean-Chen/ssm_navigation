@@ -295,14 +295,39 @@ def sorted_spectrum(R,k=5,which='LR'):
     sorted_indices = np.argsort(eigvals.real)[::-1]
     return eigvals[sorted_indices],eigvecs[:,sorted_indices]
 
+# %% scan tau
+N = 1000  # number of states
+K = 3*60  # delay window
+X_traj, track_id = build_X(data4fit, return_id=True, K=K)
+X_traj, track_id = build_X(data4fit, return_id=True, K=K)
+labels, centrals = kmeans_knn_partition(X_traj, N, return_centers=True)
+
+taus = np.array([1,5,10,30,30,60,120,180])
+specs_tau = np.zeros((len(taus), N-1))
+for tt in range(len(taus)):
+    taui = taus[tt]
+    P = compute_transition_matrix(labels[::taui], track_id[::taui], N)
+    uu,vv = np.linalg.eig(P)
+    idx = uu.argsort()[::-1]  # Get indices to sort eigenvalues
+    sorted_eigenvalues = uu[idx]
+    specs_tau[tt,:] = (-1/60*taui)/np.log(sorted_eigenvalues[1:])
+    print(tt)
+
+# %% 
+plt.figure()
+plt.plot(taus/60, specs_tau[:,:5],'-o')
+# plt.xscale('log')
+plt.xlabel(r'step $\tau$ (s)'); plt.ylabel('relaxation time (s)')
+
 # %% fix param now
 N = 1000  # number of states
 K = 3*60  # delay window
-tau = 3   # transition steps
-X_traj = build_X(data4fit, K)[::tau, :]
+tau = 10   # transition steps
+X_traj, track_id = build_X(data4fit, return_id=True, K=K)
+X_traj, track_id = X_traj[::tau, :], track_id[::tau]
 labels, centrals = kmeans_knn_partition(X_traj, N, return_centers=True)
 # labels = labels[::tau]
-P = compute_transition_matrix(labels, N)
+P = compute_transition_matrix(labels, track_id, N)
 
 # %%
 R = get_reversible_transition_matrix(P)
@@ -332,22 +357,28 @@ sc = ax.scatter(data_2d[:,0], data_2d[:,1],data_2d[:,2], c=phi2[sub_samp], cmap=
 plt.colorbar(sc)
 
 # %% spectral analysis
-# P_shuff = compute_transition_matrix(np.random.permutation(labels), N)
-uu,vv = np.linalg.eig(P)  #P_shuff
+P_shuff = compute_transition_matrix(np.random.permutation(labels),track_id, N)
+uu,vv = np.linalg.eig(P_shuff)  #P_shuff
+uu,vv = np.linalg.eig(P)
 idx = uu.argsort()[::-1]  # Get indices to sort eigenvalues
-sorted_eigenvalues = uu[idx]
-plt.plot((-1/60*tau)/np.log(sorted_eigenvalues[1:30]),'-o')
+sorted_eigenvalues = np.real(uu[idx])
+plt.plot((-1/60*tau)/np.log(sorted_eigenvalues[1:1000]),'-o')
 plt.ylabel('relaxation time (s)')
 plt.xlabel('eigenvalue index')
+plt.yscale('log')
+plt.ylim([0.001, 20])
 
 # %% color code tracks]
 imode = 2
+tau = 10
 phi2 = eigvecs[labels,imode].real
-window_show = np.arange(50000,70000)
-X_xy = build_X(rec_tracks, K)[::tau, :]
+window_show = np.arange(10000,17000)
+# X_xy = build_X(rec_tracks, K)[::tau, :]
+X_xy, track_id = build_X(rec_tracks, return_id=True, K=K)
+X_xy, track_id = X_xy[::tau, :], track_id[::tau]
 xy_back = X_xy[:, [0,K]]
 plt.figure()
-plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.1,vmin=-color_abs,vmax=color_abs)
+plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
 plt.title(f'mode#{imode}')
 
 # %% test metastable state
@@ -406,9 +437,11 @@ def indices_in_s(S, X):
     mask = np.isin(X, S)
     return np.where(mask)[0]
 
-window_show = np.arange(0,20000)  # choose window
+window_show = np.arange(0,10000)  # choose window
 meta_pos = indices_in_s(np.where(kmeans_labels==1)[0], labels[window_show])
-X_xy = build_X(rec_tracks, K)[::tau, :]
+# X_xy = build_X(rec_tracks, K)[::tau, :]
+X_xy, track_id = build_X(rec_tracks, return_id=True, K=K)
+X_xy, track_id = X_xy[::tau, :], track_id[::tau]
 xy_back = X_xy[:, [0,K]]
 plt.figure()
 plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],color='k',s=.1,vmin=-color_abs,vmax=color_abs)
@@ -494,7 +527,7 @@ def compute_autocorrelation(data, max_lag):
 samp_xy, samp_vxy = gen_tracks_given_substates(np.arange(N), 70000, return_v=True)
 
 ###
-xy_id = 0
+xy_id = 1
 lags, acf_data = compute_autocorrelation(vec_vxy[::tau, xy_id], 1000)
 lags, acf_mark = compute_autocorrelation(samp_vxy[:, xy_id], 1000)
 plt.figure()
