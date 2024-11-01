@@ -118,19 +118,22 @@ vec_ids = np.concatenate(track_id)
 
 # %% build features with delayed time series
 window = int(60*2.)
-# def build_X(data, K=window):
-#     features = []
-#     T = len(data)
-#     samp_vec = data[:-np.mod(T,K),:]
-#     X = np.zeros((T-K, K))
-#     for tt in range(len(samp_vec)-K):
-#         vx = samp_vec[tt:tt+K, 0]
-#         vy = samp_vec[tt:tt+K, 1]
-#         vx_windowed = vx.reshape(-1, K)
-#         vy_windowed = vy.reshape(-1, K)
-#         features.append(np.hstack((vx_windowed, vy_windowed)))
-#     return np.concatenate(features)
-# X = build_X(vec_vxy)
+def build_signal(data, K=window):
+    K = int(K)
+    features = []
+    ids = []
+    n_tracks = len(data)
+    for tr in range(n_tracks):
+        datai = data[tr]
+        T = len(datai)
+        samp_vec = datai[:-np.mod(T,K)-1]
+        X = np.zeros((T-K, K))
+        for tt in range(len(samp_vec)-K):
+            vs = samp_vec[tt:tt+K]
+            vs_windowed = vs.reshape(-1, K)
+            features.append(vs_windowed)   ### might have problems here across tracks!!!
+            ids.append(tr)
+    return np.concatenate(features)
 
 def build_X(data, return_id=False, K=window):
     K = int(K)
@@ -246,36 +249,36 @@ h_est = trans_entropy(Pij)
 # %%
 ###############################################################################
 # %% scanning
-tau = 3
-Ks = np.array([.5, 1, 2, 4, 6, 8])*(60/tau)
-Ns = np.array([10, 100, 250, 500, 1000, 2000, 3000])
-nats = np.zeros((len(Ks), len(Ns)))
+# tau = 3
+# Ks = np.array([.5, 1, 2, 4, 6, 8])*(60/tau)
+# Ns = np.array([10, 100, 250, 500, 1000, 2000, 3000])
+# nats = np.zeros((len(Ks), len(Ns)))
 
-for kk in range(len(Ks)):
-    for nn in range(len(Ns)):
-        ### build delay embedding
-        Xi,idsi = build_X(data4fit, return_id=True, K=Ks[kk])
-        Xi,idsi = Xi[::tau, :], idsi[::tau]
-        ### cluster
-        time_series = kmeans_knn_partition(Xi, Ns[nn])  ### mask the transition ones too!
-        ### build matrix
-        Pij = compute_transition_matrix(time_series, idsi, Ns[nn])
-        ### compute entropy
-        nati = trans_entropy(Pij)
+# for kk in range(len(Ks)):
+#     for nn in range(len(Ns)):
+#         ### build delay embedding
+#         Xi,idsi = build_X(data4fit, return_id=True, K=Ks[kk])
+#         Xi,idsi = Xi[::tau, :], idsi[::tau]
+#         ### cluster
+#         time_series = kmeans_knn_partition(Xi, Ns[nn])  ### mask the transition ones too!
+#         ### build matrix
+#         Pij = compute_transition_matrix(time_series, idsi, Ns[nn])
+#         ### compute entropy
+#         nati = trans_entropy(Pij)
         
-        nats[kk,nn] = nati / (tau/60)  ### nats per second for transitions
-        print(kk,nn)
+#         nats[kk,nn] = nati / (tau/60)  ### nats per second for transitions
+#         print(kk,nn)
 
-# %%
-plt.figure()
-colors_K = plt.cm.viridis(np.linspace(0,1,len(Ks)))
-for k,K in enumerate(Ks):
-    temp = K/60*3
-    plt.plot(Ns, nats[k]/1,c=colors_K[k],marker='o',label=f'K={temp} s')
-# plt.plot(Ns, nats.T)
-plt.xlabel('N')
-plt.ylabel('nats/s')
-plt.legend()
+# # %%
+# plt.figure()
+# colors_K = plt.cm.viridis(np.linspace(0,1,len(Ks)))
+# for k,K in enumerate(Ks):
+#     temp = K/60*3
+#     plt.plot(Ns, nats[k]/1,c=colors_K[k],marker='o',label=f'K={temp} s')
+# # plt.plot(Ns, nats.T)
+# plt.xlabel('N')
+# plt.ylabel('nats/s')
+# plt.legend()
 
 ###############################################################################
 # %% check representation
@@ -320,7 +323,7 @@ plt.plot(taus/60, specs_tau[:,:5],'-o')
 plt.xlabel(r'step $\tau$ (s)'); plt.ylabel('relaxation time (s)')
 
 # %% fix param now
-N = 1000  # number of states
+N = 500  # number of states
 K = 3*60  # delay window
 tau = 10   # transition steps
 X_traj, track_id = build_X(data4fit, return_id=True, K=K)
@@ -332,7 +335,7 @@ P = compute_transition_matrix(labels, track_id, N)
 # %%
 R = get_reversible_transition_matrix(P)
 eigvals,eigvecs = sorted_spectrum(R,k=7)  # choose the top k modes
-phi2=eigvecs[labels,1].real
+phi2=eigvecs[labels,2].real
 u,s,v = np.linalg.svd(X_traj,full_matrices=False)
 
 plt.figure(figsize=(10,7))
@@ -362,6 +365,7 @@ uu,vv = np.linalg.eig(P_shuff)  #P_shuff
 uu,vv = np.linalg.eig(P)
 idx = uu.argsort()[::-1]  # Get indices to sort eigenvalues
 sorted_eigenvalues = np.real(uu[idx])
+plt.figure()
 plt.plot((-1/60*tau)/np.log(sorted_eigenvalues[1:1000]),'-o')
 plt.ylabel('relaxation time (s)')
 plt.xlabel('eigenvalue index')
@@ -380,6 +384,76 @@ xy_back = X_xy[:, [0,K]]
 plt.figure()
 plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
 plt.title(f'mode#{imode}')
+
+# %% analyze in the task!
+X_time = build_signal(times, K)[::tau]
+X_odor = build_signal(rec_signal, K)[::tau]
+# subsamp = np.arange(0,X_time.shape[0],60)
+proj_val_offt = []
+time_since_off = []
+back2track_id = []
+for tt in range(X_time.shape[0]):
+    timei = X_time[tt,0]
+    signali = X_odor[tt,:]
+    if (timei >= 1) & (timei<45+30+90): # & (np.sum(signali)>0):
+        time_since_off.append(timei - (45+30))
+        proj_val_offt.append(phi2[tt])
+        back2track_id.append(tt)
+        
+plt.figure()
+plt.plot(time_since_off, proj_val_offt, 'k.',alpha=.09)
+plt.axvline(x=-30, color='r', linestyle='--'); plt.axvline(x=0, color='r', linestyle='--')
+plt.xlabel('since odor off (s)'); plt.ylabel(r'$\phi$')
+
+# %% sample from most-likely phi states to reconstruct tracks
+n_bins = 100
+hist, bin_edges = np.histogram(time_since_off, bins=n_bins)
+bin_indices = np.digitize(time_since_off, bins=bin_edges) - 1  # "-1" to match 0-based indexing
+elements_in_bins = [np.where(bin_indices == i)[0] for i in range(n_bins)]
+
+proj_val_offt = np.array(proj_val_offt)
+v_samps = []
+construct_vxy = []
+timing = []
+for nn in range(int(len(elements_in_bins)*1/1)):  #3/4
+    bini = elements_in_bins[nn]
+    this_bin = np.random.choice(bini,1)[0]
+    v_samps.append(proj_val_offt[this_bin])
+    idi = back2track_id[this_bin]
+    
+    ### find median
+    # median_value = np.mean(proj_val_offt[bini])
+    # idi = np.abs(proj_val_offt[bini] - median_value).argmin()
+    # print(idi)
+    
+    vxy = X_traj[idi,:]
+    construct_vxy.append(np.vstack((vxy[:K], vxy[K:])).T*1/60)
+    if (bin_edges[nn]>-30) & (bin_edges[nn]<0):
+        timing.append(np.ones(K))
+    elif bin_edges[nn]>0:
+        timing.append(np.ones(K)+1)
+    else:
+        timing.append(np.ones(K)*0)
+        
+construct_vxy = np.concatenate(construct_vxy)
+construct_xy = np.cumsum(construct_vxy, axis=0)
+timing = np.concatenate(timing)
+    
+plt.figure()
+plt.plot(v_samps)
+plt.figure()
+plt.plot(construct_xy[:,0], construct_xy[:,1],'k')
+on_window = np.where(timing==1)[0]
+plt.plot(construct_xy[on_window,0], construct_xy[on_window,1],'b')
+off_window = np.where(timing==2)[0]
+plt.plot(construct_xy[off_window,0], construct_xy[off_window,1],'r')
+
+plt.figure()
+plt.plot(construct_vxy[:,0], construct_vxy[:,1],'k.')
+plt.plot(construct_vxy[on_window,0], construct_vxy[on_window,1],'b.',alpha=.2)
+plt.plot(construct_vxy[off_window,0], construct_vxy[off_window,1],'r.',alpha=.1)
+plt.xlabel(r'$v_x$'); plt.ylabel(r'$v_y$')
+
 
 # %% test metastable state
 from scipy.signal import find_peaks
@@ -415,7 +489,7 @@ def optimal_partition(phi2,inv_measure,P,return_rho = True):
             return kmeans_labels
 
 # %%
-imode = 3
+imode = 1
 inv_measure = get_steady_state(P)
 phi2_vec = eigvecs[:, imode].real
 c_range,rho_sets,idx,kmeans_labels = optimal_partition(phi2_vec, inv_measure[:,None], P)
@@ -460,7 +534,7 @@ def sub_transition_matrix(P, S):
 
 ### symbolic sequence
 import random
-def sample_markov_chain(P, n_steps):
+def sample_markov_chain(P, n_steps, init=None):
     """
     Sample a sequence from a Markov transition matrix, starting from a random initial state.
 
@@ -473,7 +547,10 @@ def sample_markov_chain(P, n_steps):
     """
     n_states = P.shape[0]  # Number of states
     states = np.zeros(n_steps, dtype=int)  # To store the sequence of states
-    states[0] = np.random.choice(n_states) # Randomly choose the initial state
+    if init is None:
+        states[0] = np.random.choice(n_states) # Randomly choose the initial state
+    else:
+        states[0] = init
     # Sample the next state based on the current state and transition matrix
     for t in range(1, n_steps):
         current_state = states[t - 1]
@@ -481,10 +558,10 @@ def sample_markov_chain(P, n_steps):
         states[t] = next_state
     return states
 
-def gen_tracks_given_substates(subid, n_steps, return_v=False):
+def gen_tracks_given_substates(subid, n_steps, return_v=False, init=False):
     ### get submtrix and symbolic sequence
     subP = sub_transition_matrix(P, subid)
-    sub_state = sample_markov_chain(subP, n_steps)
+    sub_state = sample_markov_chain(subP, n_steps, init)
     ### back to veclicity, then construct tracks!
     sub_centrals = centrals[subid,:]
     subsample_vxy = []
@@ -543,3 +620,45 @@ count_simu,_ = np.histogram(samp_vxy[:, xy_id] /(tau/60), bins)
 plt.plot(bins[:-1], count_data/count_data.sum(), label='data')
 plt.plot(bins[:-1], count_simu/count_simu.sum(), label='delayed Markov')
 plt.xlabel(r'$v_x$'); plt.ylabel('count'); plt.legend(); plt.yscale('log')
+
+# %% compute mixing
+Ts = np.array([1,5,10,20,40,80,160])#, 320])
+# Ts = np.array([1, 2,4,8,16,32,64,128])
+init_state = np.argmin(phi2_vec)
+reps = 50
+errt = np.zeros((len(Ts), reps))
+for rr in range(reps):
+    print(rr)
+    for tau in range(len(Ts)):
+        samp_xy1, samp_v1 = gen_tracks_given_substates(np.arange(N), Ts[tau], return_v=True, init=init_state)
+        samp_xy2, samp_v2 = gen_tracks_given_substates(np.arange(N), Ts[tau], return_v=True, init=init_state)
+        # erri = (np.sum((samp_v1[-1,:] - samp_v2[-1,:])**2))**0.5   # v diference
+        # erri = (np.sum((samp_xy1[-1,:] - samp_xy2[-1,:])**2))**0.5  # x difference
+        erri = (np.sum((samp_xy1[-1,:] - np.array([0,0]))**2))**0.5  # displacement
+        errt[tau,rr] = erri
+
+# %%
+plt.figure()
+plt.plot(Ts*(tau/60), errt,'ko');
+plt.errorbar(Ts*(tau/60), np.mean(errt,1), np.std(errt,1), fmt='-o')
+plt.xlabel('time lag (s)')
+# plt.ylabel('velocity difference')
+plt.ylabel('displacement (mm)')
+# plt.xscale('log')
+
+# %% check stop to speed-up time
+vec_speed = np.sum(vec_vxy**2,1)**.5
+threshold = 5
+stop_or_not = vec_speed*0
+stop_or_not[vec_speed>threshold] = 1
+stop2run = np.diff(stop_or_not)
+stops = np.where(stop2run==-1)[0]
+runs = np.where(stop2run==1)[0]
+min_length = min(len(stops), len(runs))
+vec1_trimmed = stops[:min_length]
+vec2_trimmed = runs[:min_length]
+dur = -(vec1_trimmed - vec2_trimmed)
+plt.figure()
+plt.hist(np.abs(dur)*1/60, 500)
+plt.xlim([0,5])
+plt.xlabel('stop time (s)')

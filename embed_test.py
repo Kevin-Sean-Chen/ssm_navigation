@@ -132,6 +132,7 @@ def build_features(data, window=window):
 
 feature_vxy = build_features(vec_vxy)
 feature_pos = build_features(vec_xy)
+action_id = np.zeros(feature_vxy.shape[0])  # keep track of the index for action
 
 # %% test clustering
 ###############################################################################
@@ -307,17 +308,63 @@ plt.ylabel('proejction of off response')
 # %% relaxation upon odor-off
 proj_val_offt = []
 time_since_off = []
+back2track_id = []
 for tt in range(feat_time.shape[0]):
     timei = feat_time[tt,0]
     if (timei >= 1) & (timei<45+30+90):
         projtt = np.dot(data_2d[tt,:]-center, lda_direction.T)
         time_since_off.append(timei - (45+30))
         proj_val_offt.append(projtt)
+        back2track_id.append(tt)
         
 plt.figure()
 plt.plot(time_since_off, proj_val_offt, 'k.',alpha=.5)
 plt.axvline(x=-30, color='r', linestyle='--'); plt.axvline(x=0, color='r', linestyle='--')
 plt.xlabel('since odor off (s)'); plt.ylabel('projected action')
+
+
+# %% sample in time for typical tracks
+n_bins = 150
+hist, bin_edges = np.histogram(time_since_off, bins=n_bins)
+bin_indices = np.digitize(time_since_off, bins=bin_edges) - 1  # "-1" to match 0-based indexing
+elements_in_bins = [np.where(bin_indices == i)[0] for i in range(n_bins)]
+
+v_samps = []
+construct_vxy = []
+timing = []
+for nn in range(int(len(elements_in_bins)*1/1)):  #3/4
+    bini = elements_in_bins[nn]
+    this_bin = np.random.choice(bini,1)[0]
+    v_samps.append(proj_val_offt[this_bin])
+    idi = back2track_id[this_bin]
+    
+    vxy = feature_vxy[idi,:]
+    construct_vxy.append(np.vstack((vxy[:window], vxy[window:])).T/60)
+    if (bin_edges[nn]>-30) & (bin_edges[nn]<0):
+        timing.append(np.ones(window))
+    elif bin_edges[nn]>0:
+        timing.append(np.ones(window)+1)
+    else:
+        timing.append(np.ones(window)*0)
+        
+construct_vxy = np.concatenate(construct_vxy)
+construct_xy = np.cumsum(construct_vxy, axis=0)
+timing = np.concatenate(timing)
+    
+plt.figure()
+plt.plot(v_samps)
+plt.figure()
+plt.plot(construct_xy[:,0], construct_xy[:,1],'k')
+on_window = np.where(timing==1)[0]
+plt.plot(construct_xy[on_window,0], construct_xy[on_window,1],'b')
+off_window = np.where(timing==2)[0]
+plt.plot(construct_xy[off_window,0], construct_xy[off_window,1],'r')
+
+plt.figure()
+plt.plot(construct_vxy[:,0], construct_vxy[:,1],'k.')
+plt.plot(construct_vxy[on_window,0], construct_vxy[on_window,1],'b.',alpha=.2)
+plt.plot(construct_vxy[off_window,0], construct_vxy[off_window,1],'r.',alpha=.1)
+plt.xlabel(r'$v_x$'); plt.ylabel(r'$v_y$')
 
 # %% by fine time points...
 # # data4fit = []  # list of tracks with its vx,vy,theta signal recorded;  conditioned on behavior and long-tracks
