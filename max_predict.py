@@ -30,7 +30,7 @@ from scipy.sparse.linalg import eigs
 
 # %% for Kiri's data
 ### cutoff for short tracks
-threshold_track_l = 60 * 20  # 20 # look at long-enough tracks
+threshold_track_l = 60 * 30  # 20 # look at long-enough tracks
 
 # Define the folder path
 folder_path = 'C:/Users/ksc75/Downloads/ribbon_data_kc/'
@@ -43,23 +43,38 @@ for file in pkl_files:
     print(file)
 
 # %% for perturbed data
-# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'
-# target_file = "exp_matrix.pklz"
+# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'  ### for OU-ribbons
+root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
+# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-5'
+target_file = "exp_matrix.pklz"
 
-# # List all subfolders in the root directory
-# subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
-# pkl_files = []
+# List all subfolders in the root directory
+subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
+pkl_files = []
 
-# # Loop through each subfolder to search for the target file
-# for subfolder in subfolders:
-#     for dirpath, dirnames, filenames in os.walk(subfolder):
-#         if target_file in filenames:
-#             full_path = os.path.join(dirpath, target_file)
-#             pkl_files.append(full_path)
-#             print(full_path)
+# Loop through each subfolder to search for the target file
+for subfolder in subfolders:
+    for dirpath, dirnames, filenames in os.walk(subfolder):
+        if target_file in filenames:
+            full_path = os.path.join(dirpath, target_file)
+            pkl_files.append(full_path)
+            print(full_path)
 
 # pkl_files = pkl_files[8:]
+# pkl_files = pkl_files[4:]
+print(pkl_files) 
 
+# %%
+# plt.figure()
+# nf = len(pkl_files)
+# for ff in range(nf):
+#     ### load file
+#     with gzip.open(pkl_files[ff], 'rb') as f:
+#         data = pickle.load(f)
+#     for dd in range(len(data)):
+#         x,y = data['x_smooth'], data['y_smooth']
+#         plt.plot(x,y,'k.')
+    
 # %% concatenate across files in a folder
 data4fit = []  # list of tracks with its vx,vy,theta signal recorded;  conditioned on behavior and long-tracks
 nf = len(pkl_files)
@@ -90,7 +105,7 @@ for ff in range(nf):
                 temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]))
                 # temp = np.stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]),1)#######
                 
-                temp_xy = np.column_stack((data['x'][pos] , data['y'][pos]))
+                temp_xy = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
                                 
                 ### criteria
                 mask_i = np.where(np.isnan(temp), 0, 1)
@@ -300,7 +315,7 @@ def sorted_spectrum(R,k=5,which='LR'):
 
 # %% scan tau
 N = 1000  # number of states
-K = 3*60  # delay window
+K = 2*60  # delay window
 X_traj, track_id = build_X(data4fit, return_id=True, K=K)
 X_traj, track_id = build_X(data4fit, return_id=True, K=K)
 labels, centrals = kmeans_knn_partition(X_traj, N, return_centers=True)
@@ -323,8 +338,8 @@ plt.plot(taus/60, specs_tau[:,:5],'-o')
 plt.xlabel(r'step $\tau$ (s)'); plt.ylabel('relaxation time (s)')
 
 # %% fix param now
-N = 500  # number of states
-K = 3*60  # delay window
+N = 1000  # number of states
+K = 2*60  # delay window
 tau = 10   # transition steps
 X_traj, track_id = build_X(data4fit, return_id=True, K=K)
 X_traj, track_id = X_traj[::tau, :], track_id[::tau]
@@ -376,7 +391,8 @@ plt.ylim([0.001, 20])
 imode = 2
 tau = 10
 phi2 = eigvecs[labels,imode].real
-window_show = np.arange(10000,17000)
+# phi2 = np.ma.masked_array(phi2, mask=np.isin(labels, idx[600:]))
+window_show = np.arange(10000,20000)
 # X_xy = build_X(rec_tracks, K)[::tau, :]
 X_xy, track_id = build_X(rec_tracks, return_id=True, K=K)
 X_xy, track_id = X_xy[::tau, :], track_id[::tau]
@@ -401,9 +417,130 @@ for tt in range(X_time.shape[0]):
         back2track_id.append(tt)
         
 plt.figure()
-plt.plot(time_since_off, proj_val_offt, 'k.',alpha=.09)
+plt.plot(time_since_off, proj_val_offt, 'k.',alpha=.01)
 plt.axvline(x=-30, color='r', linestyle='--'); plt.axvline(x=0, color='r', linestyle='--')
 plt.xlabel('since odor off (s)'); plt.ylabel(r'$\phi$')
+
+# %% visualization
+import seaborn as sns
+
+# Sample scatter data
+x = np.array(time_since_off)
+y = np.array(proj_val_offt)
+
+# pos = np.where(np.abs(y)>0.01)[0]
+# x,y = x[pos], y[pos]
+down_samp = 3
+x,y = x[::down_samp], y[::down_samp]
+
+plt.figure(figsize=(8, 6))
+sns.kdeplot(x=x, y=y, cmap="viridis", fill=True, thresh=0, bw_method='silverman')
+plt.scatter(x, y, s=10, color="black", alpha=0.1)  # Optional: overlay scatter points
+plt.colorbar(label="Density")
+plt.xlabel('since odor off (s)'); plt.ylabel(r'$\phi$')
+plt.axvline(x=-30, color='r', linestyle='--'); plt.axvline(x=0, color='r', linestyle='--')
+plt.title("Smoothed Density Plot")
+plt.xlim([x.min(), x.max()]); plt.ylim([y.min(), y.max()])
+
+# %% sorting raw track by phi2 during odor!
+track_sort_id = []
+mean_phi = []
+for nn in range(len(data4fit)):
+    pos_track = np.where(track_id==nn)[0]
+    pos_post = np.where((X_time[:,0]>45+30) & (X_time[:,0]<45+30+30))[0]
+    pos_stim = np.where((X_time[:,0]>45) & (X_time[:,0]<45+30))[0]
+    # pos = np.intersect1d(pos_stim,pos_track)
+    pos = np.intersect1d(pos_post,pos_track)
+    if len(pos)>0:
+        track_sort_id.append(nn)
+        mean_phi.append(np.mean((phi2[pos])))
+        # mean_phi.append(np.std(X_odor[pos,0])*np.mean(X_odor[pos,0]))
+        # mean_phi.append(np.mean(X_odor[pos,0]))
+
+# %% plotting
+dispy = 50
+offset = 1
+post_window = 90*60
+rec_tracks_sub = [rec_tracks[ii] for ii in track_sort_id]
+times_sub = [times[ii] for ii in track_sort_id]
+
+import matplotlib.cm as cm
+colors = cm.viridis(np.linspace(0, 1, len(mean_phi)))
+
+plt.figure()
+sortt_id = np.argsort(mean_phi)[::-1]
+kk = 0
+for ii in range(0,len(sortt_id),1):
+    dd = sortt_id[ii]
+    traji = rec_tracks_sub[dd]
+    timei = times_sub[dd]
+    anchor_pos = np.argmin(np.abs(timei-(45+30)))
+    phi2i = phi2[np.where(track_id==track_sort_id[ii])[0]]
+    
+    ### remove boundary conditions
+    if traji[anchor_pos:,1].max()<180 and traji[anchor_pos:,1].min()>8 and traji[anchor_pos:,0].max()<270:
+    # if traji[anchor_pos,1].max()<180 and traji[anchor_pos,1].min()>10 and traji[anchor_pos:,0].max()<270 and len(traji[anchor_pos:,0])>1:
+    # if traji[anchor_pos:,0].max()<270:
+        
+        ### plotting tracks
+        if len(traji[anchor_pos:,:])<post_window:
+            plt.plot(traji[anchor_pos:,0] - traji[anchor_pos,0]*offset, kk*dispy + traji[anchor_pos:,1]-traji[anchor_pos,1]*offset, color=colors[ii])
+        else:
+            wind_ = anchor_pos+post_window
+            plt.plot(traji[anchor_pos:wind_,0] - traji[anchor_pos,0]*offset, kk*dispy + traji[anchor_pos:wind_,1]-traji[anchor_pos,1]*offset, color=colors[ii])
+        plt.plot(traji[anchor_pos,0]  - traji[anchor_pos,0]*offset, kk*dispy +traji[anchor_pos,1]-traji[anchor_pos,1]*offset,'r.')
+        
+        #### TRY REWRITE WITH X_xy !!! ###########
+        
+        # plt.scatter(traji[anchor_pos:,0] - traji[anchor_pos,0]*offset, kk*dispy + traji[anchor_pos:,1]-traji[anchor_pos,1]*offset,c=phi2i[anchor_pos:],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
+        kk = kk+1
+
+plt.xlabel('displacement in x since off (mm)')
+plt.ylabel('sorted by projection')
+# plt.ylabel('sorted by odor encounter')
+
+# %% with matrix
+dispy = 50
+offset = 1
+post_window = 15*60
+rec_tracks_sub = [rec_tracks[ii] for ii in track_sort_id]
+times_sub = [times[ii] for ii in track_sort_id]
+
+import matplotlib.cm as cm
+colors = cm.viridis(np.linspace(0, 1, len(mean_phi)))
+
+plt.figure()
+sortt_id = np.argsort(mean_phi)[::-1]
+kk = 0
+for ii in range(0,len(sortt_id),1):
+    dd = sortt_id[ii]
+    traji = track_sort_id[dd]
+    
+    pos = np.where(track_id==traji)[0]
+    traji = np.array([X_xy[pos,0], X_xy[pos,K+1]]).T
+    timei = X_time[pos,0]
+    anchor_pos = np.argmin(np.abs(timei-(45+30)))
+    phi2i = phi2[pos]
+    
+    ### remove boundary conditions
+    if traji[anchor_pos:,1].max()<180 and traji[anchor_pos:,1].min()>8 and traji[anchor_pos:,0].max()<270:
+    # if traji[anchor_pos,1].max()<180 and traji[anchor_pos,1].min()>10 and traji[anchor_pos:,0].max()<270 and len(traji[anchor_pos:,0])>1:
+    # if traji[anchor_pos:,0].max()<270:
+        #### TRY REWRITE WITH X_xy !!! ###########
+        if len(traji[anchor_pos:,:])<post_window:
+            plt.scatter(traji[anchor_pos:,0] - traji[anchor_pos,0]*offset, kk*dispy + traji[anchor_pos:,1]-traji[anchor_pos,1]*offset,c=phi2i[anchor_pos:],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
+            # plt.scatter(traji[anchor_pos:,0] - traji[anchor_pos,0]*offset, kk*dispy + traji[anchor_pos:,1]-traji[anchor_pos,1]*offset,c=np.abs(phi2i[anchor_pos:]),cmap='coolwarm',s=.5,vmin=0,vmax=color_abs)
+        else:
+            wind_ = anchor_pos+post_window
+            plt.scatter(traji[anchor_pos:wind_,0] - traji[anchor_pos,0]*offset, kk*dispy + traji[anchor_pos:wind_,1]-traji[anchor_pos,1]*offset,c=phi2i[anchor_pos:wind_],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
+            
+        plt.plot(traji[anchor_pos,0]  - traji[anchor_pos,0]*offset, kk*dispy +traji[anchor_pos,1]-traji[anchor_pos,1]*offset,'r.')
+        kk = kk+1
+
+plt.xlabel('displacement in x since off (mm)')
+# plt.ylabel('sorted by projection')
+plt.ylabel('sorted by odor encounter')
+
 
 # %% sample from most-likely phi states to reconstruct tracks
 n_bins = 100
