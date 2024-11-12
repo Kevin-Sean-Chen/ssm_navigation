@@ -83,7 +83,10 @@ for ff in range(nf):
                 # temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos] , \
                                         # data['theta_smooth'][pos] , data['signal'][pos]))
                 thetas = data['theta'][pos]
-                temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]))
+                
+                ### symmetrize!
+                temp = np.column_stack((data['vx_smooth'][pos] , np.abs(data['vy_smooth'][pos])))
+                # temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]))
                 # temp = np.stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]),1)#######
                 
                 temp_xy = np.column_stack((data['x'][pos] , data['y'][pos]))
@@ -322,6 +325,26 @@ plt.plot(time_since_off, proj_val_offt, 'k.',alpha=.5)
 plt.axvline(x=-30, color='r', linestyle='--'); plt.axvline(x=0, color='r', linestyle='--')
 plt.xlabel('since odor off (s)'); plt.ylabel('projected action')
 
+# %% visualization
+import seaborn as sns
+
+# Sample scatter data
+x = np.array(time_since_off)
+y = np.array(proj_val_offt)[:,0]
+
+# pos = np.where(np.abs(y)>0.01)[0]
+# x,y = x[pos], y[pos]
+down_samp = 1
+x,y = x[::down_samp], y[::down_samp]
+
+plt.figure(figsize=(8, 6))
+sns.kdeplot(x=x, y=y, cmap="viridis", fill=True, thresh=0, bw_method='silverman')
+plt.scatter(x, y, s=10, color="black", alpha=0.1)  # Optional: overlay scatter points
+plt.colorbar(label="Density")
+plt.xlabel('since odor off (s)'); plt.ylabel('projected action')
+plt.axvline(x=-30, color='r', linestyle='--'); plt.axvline(x=0, color='r', linestyle='--')
+plt.title("Smoothed Density Plot")
+plt.xlim([x.min(), x.max()]); plt.ylim([y.min(), y.max()])
 
 # %% sample in time for typical tracks
 n_bins = 150
