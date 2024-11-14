@@ -27,13 +27,14 @@ end
 algorithms = {'interior-point', 'sqp', 'sqp-legacy', 'active-set', 'trust-region-reflective'};
 lfun = @(x)nll(x, dth, stim, cosBasis);  % objective function
 opts = optimset('display','iter','Algorithm', algorithms{1});
+opts = optimset('display','iter');
 num_par = 9;
 LB = [ones(1,num_par)]*-2;
 UB = [ones(1,num_par)]*2;
 % prs0 = [alpha_h,alpha_s,base];%
 prs0 = randn(1,num_par);
-[x,fval,EXITFLAG,OUTPUT,LAMBDA,GRAD,HESSIAN] = fmincon(lfun,prs0,[],[],[],[],LB,UB,[],opts);  % constrained optimization
-% [x,FVAL,EXITFLAG,OUTPUT,GRAD,HESSIAN] = fminunc(lfun, prs0, opts);
+% [x,fval,EXITFLAG,OUTPUT,LAMBDA,GRAD,HESSIAN] = fmincon(lfun,prs0,[],[],[],[],LB,UB,[],opts);  % constrained optimization
+[x,FVAL,EXITFLAG,OUTPUT,GRAD,HESSIAN] = fminunc(lfun, prs0, opts);
 
 %% evaluation
 beta_rec = 1;%x(1);

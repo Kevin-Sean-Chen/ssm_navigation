@@ -307,7 +307,7 @@ for jj = 1:nStates
 %     prs0 = prs0 + prs0.*randn(1,length(UB))*0.5;
     prs0 = mm.wts(:,:,jj); %+ mm.wts(:,:,jj).*(2*(rand(1,length(UB))-0.5))*0.5;  %from last time!
     [x,fval,EXITFLAG,OUTPUT,LAMBDA,GRAD,HESSIAN] = fmincon(lfun,prs0,[],[],[],[],LB,UB,[],opts);
-%     x = fminunc(lfun, prs0);
+    % x = fminunc(lfun, prs0);
     mm.wts(:,:,jj) = x; % weighted optimization
 end
 

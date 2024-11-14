@@ -20,8 +20,8 @@ signal(isnan(signal)) = 0;  % remove nans
 %% process actions and signal
 diff_stop = diff(stops);
 stops_time = stops*0;
-% stops_time(find(diff_stop<0)) = 1;  % walking
-stops_time(find(diff_stop>0)) = 1;  % stopping (BTA has rising shape)
+stops_time(find(diff_stop<0)) = 1;  % walking
+% stops_time(find(diff_stop>0)) = 1;  % stopping (BTA has rising shape)
 
 bin_signal = signal*0;
 bin_signal(find(signal>3)) = 1;
@@ -44,7 +44,7 @@ list_tracks = unique(trjNum);
 clear Data
 Data(length(ntracks)) = struct();
 di = 1;
-for nn = 1:500 %ntracks
+for nn = 1:200 %ntracks
     pos = find(trjNum==list_tracks(nn));
     pos = pos(1:down_samp:end);
     Data(di).act = stops_time(pos); %stops
@@ -189,6 +189,7 @@ function [NLL] = nll(THETA, act, stim, cosBasis, lambda, mask)
     % F = F.*mask_;
     P = NL(F, M, m);
     P = P*0.011;  % per time probability
+    P = max(0, min(1, P));  % for unconstrained optimization
 
 %%% log-likelihood
     y_1 = find(act_ == 1);
