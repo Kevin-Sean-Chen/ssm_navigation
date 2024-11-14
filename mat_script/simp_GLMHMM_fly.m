@@ -9,8 +9,13 @@
 %%% % explore rawer emissions, such as angular change and speed
 %%% % test across environments/data
 
+% clear
+% clc
+% rng(0)
+
 %% load data
-load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+% load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
 full_data = ComplexPlume.Smoke.expmat;
 
 %% build Data structure
@@ -28,8 +33,8 @@ signal(isnan(signal)) = 0;  % remove nans
 %%% process actions and signal
 diff_stop = diff(stops);
 stops_time = stops*0;
-% stops_time(find(diff_stop<0)) = 1;  % walking
-stops_time(find(diff_stop>0)) = 1;  % stopping (BTA has rising shape)
+stops_time(find(diff_stop<0)) = 1;  % walking
+% stops_time(find(diff_stop>0)) = 1;  % stopping (BTA has rising shape)
 
 bin_signal = signal*0;
 bin_signal(find(signal>3)) = 1;
@@ -51,7 +56,7 @@ list_tracks = unique(trjNum);
 clear Data
 Data(length(ntracks)) = struct();
 di = 1;
-for nn = 1:400 %ntracks
+for nn = 1:200 %ntracks
     pos = find(trjNum==list_tracks(nn));
     pos = pos(1:down_samp:end);
     Data(di).act = stops_time(pos); %stops
@@ -86,14 +91,14 @@ nT = length(yy); % number of time bins
 loglifun = @logli_fly;  % log-likelihood function
 
 % Set transition matrix by sampling from Dirichlet distr
-alpha_diag = 10; %25 % concentration param added to diagonal (higher makes more diagonal-dominant)
+alpha_diag = 50; %25 % concentration param added to diagonal (higher makes more diagonal-dominant)
 alpha_full = 5;  % concentration param for other entries (higher makes more uniform)
 G = gamrnd(alpha_full*ones(nStates) + alpha_diag*eye(nStates),1); % sample gamma random variables
 A0 = G./repmat(sum(G,2),1,nStates); % normalize so rows sum to 1
 % A0 = [0.99,0.01; 0.01,0.99];
 
 % sticky priors
-alpha = 1.;  % Dirichlet shape parameter as a prior
+alpha = 5.;  % Dirichlet shape parameter as a prior
 kappa = .5;  % upweighting self-transition for stickiness
 
 % Set linear weights & output noise variances
@@ -109,7 +114,8 @@ mmhat = struct('A',A0, 'wts',wts0, 'loglifun',loglifun, 'basis',cosBasis, 'lambd
 %% call inference procedure
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% debug
-[logli] = logli_fly(mmhat, xx, yy, mask);
+% [logli] = logli_fly(mmhat, xx, yy, mask);
+% [NLL] = nll_fly(x, yy, xx, gams(2,:), cosBasis, 0, mask);
 
 %% Set up variables for EM
 maxiter = 50;
@@ -156,7 +162,7 @@ jj = jj-1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% plot some results
 cols = ['k','r'];
-stateK = 1;
+stateK = 2;
 flip = 1;
 x = squeeze(mmhat.wts(:,:,stateK));
 M = x(1);
@@ -175,13 +181,22 @@ subplot(122); plot(xv, (M-m)./(1+exp(flip*-(xv+base))) + m, cols(stateK), 'LineW
 xlabel('proejcted input'); ylabel('P(walk)')
 set(gca, 'FontSize', 14, 'XColor', 'k', 'YColor', 'k', 'LineWidth', 1.5);
 
-%%
-[logp,gams,xisum] = runFB_GLMHMM(mmhat,xx,yy,mask);
-pos_state1 = find(gams(1,:)>0.5);
-pos_state2 = find(gams(2,:)>0.5);
+%% state predictions
+[logp,gams_,xisum] = runFB_GLMHMM(mmhat,xx,yy,mask);
+[aa,bb] = max( gams_ ,[], 1 );
+pos_state1 = find(bb==1);
+pos_state2 = find(bb==2);
+% pos_state1 = find(gams(1,:)>0.5);
+% pos_state2 = find(gams(2,:)>0.5);
 figure;
-plot(data_x(pos_state1), data_y(pos_state1), 'k.'); hold on
-plot(data_x(pos_state2), data_y(pos_state2), 'r.');
+% plot(data_x(pos_state1), data_y(pos_state1), 'k.', 'MarkerFaceAlpha',.2); hold on
+% plot(data_x(pos_state2), data_y(pos_state2), 'r.', 'MarkerFaceAlpha',.2);
+scatter(data_x(pos_state1), data_y(pos_state1), 10, 'k', 'filled', 'MarkerFaceAlpha', 1, 'MarkerEdgeAlpha', 1); hold on
+scatter(data_x(pos_state2), data_y(pos_state2), 1.5, 'r', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);
+
+% figure;
+% subplot(211); hist(data_speed(pos_state1),100)
+% subplot(212); hist(data_speed(pos_state2),100)
 
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -220,8 +235,12 @@ function [logli] = logli_fly(mm, xx, yy, mask)
     logli = zeros(lt, K);
     for k = 1:K
         %%% Assume we parameterize in such way first
-        M = THETA(1,1,k);          % Max rate
-        m = THETA(1,2,k);          % min rate
+        M = abs(THETA(1,1,k));          % Max rate
+        m = abs(THETA(1,2,k));          % min rate
+        %%% hakking proability
+        if M<m
+            [M, m] = deal(m, M);
+        end
         base = THETA(1,3,k);       % baseline in sigmoid
         alpha_s = THETA(1,4:7,k);  % kernel for sensory input (weights on kerenl basis)
 
@@ -231,10 +250,11 @@ function [logli] = logli_fly(mm, xx, yy, mask)
         %%% turning decision
         filt_stim = conv_kernel(stim, K_s);
         P = NL(filt_stim + 0 + base, M, m);
-        % P = P*0.011;  % per time probability
+        P = P*0.011;  % per time probability
+        % P = max(0, min(1, P));  % for unconstrained optimization
 
         %%% Bernoulli log-likelihood
-        epsilon = 1e-15;  % Small value to avoid log(0)
+        epsilon = 1e-20;  % Small value to avoid log(0)
         P = max(min(P, 1 - epsilon), epsilon);
         logli(:,k) = [mask.* ((log(P).*act) + ((1-act).*log(1-P))) - lambda*sum((K_s - 0).^2)*0]';  % can later add regularization...
     end
@@ -258,7 +278,7 @@ function mm = runMstep_fly(mm, xx, yy, gams, mask)
 %  mmnew - new model struct
 
 % normalize the gammas to sum to 1
-gamnrm = gams./(sum(gams,2)+1e-10);  
+gamnrm = gams./(sum(gams,2)+1e-20);  
 nStates = size(gams,1);
 
 %%% loading parameters
@@ -286,13 +306,13 @@ end
 function [NLL] = nll_fly(THETA, act, stim, gams, cosBasis, lambda, mask)
     
     %%% unpacking
-    base = THETA(1);
-    M = abs(THETA(2));
-    m = abs(THETA(3));
+    M = abs(THETA(1));
+    m = abs(THETA(2));
     %%% hakking proability
     if M<m
         [M, m] = deal(m, M);
     end
+    base = THETA(3);
     nb = size(cosBasis, 2);
     alpha_s = THETA(3+1:3+nb);
     % alpha_a = THETA(3+nb+1:end);
@@ -303,12 +323,13 @@ function [NLL] = nll_fly(THETA, act, stim, gams, cosBasis, lambda, mask)
     % design matrix method?
     F = conv_kernel(stim',K_s) + base*1;
     F = F(1:length(act));
-    F(1:length(K_s)) = 0;
+    % F(1:length(K_s)) = 0;
     P = NL(F, M, m);
-    % P = P*0.011;  % per time probability
+    P = P*0.011;  % per time probability
+    % P = max(0, min(1, P));  % for unconstrained optimization
 
     %%% log-likelihood
-    epsilon = 1e-15;  % Small value to avoid log(0)
+    epsilon = 1e-20;  % Small value to avoid log(0)
     P = max(min(P, 1 - epsilon), epsilon)';
     
     %%% the Bernoulli way
