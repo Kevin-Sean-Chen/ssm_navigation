@@ -91,14 +91,14 @@ nT = length(yy); % number of time bins
 loglifun = @logli_fly;  % log-likelihood function
 
 % Set transition matrix by sampling from Dirichlet distr
-alpha_diag = 50; %25 % concentration param added to diagonal (higher makes more diagonal-dominant)
+alpha_diag = 10; %25 % concentration param added to diagonal (higher makes more diagonal-dominant)
 alpha_full = 5;  % concentration param for other entries (higher makes more uniform)
 G = gamrnd(alpha_full*ones(nStates) + alpha_diag*eye(nStates),1); % sample gamma random variables
 A0 = G./repmat(sum(G,2),1,nStates); % normalize so rows sum to 1
 % A0 = [0.99,0.01; 0.01,0.99];
 
 % sticky priors
-alpha = 5.;  % Dirichlet shape parameter as a prior
+alpha = 1.;  % Dirichlet shape parameter as a prior
 kappa = .5;  % upweighting self-transition for stickiness
 
 % Set linear weights & output noise variances
@@ -162,11 +162,12 @@ jj = jj-1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% plot some results
 cols = ['k','r'];
-stateK = 2;
+stateK = 1;
 flip = 1;
 x = squeeze(mmhat.wts(:,:,stateK));
 M = x(1);
 m = x(2);
+M = 1; m = 0;  %%%% without fitting max-min probablity
 base = x(3);
 alpha_s = flip*x(4:7);
 
@@ -192,7 +193,7 @@ figure;
 % plot(data_x(pos_state1), data_y(pos_state1), 'k.', 'MarkerFaceAlpha',.2); hold on
 % plot(data_x(pos_state2), data_y(pos_state2), 'r.', 'MarkerFaceAlpha',.2);
 scatter(data_x(pos_state1), data_y(pos_state1), 10, 'k', 'filled', 'MarkerFaceAlpha', 1, 'MarkerEdgeAlpha', 1); hold on
-scatter(data_x(pos_state2), data_y(pos_state2), 1.5, 'r', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);
+scatter(data_x(pos_state2), data_y(pos_state2), 15, 'r', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);
 
 % figure;
 % subplot(211); hist(data_speed(pos_state1),100)
@@ -202,8 +203,8 @@ scatter(data_x(pos_state2), data_y(pos_state2), 1.5, 'r', 'filled', 'MarkerFaceA
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% inference ll and M-step
 function [P] = NL(F,M,m)
-    P = (M-m)./(1+exp(-F)) + m;
-    % P = 1./(1+exp(-F));
+    % P = (M-m)./(1+exp(-F)) + m;
+    P = 1./(1+exp(-F));
 end
 
 function [logli] = logli_fly(mm, xx, yy, mask)
@@ -296,8 +297,8 @@ prs0 = [.9, .1, 0, randn(1,nb*1)];%
 for jj = 1:nStates
     lfun = @(x)nll_fly(x, act, stim, gamnrm(jj,:), Basis, lambda, mask);
     prs0 = mm.wts(:,:,jj); %+ mm.wts(:,:,jj).*(2*(rand(1,length(UB))-0.5))*0.5;  %from last time!
-    [x,fval,EXITFLAG,OUTPUT,LAMBDA,GRAD,HESSIAN] = fmincon(lfun,prs0,[],[],[],[],LB,UB,[],opts);
-    % [x,fval,exitflag,output,grad,hessian] = fminunc(lfun,prs0, opts);
+    % [x,fval,EXITFLAG,OUTPUT,LAMBDA,GRAD,HESSIAN] = fmincon(lfun,prs0,[],[],[],[],LB,UB,[],opts);
+    [x,fval,exitflag,output,grad,hessian] = fminunc(lfun,prs0, opts);
     mm.wts(:,:,jj) = x; % weighted optimization
 end
 
