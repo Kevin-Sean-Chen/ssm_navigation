@@ -57,7 +57,7 @@ list_tracks = unique(trjNum);
 clear Data
 Data(length(ntracks)) = struct();
 di = 1;
-for nn = 1:400 %ntracks
+for nn = 1:200 %ntracks
     pos = find(trjNum==list_tracks(nn));
     pos = pos(1:down_samp:end);
     Data(di).act = speed_smooth(pos); stops_time(pos); %stops
@@ -116,7 +116,7 @@ mmhat = struct('A',A0, 'wts',wts0, 'loglifun',loglifun, 'basis',cosBasis, 'lambd
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% debug
 % [logli] = logli_fly(mmhat, xx, yy, mask);
-% [NLL] = nll_fly(ones(1,nX), yy, xx, gams(2,:), cosBasis, 0, mask);
+% [NLL] = nll_fly(ones(1,nX), yy, xx, gams(2,:), cosBasis, 0, mask)
 
 %% Set up variables for EM
 maxiter = 50;
@@ -274,12 +274,15 @@ function [logli] = logli_fly(mm, xx, yy, mask)
         P = max(min(P, 1 - epsilon), epsilon);
 
         pos = (~isinf(log(act)));
-        ll_gamm1 = (a1-1)*log(act.*pos) - act/b1 - a1*log(b1) - gammaln(a1);
-        ll_gamm2 = (a2-1)*log(act.*pos) - act/b2 - a2*log(b2) - gammaln(a2);
+        % ll_gamm1 = exp((a1-1)*log(act.*pos) - act/b1 - a1*log(b1) - gammaln(a1));
+        % ll_gamm2 = exp((a2-1)*log(act.*pos) - act/b2 - a2*log(b2) - gammaln(a2));
+        gamm_1 = gampdf(act, a1, b1);
+        gamm_2 = gampdf(act, a2, b2);
+        marginalP = (1-P(pos)).* gamm_1(pos) + P(pos).* gamm_2(pos);
         if K>1
-            logli(:,k) = mask.* (ll_gamm1.*P + ll_gamm2.*(1-P));
+            logli(pos,k) = mask(pos).* ( log(marginalP + 1*1e-10) );  %mask.* log(ll_gamm1.*P + ll_gamm2.*(1-P));
         elseif K==1
-            logli(:) = mask.* (ll_gamm1.*P + ll_gamm2.*(1-P));;
+            logli(pos) = mask(pos).* ( log(marginalP + 1*1e-10) );
         end
 
     end
@@ -357,6 +360,6 @@ function [NLL] = nll_fly(THETA, act, stim, gams, cosBasis, lambda, mask)
     pos = (~isinf(log(act)));
     ll_gamm1 = (a1-1)*log(act.*pos) - act/b1 - a1*log(b1) - gammaln(a1);
     ll_gamm2 = (a2-1)*log(act.*pos) - act/b2 - a2*log(b2) - gammaln(a2);
-    ll = nansum(gams.* mask.* (ll_gamm1.*P + ll_gamm2.*(1-P)));
+    ll = sum(gams.* mask.* (ll_gamm1.*P + ll_gamm2.*(1-P)));
     NLL = -ll;
 end
