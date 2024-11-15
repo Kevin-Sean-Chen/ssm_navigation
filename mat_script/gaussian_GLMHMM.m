@@ -14,8 +14,8 @@
 % rng(0)
 
 %% load data
-load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
-% load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+% load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
 full_data = ComplexPlume.Smoke.expmat;
 
 %% build Data structure
@@ -58,7 +58,7 @@ list_tracks = unique(trjNum);
 clear Data
 Data(length(ntracks)) = struct();
 di = 1;
-for nn = 1:200 %ntracks
+for nn = 1:500 %ntracks
     pos = find(trjNum==list_tracks(nn));
     pos = pos(1:down_samp:end);
     Data(di).act = speed_smooth(pos); %stops_time(pos); %stops
@@ -100,7 +100,7 @@ data_speed = [extractfield(Data,'speed_smooth')];
 %% Observation and input
 % Set parameters: transition matrix and emission matrix
 nStates = 2; % number of latent states
-nX = nb+1+1;  % number of input dimensions (i.e., dimensions of regressor)
+nX = nb+1;  % number of input dimensions (i.e., dimensions of regressor)
 nY = 1;  % number of output dimensions 
 nT = length(yy); % number of time bins
 loglifun = @logli_fly;  % log-likelihood function
