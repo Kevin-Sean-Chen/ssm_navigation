@@ -14,8 +14,8 @@
 % rng(0)
 
 %% load data
-% load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
-load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+% load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
 full_data = ComplexPlume.Smoke.expmat;
 
 %% build Data structure
@@ -37,7 +37,7 @@ stops_time(find(diff_stop<0)) = 1;  % walking
 % stops_time(find(diff_stop>0)) = 1;  % stopping (BTA has rising shape)
 
 bin_signal = signal*0;
-bin_signal(find(signal>3)) = 1;
+bin_signal(find(signal>4)) = 1;
 diff_signal = diff(bin_signal);
 signal_time = diff_signal*0;
 signal_time(find(diff_signal>0)) = 1;
@@ -91,7 +91,7 @@ nT = length(yy); % number of time bins
 loglifun = @logli_fly;  % log-likelihood function
 
 % Set transition matrix by sampling from Dirichlet distr
-alpha_diag = 10; %25 % concentration param added to diagonal (higher makes more diagonal-dominant)
+alpha_diag = 25; %25 % concentration param added to diagonal (higher makes more diagonal-dominant)
 alpha_full = 5;  % concentration param for other entries (higher makes more uniform)
 G = gamrnd(alpha_full*ones(nStates) + alpha_diag*eye(nStates),1); % sample gamma random variables
 A0 = G./repmat(sum(G,2),1,nStates); % normalize so rows sum to 1
@@ -104,8 +104,10 @@ kappa = .5;  % upweighting self-transition for stickiness
 % Set linear weights & output noise variances
 wts0 = rand(nY,nX,nStates); % parameters for the mixture-VonMesis behavioral model
 %%% Parameters: M, m, base, alpha
-wts0(1,:,1) = [.9, .1, 0, randn(1,nb)*1]; %single mGLM
-wts0(1,:,2) = [.6, .4, 0, randn(1,nb)*1];
+% wts0(1,:,1) = [.9, .1, 0, randn(1,nb)*1]; %single mGLM
+% wts0(1,:,2) = [.6, .4, 0, randn(1,nb)*1];
+wts0(1,:,1) = [.9, .1, -1.4208   -0.0679    0.1650   -0.2163    0.1259]; %single mGLM
+wts0(1,:,2) = [.6, .4, -1.5840    0.5609   -0.8913    0.9752   -0.6686];
 % wts0(1,:,3) = [.9, .1, 0, randn(1,nB)*10];
 
 % Build struct for initial params
@@ -162,7 +164,7 @@ jj = jj-1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% plot some results
 cols = ['k','r'];
-stateK = 1;
+stateK = 2;
 flip = 1;
 x = squeeze(mmhat.wts(:,:,stateK));
 M = x(1);
@@ -195,9 +197,9 @@ figure;
 scatter(data_x(pos_state1), data_y(pos_state1), 10, 'k', 'filled', 'MarkerFaceAlpha', 1, 'MarkerEdgeAlpha', 1); hold on
 scatter(data_x(pos_state2), data_y(pos_state2), 15, 'r', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);
 
-% figure;
-% subplot(211); hist(data_speed(pos_state1),100)
-% subplot(212); hist(data_speed(pos_state2),100)
+figure;
+subplot(211); hist(data_speed(pos_state1),100)
+subplot(212); hist(data_speed(pos_state2),100)
 
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
