@@ -14,8 +14,8 @@
 % rng(0)
 
 %% load data
-% load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
-load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+% load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
 full_data = ComplexPlume.Smoke.expmat;
 
 %% build Data structure
@@ -28,7 +28,8 @@ x_smooth = full_data(:,32);
 y_smooth = full_data(:,33);
 speed_smooth = full_data(:,31);
 
-speed_smooth(speed_smooth>30) = 0;%mean(speed_smooth);
+% speed_smooth(speed_smooth>30) = 30;%mean(speed_smooth);
+speed_smooth(speed_smooth==0) = .1;
 signal(isnan(signal)) = 0;  % remove nans
 
 %%% process actions and signal
@@ -57,7 +58,7 @@ list_tracks = unique(trjNum);
 clear Data
 Data(length(ntracks)) = struct();
 di = 1;
-for nn = 1:200 %ntracks
+for nn = 1:100 %ntracks
     pos = find(trjNum==list_tracks(nn));
     pos = pos(1:down_samp:end);
     Data(di).act = speed_smooth(pos); stops_time(pos); %stops
@@ -92,7 +93,7 @@ nT = length(yy); % number of time bins
 loglifun = @logli_fly;  % log-likelihood function
 
 % Set transition matrix by sampling from Dirichlet distr
-alpha_diag = 25; %25 % concentration param added to diagonal (higher makes more diagonal-dominant)
+alpha_diag = 50; %25 % concentration param added to diagonal (higher makes more diagonal-dominant)
 alpha_full = 5;  % concentration param for other entries (higher makes more uniform)
 G = gamrnd(alpha_full*ones(nStates) + alpha_diag*eye(nStates),1); % sample gamma random variables
 A0 = G./repmat(sum(G,2),1,nStates); % normalize so rows sum to 1
@@ -209,7 +210,7 @@ gam_1 = gampdf(bb, a1, b1); gam_2 = gampdf(bb, a2, b2);
 bar(bb,cc/sum(cc)); hold on
 plot(bb, gam_1/sum(gam_1))
 subplot(212);
-stateK = 2; x = squeeze(mmhat.wts(:,:,stateK));
+stateK = 1; x = squeeze(mmhat.wts(:,:,stateK));
 a1 = x(1); b1 = x(2); a2 = x(3); b2 = x(4);
 [cc, bb] = histcounts(data_speed(pos_state2), 100); bb = bb(2:end);
 gam_1 = gampdf(bb, a1, b1); gam_2 = gampdf(bb, a2, b2);
@@ -319,7 +320,7 @@ nb = size(Basis,2);
 opts = optimset('display','iter'); % opts.Algorithm = 'sqp';
 %%% Parameters: a1,b1,a2,b2,alpha(1,nb),base
 UB = [ones(1,4)*100, ones(1,nb*1)*100,  100];
-LB = [ones(1,4)*.1, -ones(1,nb*1)*100, -100];
+LB = [ones(1,4)*1e-5, -ones(1,nb*1)*100, -100];
 prs0 = [ones(1,4), randn(1,nb*1), 0];%
 
 for jj = 1:nStates
@@ -358,8 +359,11 @@ function [NLL] = nll_fly(THETA, act, stim, gams, cosBasis, lambda, mask)
     
     %%% driven-mixture Gamma model
     pos = (~isinf(log(act)));
-    ll_gamm1 = (a1-1)*log(act.*pos) - act/b1 - a1*log(b1) - gammaln(a1);
-    ll_gamm2 = (a2-1)*log(act.*pos) - act/b2 - a2*log(b2) - gammaln(a2);
-    ll = sum(gams.* mask.* (ll_gamm1.*P + ll_gamm2.*(1-P)));
+    gamm_1 = gampdf(act, a1, b1);
+    gamm_2 = gampdf(act, a2, b2);
+    marginalP = (1-P(pos)).* gamm_1(pos) + P(pos).* gamm_2(pos);
+    % ll_gamm1 = (a1-1)*log(act.*pos) - act/b1 - a1*log(b1) - gammaln(a1);
+    % ll_gamm2 = (a2-1)*log(act.*pos) - act/b2 - a2*log(b2) - gammaln(a2);
+    ll = sum(gams(pos).* mask(pos).* marginalP);
     NLL = -ll;
 end
