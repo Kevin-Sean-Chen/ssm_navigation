@@ -14,8 +14,8 @@
 % rng(0)
 
 %% load data
-% load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
-load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+% load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
 full_data = ComplexPlume.Smoke.expmat;
 
 %% build Data structure
@@ -58,7 +58,7 @@ list_tracks = unique(trjNum);
 clear Data
 Data(length(ntracks)) = struct();
 di = 1;
-for nn = 1:300 %ntracks
+for nn = 1:500 %ntracks
     pos = find(trjNum==list_tracks(nn));
     pos = pos(1:down_samp:end);
     Data(di).act = speed_smooth(pos); %stops_time(pos); %stops
@@ -86,15 +86,16 @@ data_speed = [extractfield(Data,'speed_smooth')];
 
 %% quick OLS checkl
 lk = 200;
+x_ =xx(pos_state2); y_=yy(pos_state2);
 % X = [convmtx(xx(lk:end),lk)];    % (n x T)
-X = hankel(xx(1:lk), xx(lk:end));
-X = [ones(1,size(X,2)); X];
+X = hankel(x_(1:lk), x_(lk:end));
+X = [X; ones(1,size(X,2))];
 XXT_inv = (X * X'); % (n x n)
-Xy = X * yy(lk:end)';           % (n x 1)
+Xy = X * y_(1:end-lk+1)';           % (n x 1)
 beta = XXT_inv \ Xy;   % (n x 1)
 figure
-kernel = flipud(beta(2:end-1));  % removing baseline for now
-plot([1:length(kernel)]*0.011*down_samp, kernel,'-o','LineWidth',5); set(gcf, 'Color', 'w');
+kernel = (beta(2:end-1));  % removing baseline for now
+plot([1:length(kernel)]*0.011*down_samp, kernel,'r-o','LineWidth',5); set(gcf, 'Color', 'w');
 xlabel('time lag (s)'); ylabel('weight'); set(gca, 'FontSize', 14, 'XColor', 'k', 'YColor', 'k', 'LineWidth', 1.5);
 
 %% Observation and input
@@ -179,7 +180,7 @@ jj = jj-1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% plot some results
 cols = ['k','r','b'];
-stateK = 2;
+stateK = 1;
 flip = 1;
 x = squeeze(mmhat.wts(:,:,stateK));
 alpha_s = flip*x(1:nb);
@@ -205,10 +206,12 @@ pos_state2 = find(bb==2);
 figure;
 % plot(data_x(pos_state1), data_y(pos_state1), 'k.', 'MarkerFaceAlpha',.2); hold on
 % plot(data_x(pos_state2), data_y(pos_state2), 'r.', 'MarkerFaceAlpha',.2);
+
+scatter(data_x(pos_state2), data_y(pos_state2), 4, 'r', 'filled', 'MarkerFaceAlpha', 0.2, 'MarkerEdgeAlpha', 0.2);set(gcf, 'Color', 'w'); hold on
 scatter(data_x(pos_state1), data_y(pos_state1), 2, 'k', 'filled', 'MarkerFaceAlpha', 1, 'MarkerEdgeAlpha', 1); hold on
-scatter(data_x(pos_state2), data_y(pos_state2), 4, 'r', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);set(gcf, 'Color', 'w');
 % scatter(data_x(pos_state3), data_y(pos_state3), 2, 'b', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);
 
+%%
 figure;
 subplot(211); h = histogram(data_speed(pos_state1),100); h.FaceColor = 'black'; xlim([0,29]);set(gca, 'FontSize', 14, 'XColor', 'k', 'YColor', 'k', 'LineWidth', 1.5)
 subplot(212); h = histogram(data_speed(pos_state2),100); h.FaceColor = 'red'; set(gcf, 'Color', 'w');xlim([0,29]); set(gca, 'FontSize', 14, 'XColor', 'k', 'YColor', 'k', 'LineWidth', 1.5)
@@ -240,7 +243,7 @@ function [logli] = logli_fly(mm, xx, yy, mask)
     
     %%% loading parameters
     THETA = mm.wts;
-    Basis = mm.basis;
+    Basis = (mm.basis);
     lambda = mm.lambda;
     act = yy;
     stim = xx;
@@ -258,7 +261,7 @@ function [logli] = logli_fly(mm, xx, yy, mask)
         
         %%% USE MATRIX HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         weighted_x = mask.* xx;
-        X = hankel(weighted_x(1:lk), weighted_x(lk:end))';  % T x lk
+        X = hankel(weighted_x(1:lk), weighted_x(lk:end))';  % (T-lk_1) x lk
         X = [X;  zeros(lk-1, lk)];
         Xf = X * Basis;  % T x nb
         Xf = [Xf ones(size(X,1),1)];  % add offset
@@ -272,7 +275,7 @@ end
 function mm = runMstep_analytic(mm, xx, yy, gams, mask)
     
     %%% unpack
-    Basis = mm.basis;  % lk x nb
+    Basis = (mm.basis);  % lk x nb
     lambda = mm.lambda;
     nb = size(Basis,2);  % number of kernels
     lk = size(Basis,1);  % length of kernels
@@ -293,75 +296,8 @@ function beta = OLS_glm(xx, yy, gams, mask, Basis)
     Xf = X * Basis;  % T x nb
     Xf = [Xf ones(size(X,1),1)];  % add offset
     XXT = Xf' * Xf;
-    Xy = Xf' * yy(lk:end)';
+    Xy = Xf' * yy(1:end-lk+1)';
     beta = XXT \ Xy;  %%% OLS
-end
-
-function mm = runMstep_fly(mm, xx, yy, gams, mask)
-%
-% Run m-step updates for GLM-like observation model
-%
-% Inputs
-% ------
-%   mm [struct] - model structure with params 
-%        .wts  [1 K] - per-state slopes
-%        .vars [1 K] - per-state variances
-%    xx [1 T] - input (design matrix)
-%    yy [1 T] - outputs
-%  gams [K T] - log marginal sate probabilities given data
-%
-% Output
-% ------
-%  mmnew - new model struct
-
-% normalize the gammas to sum to 1
-gamnrm = gams./(sum(gams,2)+1e-20);  
-nStates = size(gams,1);
-
-%%% loading parameters
-Basis = mm.basis;
-lambda = mm.lambda;
-act = yy;
-stim = xx;
-nb = size(Basis,2);
-
-opts = optimset('display','iter'); % opts.Algorithm = 'sqp';
-UB = [ones(1,nb*1)*100, 100, 100];
-LB = [-ones(1,nb*1)*100, -100, .1];
-prs0 = [.9, .1, 0, randn(1,nb*1)];%
-
-for jj = 1:nStates
-    lfun = @(x)nll_fly(x, act, stim, gamnrm(jj,:), Basis, lambda, mask);
-    prs0 = mm.wts(:,:,jj); %+ mm.wts(:,:,jj).*(2*(rand(1,length(UB))-0.5))*0.5;  %from last time!
-    % [x,fval,EXITFLAG,OUTPUT,LAMBDA,GRAD,HESSIAN] = fmincon(lfun,prs0,[],[],[],[],LB,UB,[],opts);
-    [x,fval,exitflag,output,grad,hessian] = fminunc(lfun,prs0, opts);
-    mm.wts(:,:,jj) = x; % weighted optimization
-end
-
-end
-
-function [NLL] = nll_fly(THETA, act, stim, gams, cosBasis, lambda, mask)
-    
-    %%% unpacking
-    nb = size(cosBasis, 2);
-    base = THETA(nb+1);
-    alpha_s = THETA(1:nb);
-    sigma2 = THETA(end)^2;
-    % alpha_a = THETA(3+nb+1:end);
-
-    %%% construct filters
-    K_s = (alpha_s*cosBasis');
-    % K_s = Laguerre(alpha_s(1), alpha_s(2:end), size(cosBasis,1));
-    
-    % design matrix method?
-    F = conv_kernel(stim,K_s) + base*1;
-    F = F(1:length(act));
-    logp = -1/(2*1)*(F - act).^2 - log(1);
-    
-    %%% the Bernoulli way
-    ll = sum(  mask.*gams.* logp  ) - lambda*(1*sum((K_s - 0).^2));
-
-    NLL = -ll;
 end
 
 function [Kt] = Laguerre(lambda, beta, kernel_length)
