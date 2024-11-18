@@ -14,8 +14,8 @@
 % rng(0)
 
 %% load data
-% load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
-load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+% load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
 full_data = ComplexPlume.Smoke.expmat;
 
 %% build Data structure
@@ -58,7 +58,7 @@ list_tracks = unique(trjNum);
 clear Data
 Data(length(ntracks)) = struct();
 di = 1;
-for nn = 1:500 %ntracks
+for nn = 1:200 %ntracks
     pos = find(trjNum==list_tracks(nn));
     pos = pos(1:down_samp:end);
     Data(di).act = speed_smooth(pos); %stops_time(pos); %stops
@@ -86,21 +86,22 @@ data_speed = [extractfield(Data,'speed_smooth')];
 
 %% quick OLS checkl
 % lk = 200;
+% x_ =xx(pos_state2); y_=yy(pos_state2);
 % % X = [convmtx(xx(lk:end),lk)];    % (n x T)
-% X = hankel(xx(1:lk), xx(lk:end));
+% X = hankel(x_(1:lk), x_(lk:end));
 % X = [X; ones(1,size(X,2))];
 % XXT_inv = (X * X'); % (n x n)
-% Xy = X * yy(lk:end)';           % (n x 1)
+% Xy = X * y_(1:end-lk+1)';           % (n x 1)
 % beta = XXT_inv \ Xy;   % (n x 1)
 % figure
-% kernel = flipud(beta(5:end-1));
-% plot([1:length(kernel)]*0.011*down_samp, kernel,'-o','LineWidth',5); set(gcf, 'Color', 'w');
+% kernel = (beta(2:end-1));
+% plot([1:length(kernel)]*0.011*down_samp, kernel,'k-o','LineWidth',5); set(gcf, 'Color', 'w');
 % xlabel('time lag (s)'); ylabel('weight'); set(gca, 'FontSize', 14, 'XColor', 'k', 'YColor', 'k', 'LineWidth', 1.5);
 
 %% Observation and input
 % Set parameters: transition matrix and emission matrix
 nStates = 2; % number of latent states
-nX = nb+1;  % number of input dimensions (i.e., dimensions of regressor)
+nX = nb+2;  % number of input dimensions (i.e., dimensions of regressor)
 nY = 1;  % number of output dimensions 
 nT = length(yy); % number of time bins
 loglifun = @logli_fly;  % log-likelihood function
