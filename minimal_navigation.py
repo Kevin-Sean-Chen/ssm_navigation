@@ -266,4 +266,4 @@ betas = res.x
 K_s, K_a, base = betas[:lags], betas[lags:lags*2], betas[-1]
 plt.figure(figsize=(12, 4))
 plt.subplot(121); plt.plot(K_s); plt.title('K_s'); plt.xlabel('time lag')
-plt.subplot(122); plt.plot(K_a); plt.title('K_a'); plt.xlabel('time lag')
+plt.subplot(122); plt.plot(K_a); plt.title('K_a'); plt.xlabel('time lag') 
