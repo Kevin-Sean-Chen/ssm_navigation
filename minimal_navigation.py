@@ -52,7 +52,7 @@ def theta2state(pos, theta):
     """
     take continuous angle dth and put back to discrete states
     """
-    dv = v0 + np.random.randn()*0  # draw speed
+    dv = v0 + np.random.randn()*0.1  # draw speed
     vec = np.array([np.cos(theta)*dv , np.sin(theta)*dv] )
     pos = pos + vec #np.array([dx, dy])
     return pos, vec
@@ -117,7 +117,9 @@ while tt<lt and dist2source(pos_t)>eps:
     new_pos, new_vec = theta2state(pos_t, theta)
     ### record
     xys.append(pos_t)
-    cs.append(env_space(pos_t))
+    # cs.append(env_space(pos_t))
+    cs.append(np.log(env_space(pos_t)))
+    # cs.append(d_phi)
     vecs.append(vec_t)
     Fs.append(df_dt)
     tumbles.append(tumb_t)
@@ -151,7 +153,9 @@ plt.plot(vec_xy[-1,0], vec_xy[-1,1],'r*')
 # %% setup design matrix 
 lags = 15
 X_s = hankel(vec_cs[:lags], vec_cs[lags-1:]).T  ### time by lag
-X_a = hankel(vec_tumb[:lags], vec_tumb[lags-1:]).T  ### time by lag
+vec_causal = vec_tumb[:-1]
+vec_causal = np.insert(vec_causal, 0, 0)
+X_a = hankel(vec_causal[:lags], vec_causal[lags-1:]).T  ### time by lag
 X = np.concatenate((X_s,X_a), 1)
 X = np.concatenate((X, np.ones((X_s.shape[0],1))), 1)
 y = vec_tumb[:-lags+1]*1  # actions
