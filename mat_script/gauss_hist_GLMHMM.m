@@ -14,8 +14,8 @@
 % rng(0)
 
 %% load data
-load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
-% load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+% load('C:\Users\kevin\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
+load('C:\Users\ksc75\Yale University Dropbox\users\mahmut_demir\data\Smoke Navigation Paper Data\ComplexPlumeNavigationPaperData.mat')
 full_data = ComplexPlume.Smoke.expmat;
 
 %% build Data structure
@@ -59,7 +59,7 @@ list_tracks = unique(trjNum);
 clear Data
 Data(length(ntracks)) = struct();
 di = 1;
-for nn = 1:200 %ntracks-1
+for nn = 1:ntracks-1
     pos = find(trjNum==list_tracks(nn));
     pos = pos(1:down_samp:end);
     Data(di).act = speed_smooth(pos); %stops_time(pos); %stops
@@ -76,16 +76,20 @@ for nn = 1:200 %ntracks-1
     di = di + 1;
 end
 
+%% train and test sets
+Data_train = Data(1:500);
+Data_test = Data(500:end);
+
 %% then extract complete data vectors for EM
-xx = [extractfield(Data,'stim')];  % input
-yy = [extractfield(Data,'act')];  % observation
-mask = [extractfield(Data,'mask')];  % mask for LL
+xx = [extractfield(Data_train,'stim')];  % input
+yy = [extractfield(Data_train,'act')];  % observation
+mask = [extractfield(Data_train,'mask')];  % mask for LL
 mask = cat(1,mask{:})';
 
-data_x = [extractfield(Data,'x_smooth')]; 
-data_y = [extractfield(Data,'y_smooth')]; 
-data_speed = [extractfield(Data,'speed_smooth')]; 
-data_dtheta =  [extractfield(Data,'dtheta_smooth')];
+data_x = [extractfield(Data_train,'x_smooth')]; 
+data_y = [extractfield(Data_train,'y_smooth')]; 
+data_speed = [extractfield(Data_train,'speed_smooth')]; 
+data_dtheta =  [extractfield(Data_train,'dtheta_smooth')];
 
 %% quick OLS checkl
 % lk = 200;
@@ -103,7 +107,7 @@ data_dtheta =  [extractfield(Data,'dtheta_smooth')];
 
 %% Observation and input
 % Set parameters: transition matrix and emission matrix
-nStates = 1; % number of latent states
+nStates = 3; % number of latent states
 nX = nb*2+2;  % number of input dimensions (i.e., dimensions of regressor)
 nY = 1;  % number of output dimensions 
 nT = length(yy); % number of time bins
@@ -124,8 +128,8 @@ kappa = .5;  % upweighting self-transition for stickiness
 wts0 = rand(nY,nX,nStates); % parameters for the mixture-VonMesis behavioral model
 %%% Parameters: alpha, base, sigma
 wts0(1,:,1) = [randn(1,nb)*1 randn(1,nb)*1 0, 1]; %single mGLM
-% wts0(1,:,2) = [randn(1,nb)*1 randn(1,nb)*1 0, 1];
-% wts0(1,:,3) = [randn(1,nb)*1 0, 1]; %[.9, .1, 0, randn(1,nB)*10];
+wts0(1,:,2) = [randn(1,nb)*1 randn(1,nb)*1 0, 1];
+wts0(1,:,3) = [randn(1,nb)*1 randn(1,nb)*1 0, 1]; %[.9, .1, 0, randn(1,nB)*10];
 
 % Build struct for initial params
 mmhat = struct('A',A0, 'wts',wts0, 'loglifun',loglifun, 'basis',cosBasis, 'lambda',[.0]);
@@ -183,7 +187,7 @@ jj = jj-1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% plot some results
 cols = ['k','r','b'];
-stateK = 1;
+stateK = 3;
 flip = 1;
 x = squeeze(mmhat.wts(:,:,stateK));
 alpha_s = flip*x(1:nb);
@@ -206,7 +210,7 @@ xlabel('time (s)'); ylabel('weights');set(gca, 'FontSize', 14, 'XColor', 'k', 'Y
 [aa,bb] = max( gams_ ,[], 1 );
 pos_state1 = find(bb==1);
 pos_state2 = find(bb==2);
-% pos_state3 = find(bb==3);
+pos_state3 = find(bb==3);
 
 % pos_state1 = find(gams(1,:)>0.5);
 % pos_state2 = find(gams(2,:)>0.5);
@@ -215,12 +219,13 @@ figure;
 % plot(data_x(pos_state2), data_y(pos_state2), 'r.', 'MarkerFaceAlpha',.2);
 scatter(data_x(pos_state1), data_y(pos_state1), 2, 'k', 'filled', 'MarkerFaceAlpha', 1, 'MarkerEdgeAlpha', 1); hold on
 scatter(data_x(pos_state2), data_y(pos_state2), 4, 'r', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);set(gcf, 'Color', 'w');
-% scatter(data_x(pos_state3), data_y(pos_state3), 2, 'b', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);
+scatter(data_x(pos_state3), data_y(pos_state3), 2, 'b', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);
 
+%%
 figure;
 subplot(211); h = histogram(data_speed(pos_state1),100); h.FaceColor = 'black'; xlim([0,29]);set(gca, 'FontSize', 14, 'XColor', 'k', 'YColor', 'k', 'LineWidth', 1.5)
 subplot(212); h = histogram(data_speed(pos_state2),100); h.FaceColor = 'red'; set(gcf, 'Color', 'w');xlim([0,29]); set(gca, 'FontSize', 14, 'XColor', 'k', 'YColor', 'k', 'LineWidth', 1.5)
-set(gca, 'YScale', 'log');
+% set(gca, 'YScale', 'log');
 
 %% simple cross-validation
 reps = 20;
