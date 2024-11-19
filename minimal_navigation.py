@@ -23,10 +23,10 @@ sns.set_context("talk")
 
 # %% parameter setup
 dt = 1   # characteristic time scale
-t_M = 10  # memory
+t_M = 1  # memory
 N = 1  # receptor gain
 H = 1  # motor gain
-F0 = 0  # adapted internal state
+F0 = 0.5  # adapted internal state
 v0 = 1  # run speed
 
 target = np.array([100,100])  ### location of source
@@ -36,7 +36,7 @@ sigC = 50
 
 # %% kinematics
 def r_F(F):
-    return 1/(1+np.exp(-H*F))  # run rate
+    return 1/(1+np.exp(-H*F))+.0  # run rate
 
 def tumble(r):
     p = np.random.rand()
@@ -52,7 +52,7 @@ def theta2state(pos, theta):
     """
     take continuous angle dth and put back to discrete states
     """
-    dv = v0 + np.random.randn()*0.1  # draw speed
+    dv = v0 + np.random.randn()*0.  # draw speed
     vec = np.array([np.cos(theta)*dv , np.sin(theta)*dv] )
     pos = pos + vec #np.array([dx, dy])
     return pos, vec
@@ -83,7 +83,7 @@ def gaussian(x, y, mu_x=0, mu_y=0, sigma_x=1, sigma_y=1):
 gradient = grad(env_space)
 def grad_env(x, u_x):
     grad_x = gradient(x)
-    percieved = np.dot(grad_x, u_x)  # dot product between motion and local gradient
+    percieved = np.dot(grad_x/np.linalg.norm(grad_x), u_x/(1))  # dot product between motion and local gradient
     return percieved
 
 # # Example point
@@ -92,7 +92,7 @@ def grad_env(x, u_x):
 
 # %% setup time
 lt = 10000   #max time lapse
-eps = 1  # criteria to reach source
+eps = 3  # criteria to reach source
 xys = []
 cs = []
 vecs = []
@@ -110,7 +110,7 @@ while tt<lt and dist2source(pos_t)>eps:
     ### internal dynamics
     df_dt = df_dt + dt*(-1/t_M*(df_dt - F0) + d_phi)
     ### draw actions
-    r_t = r_F(df_dt)
+    r_t = r_F(df_dt)*dt
     dth,tumb_t = tumble(r_t)
     ### make movements
     theta = theta + dth
@@ -118,15 +118,60 @@ while tt<lt and dist2source(pos_t)>eps:
     ### record
     xys.append(pos_t)
     # cs.append(env_space(pos_t))
-    cs.append(np.log(env_space(pos_t)))
-    # cs.append(d_phi)
+    # cs.append(np.log(env_space(pos_t)))
+    cs.append(d_phi)
     vecs.append(vec_t)
     Fs.append(df_dt)
     tumbles.append(tumb_t)
     ### update
     pos_t, vec_t = new_pos*1, new_vec*1
     tt += 1
-    
+
+def gen_tracks():
+    lt = 10000   #max time lapse
+    eps = 1  # criteria to reach source
+    xys = []
+    cs = []
+    vecs = []
+    Fs = []
+    tumbles = []
+    pos_t = np.random.randn(2)  # random init location
+    vec_t = np.random.randn(2)  # random init direction
+    df_dt = np.random.randn()     # init internal state
+    theta = 0
+    tt = 0
+
+    while tt<lt and dist2source(pos_t)>eps:
+        ### compute impulse
+        d_phi = grad_env(pos_t, vec_t)
+        ### internal dynamics
+        df_dt = df_dt + dt*(-1/t_M*(df_dt - F0) + d_phi)
+        ### draw actions
+        r_t = r_F(df_dt)*dt
+        dth,tumb_t = tumble(r_t)
+        ### make movements
+        theta = theta + dth
+        new_pos, new_vec = theta2state(pos_t, theta)
+        ### record
+        xys.append(pos_t)
+        ### choose input
+        # cs.append(env_space(pos_t))
+        # cs.append(np.log(env_space(pos_t)))
+        cs.append(d_phi)
+        ####
+        vecs.append(vec_t)
+        Fs.append(df_dt)
+        tumbles.append(tumb_t)
+        ### update
+        pos_t, vec_t = new_pos*1, new_vec*1
+        tt += 1
+    ### vectorize
+    vec_xy = np.array(xys)
+    vec_cs = np.array(cs)
+    vec_Fs = np.array(Fs)
+    vec_tumb = np.array(tumbles)
+    return vec_xy, vec_cs, vec_Fs, vec_tumb
+
 # %% vectorize lists
 vec_xy = np.array(xys)
 vec_cs = np.array(cs)
@@ -151,7 +196,7 @@ plt.plot(vec_xy[-1,0], vec_xy[-1,1],'r*')
 # %% now test inference!
 ###############################################################################
 # %% setup design matrix 
-lags = 15
+lags = 10
 X_s = hankel(vec_cs[:lags], vec_cs[lags-1:]).T  ### time by lag
 vec_causal = vec_tumb[:-1]
 vec_causal = np.insert(vec_causal, 0, 0)
@@ -181,3 +226,44 @@ K_s, K_a, base = betas[:lags], betas[lags:lags*2], betas[-1]
 plt.figure()
 plt.plot(K_s)
 plt.plot(K_a)
+
+# %% group analysis
+###############################################################################
+# %% make group dictionary
+reps = 50
+tracks_dic = {}
+for rr in range(reps):
+    vec_xy, vec_cs, vec_Fs, vec_tumb = gen_tracks()
+    if len(vec_xy)<lt:  ### if reached goal...
+        tracks_dic[rr] = {'xy':vec_xy, 'cs':vec_cs, 'Fs':vec_Fs, 'tumb': vec_tumb}
+    print(rr)
+# %% group nll
+def group_nll(theta, tracks, lamb):
+    gnll = 0
+    for ii in range(len(tracks)):
+        tracki = tracks[ii]
+        _, vec_cs, _, vec_tumb = tracki['xy'], tracki['cs'], tracki['Fs'], tracki['tumb']
+        lags = 10
+        X_s = hankel(vec_cs[:lags], vec_cs[lags-1:]).T  ### time by lag
+        vec_causal = vec_tumb[:-1]
+        vec_causal = np.insert(vec_causal, 0, 0)
+        X_a = hankel(vec_causal[:lags], vec_causal[lags-1:]).T  ### time by lag
+        X = np.concatenate((X_s,X_a), 1)
+        X = np.concatenate((X, np.ones((X_s.shape[0],1))), 1)
+        y = vec_tumb[:-lags+1]*1  # actions
+        
+        gnll += neg_ll(theta, y, X)
+    return gnll + lamb*np.sum(np.diff(theta)**2)
+
+# %% optimize for group
+n_params = lags*2 + 1  ### two kernels and one offset
+lamb = 0
+theta0 = np.ones(n_params)*0
+res = sp.optimize.minimize( group_nll, theta0, args=(tracks_dic, lamb), options={'disp':True,'gtol':1e-9})
+
+# %% plot sensory and history kernels
+betas = res.x
+K_s, K_a, base = betas[:lags], betas[lags:lags*2], betas[-1]
+plt.figure(figsize=(12, 4))
+plt.subplot(121); plt.plot(K_s); plt.title('K_s'); plt.xlabel('time lag')
+plt.subplot(122); plt.plot(K_a); plt.title('K_a'); plt.xlabel('time lag')
