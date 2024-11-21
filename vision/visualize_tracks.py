@@ -49,8 +49,8 @@ print(pkl_files)
 
 # %%
 ff = np.array([1,2,3])+0 ### bar-only
-ff = np.array([4,5,6])+0 ### wind
-ff = np.array([7,0]) ### after
+# ff = np.array([4,5,6])+0 ### wind
+# ff = np.array([7,0]) ### after
 
 # ff = [3 +0]
 
@@ -72,7 +72,7 @@ for ii in range(len(ff)):
             if len(pos) > threshold_track_l:
                 
                 ### make per track data
-                theta = data['theta'][pos]
+                theta = data['theta_smooth'][pos]
                 temp_v = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]))
                 temp_x = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
                 times.append(data['t'][pos])
@@ -81,7 +81,7 @@ for ii in range(len(ff)):
                 track_id.append(np.zeros(len(pos))+jj) 
                 thetas.append(theta)
 
-# %%
+# %% vectorize for all data
 vec_time = np.concatenate(times)  # time in trial
 vec_vxy = np.concatenate(vxys)  # velocity
 vec_xy = np.concatenate(tracks)  # position
@@ -104,3 +104,13 @@ plt.figure()
 # plt.plot(bb[:-1],aa)
 plt.hist(vec_vxy[:,0],50)
 plt.yscale('log')
+
+# %% checking for speeding
+plt.figure()
+for ii in range(len(tracks)):
+    xy_i = tracks[ii]
+    vxy_i = vxys[ii]
+    # plt.plot(xy_i[:,1], vxy_i[:,1],'k-.',alpha=0.2)
+    plt.plot(xy_i[:,1], thetas[ii],'k-.',alpha=0.02)
+# plt.ylim([-30,30])
+plt.xlabel('y (mm)'); plt.ylabel('vy (mm/s)')

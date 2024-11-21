@@ -45,8 +45,10 @@ for file in pkl_files:
 
 # %% for perturbed data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'  ### for OU-ribbons
-root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
+# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-5'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-11-7'  ### for full field
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-10-31'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -62,7 +64,7 @@ for subfolder in subfolders:
             print(full_path)
 
 # pkl_files = pkl_files[8:]
-# pkl_files = pkl_files[4:]
+pkl_files = pkl_files[:30]
 print(pkl_files) 
 
     
@@ -86,17 +88,19 @@ for ff in range(nf):
     
     for ii in n_tracks:
         pos = np.where(data['trjn']==ii)[0] # find track elements
-        if sum(data['behaving'][pos]):  # check if behaving
+        # if sum(data['behaving'][pos]):  # check if behaving
+        if 1==1: 
             if len(pos) > threshold_track_l:
                 
                 ### make per track data
                 # temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos] , \
                                         # data['theta_smooth'][pos] , data['signal'][pos]))
                 thetas = data['theta'][pos]
-                temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]))
+                temp = np.column_stack((data['headx'][pos] , data['heady'][pos]))
                 # temp = np.stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]),1)#######
                 
-                temp_xy = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
+                # temp_xy = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
+                temp_xy = np.column_stack((data['x'][pos] , data['y'][pos]))
                                 
                 ### criteria
                 mask_i = np.where(np.isnan(temp), 0, 1)
@@ -104,12 +108,13 @@ for ff in range(nf):
                 mean_v = np.nanmean(np.sum(temp**2,1)**0.5)
                 max_v = np.max(np.sum(temp**2,1)**0.5)
                 # print(mean_v)
-                if np.prod(mask_i)==1 and np.prod(mask_j)==1 and mean_v>1 and max_v<20:  ###################################### removing nan for now
+                if np.prod(mask_i)==1 and np.prod(mask_j)==1:# and mean_v>1 and max_v<20:  ###################################### removing nan for now
                     data4fit.append(temp)  # get data for ssm fit
                     rec_tracks.append(temp_xy)  # get raw tracks
                     # track_id.append(np.array([ff,ii]))  # get track id
                     track_id.append(np.zeros(len(pos))+ii) 
-                    rec_signal.append(data['signal'][pos])
+                    # rec_signal.append(data['signal'][pos])
+                    rec_signal.append(np.ones((len(pos),1)))   ########################## hacking for now...
                     cond_id += 1
                     masks.append(thetas)
                     times.append(data['t'][pos])
@@ -132,8 +137,9 @@ for nn in range(len(data4fit)):
     xy_i = rec_tracks[nn]
     vxy_i = data4fit[nn]
     pos_stim = np.where((time_i>45) & (time_i<45+30))[0]
-    if np.nansum(signal_i)>0:  # some odor encounter
-        pos = np.where(signal_i>0)[0][-1]  # last encounter
+    if np.nansum(signal_i)>0 and len(pos_stim)>0:  # some odor encounter
+        # pos = np.where(signal_i>0)[0][-1]  # last encounter
+        pos = pos_stim[-1]
         post_vxy.append(vxy_i[pos:,:])
         post_xy.append(xy_i[pos:,:])
         ### building features
@@ -141,6 +147,12 @@ for nn in range(len(data4fit)):
         signal_vec[signal_i[pos_stim,0]>0] = 1
         temp = np.diff(signal_vec)
         odor_feature.append(np.nanmean(signal_i))
+        
+        ### pre-off behavior
+        # xy_during = xy_i[pos_stim,:]
+        # dxdy2 = np.linalg.norm(np.diff(xy_i), axis=0)
+        # odor_feature.append(np.nanmean(dxdy2))
+        
         ### number of encounter
         # odor_feature.append( len(np.where(temp>1)[0]) )
         # odor_feature.append(np.mean(vxy_i[:pos,:]**2))
@@ -153,7 +165,7 @@ for nn in range(len(data4fit)):
 # %% sorted plots
 dispy = 1
 offset = 1
-post_window = 20*60
+post_window = 15*60
 
 sortt_id = np.argsort(odor_feature)[::-1]
 import matplotlib.cm as cm
