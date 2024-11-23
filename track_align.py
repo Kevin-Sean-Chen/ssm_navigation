@@ -45,10 +45,10 @@ for file in pkl_files:
 
 # %% for perturbed data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'  ### for OU-ribbons
-# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
+root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-5'
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-11-7'  ### for full field
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-10-31'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-10-31'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -64,7 +64,7 @@ for subfolder in subfolders:
             print(full_path)
 
 # pkl_files = pkl_files[8:]
-pkl_files = pkl_files[:30]
+# pkl_files = pkl_files[:30]
 print(pkl_files) 
 
     
@@ -96,11 +96,11 @@ for ff in range(nf):
                 # temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos] , \
                                         # data['theta_smooth'][pos] , data['signal'][pos]))
                 thetas = data['theta'][pos]
-                temp = np.column_stack((data['headx'][pos] , data['heady'][pos]))
-                # temp = np.stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]),1)#######
+                # temp = np.column_stack((data['headx'][pos] , data['heady'][pos]))
+                temp = np.stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]),1)#######
                 
-                # temp_xy = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
-                temp_xy = np.column_stack((data['x'][pos] , data['y'][pos]))
+                temp_xy = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
+                # temp_xy = np.column_stack((data['x'][pos] , data['y'][pos]))
                                 
                 ### criteria
                 mask_i = np.where(np.isnan(temp), 0, 1)
@@ -113,8 +113,8 @@ for ff in range(nf):
                     rec_tracks.append(temp_xy)  # get raw tracks
                     # track_id.append(np.array([ff,ii]))  # get track id
                     track_id.append(np.zeros(len(pos))+ii) 
-                    # rec_signal.append(data['signal'][pos])
-                    rec_signal.append(np.ones((len(pos),1)))   ########################## hacking for now...
+                    rec_signal.append(data['signal'][pos])
+                    # rec_signal.append(np.ones((len(pos),1)))   ########################## hacking for now...
                     cond_id += 1
                     masks.append(thetas)
                     times.append(data['t'][pos])
@@ -138,15 +138,16 @@ for nn in range(len(data4fit)):
     vxy_i = data4fit[nn]
     pos_stim = np.where((time_i>45) & (time_i<45+30))[0]
     if np.nansum(signal_i)>0 and len(pos_stim)>0:  # some odor encounter
-        # pos = np.where(signal_i>0)[0][-1]  # last encounter
-        pos = pos_stim[-1]
+        pos = np.where(signal_i>0)[0][-1]  # last encounter
+        # pos = pos_stim[-1]
         post_vxy.append(vxy_i[pos:,:])
         post_xy.append(xy_i[pos:,:])
+        
         ### building features
         signal_vec = signal_i[pos_stim,0]*0
         signal_vec[signal_i[pos_stim,0]>0] = 1
         temp = np.diff(signal_vec)
-        odor_feature.append(np.nanmean(signal_i))
+        # odor_feature.append(np.nanmean(signal_i))
         
         ### pre-off behavior
         # xy_during = xy_i[pos_stim,:]
@@ -156,11 +157,12 @@ for nn in range(len(data4fit)):
         ### number of encounter
         # odor_feature.append( len(np.where(temp>1)[0]) )
         # odor_feature.append(np.mean(vxy_i[:pos,:]**2))
+        
         ### encounter time
-        # if len(np.where(temp>0)[0])>0:
-        #     odor_feature.append( pos - np.where(temp>0)[0][-1])
-        # else:
-        #     odor_feature.append( pos )
+        if len(np.where(temp>0)[0])>0:
+            odor_feature.append( pos - np.where(temp>0)[0][-1])
+        else:
+            odor_feature.append( pos )
         
 # %% sorted plots
 dispy = 1
@@ -172,7 +174,7 @@ import matplotlib.cm as cm
 colors = cm.viridis(np.linspace(0, 1, len(sortt_id)))
 
 plt.figure()
-for kk in range(0,len(sortt_id),2):
+for kk in range(0,len(sortt_id),3):
     ### plot tracks
     traji = post_xy[sortt_id[kk]]
     if len(traji)<post_window:
@@ -187,3 +189,39 @@ for kk in range(0,len(sortt_id),2):
     # post_feature = np.sum((traji[0,0] - traji[-1,0])**2)**.5
     # post_feature = ((traji[0,1] - traji[-1,1]))
     # plt.plot(odor_feature[sortt_id[kk]], post_feature,'o')
+
+# %%
+###############################################################################    
+# %% MSD analysis!
+
+sortt_id = np.array(sortt_id, dtype=int)
+# track_set = post_xy[sortt_id[:len(sortt_id)//2]]  ## compare sorted
+track_set = [post_xy[i] for i in sortt_id[-len(sortt_id)//2:]]
+max_lag = max(len(track) for track in track_set)
+
+# Initialize arrays for MSD and counts
+msd = np.zeros(max_lag)
+counts = np.zeros(max_lag)
+
+# Compute MSD
+for track in track_set:
+    n_points = len(track_set)
+    for lag in range(1, n_points):
+        displacements = track[lag:] - track[:-lag]  # Displacements for this lag
+        squared_displacement = np.sum(displacements**2, axis=1)  # (dx^2 + dy^2)
+        msd[lag] += np.sum(squared_displacement)  # Sum displacements
+        counts[lag] += len(squared_displacement)  # Count valid pairs
+
+# Normalize to get the average MSD for each lag
+msd = msd / counts
+
+# Plot MSD
+lag_times = np.arange(max_lag)  # Lag times
+plt.figure(figsize=(8, 6))
+plt.plot(lag_times, msd, marker='o', linestyle='-', color='b')
+plt.xlabel("Lag Time")
+plt.ylabel("Mean Squared Displacement (MSD)")
+plt.title("MSD vs Lag Time")
+plt.grid(True)
+plt.show()
+

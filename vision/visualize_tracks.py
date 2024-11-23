@@ -111,6 +111,7 @@ for ii in range(len(tracks)):
     xy_i = tracks[ii]
     vxy_i = vxys[ii]
     # plt.plot(xy_i[:,1], vxy_i[:,1],'k-.',alpha=0.2)
-    plt.plot(xy_i[:,1], thetas[ii],'k-.',alpha=0.02)
+    plt.plot(xy_i[:,0], thetas[ii],'k-.',alpha=0.04)
 # plt.ylim([-30,30])
-plt.xlabel('y (mm)'); plt.ylabel('vy (mm/s)')
+# plt.xlabel('x (mm)'); plt.ylabel('vy (mm/s)')
+plt.xlabel('x (mm)'); plt.ylabel('heading (degrees from wind)')
