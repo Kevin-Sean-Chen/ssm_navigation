@@ -23,6 +23,10 @@ from sklearn.cluster import MiniBatchKMeans
 from scipy.sparse import diags
 from scipy.sparse.linalg import eigs
 
+import matplotlib
+matplotlib.rc('xtick', labelsize=20) 
+matplotlib.rc('ytick', labelsize=20)
+
 # %% revisiting analysis of kinematics, conditioned on last encountrance
 # start with vx,vy, dth
 # analyze cross-wind and down-wind displacement
@@ -33,19 +37,19 @@ from scipy.sparse.linalg import eigs
 ### cutoff for short tracks
 threshold_track_l = 60 * 20  # 20 # look at long-enough tracks
 
-# Define the folder path
-folder_path = 'C:/Users/ksc75/Downloads/ribbon_data_kc/'
+# # Define the folder path
+# folder_path = 'C:/Users/ksc75/Downloads/ribbon_data_kc/'
 
-# Use glob to search for all .pkl files in the folder
-pkl_files = glob.glob(os.path.join(folder_path, '*.pklz'))
+# # Use glob to search for all .pkl files in the folder
+# pkl_files = glob.glob(os.path.join(folder_path, '*.pklz'))
 
-# Print the list of .pkl files
-for file in pkl_files:
-    print(file)
+# # Print the list of .pkl files
+# for file in pkl_files:
+#     print(file)
 
 # %% for perturbed data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'  ### for OU-ribbons
-root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
+root_dir = 'C:/Users/kevin/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-5'
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-11-7'  ### for full field
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-10-31'
@@ -108,7 +112,7 @@ for ff in range(nf):
                 mean_v = np.nanmean(np.sum(temp**2,1)**0.5)
                 max_v = np.max(np.sum(temp**2,1)**0.5)
                 # print(mean_v)
-                if np.prod(mask_i)==1 and np.prod(mask_j)==1:# and mean_v>1 and max_v<20:  ###################################### removing nan for now
+                if np.prod(mask_i)==1 and np.prod(mask_j)==1 and mean_v>.2 and max_v<20:  ###################################### removing nan for now
                     data4fit.append(temp)  # get data for ssm fit
                     rec_tracks.append(temp_xy)  # get raw tracks
                     # track_id.append(np.array([ff,ii]))  # get track id
@@ -144,7 +148,7 @@ for nn in range(len(data4fit)):
         post_xy.append(xy_i[pos:,:])
         
         ### building features
-        signal_vec = signal_i[pos_stim,0]*0
+        signal_vec = np.zeros_like(signal_i[pos_stim,0])
         signal_vec[signal_i[pos_stim,0]>0] = 1
         temp = np.diff(signal_vec)
         # odor_feature.append(np.nanmean(signal_i))
@@ -155,26 +159,26 @@ for nn in range(len(data4fit)):
         # odor_feature.append(np.nanmean(dxdy2))
         
         ### number of encounter
-        # odor_feature.append( len(np.where(temp>1)[0]) )
+        # odor_feature.append( len(np.where(temp>0)[0]) )
         # odor_feature.append(np.mean(vxy_i[:pos,:]**2))
         
         ### encounter time
         if len(np.where(temp>0)[0])>0:
-            odor_feature.append( pos - np.where(temp>0)[0][-1])
+            odor_feature.append( pos - np.where(temp>0)[0][-1] - pos_stim[0])
         else:
-            odor_feature.append( pos )
+            odor_feature.append( pos - pos_stim[0])
         
 # %% sorted plots
 dispy = 1
 offset = 1
-post_window = 15*60
+post_window = 20*60
 
 sortt_id = np.argsort(odor_feature)[::-1]
 import matplotlib.cm as cm
 colors = cm.viridis(np.linspace(0, 1, len(sortt_id)))
 
 plt.figure()
-for kk in range(0,len(sortt_id),3):
+for kk in range(0,len(sortt_id),1):
     ### plot tracks
     traji = post_xy[sortt_id[kk]]
     if len(traji)<post_window:
@@ -196,32 +200,54 @@ for kk in range(0,len(sortt_id),3):
 
 sortt_id = np.array(sortt_id, dtype=int)
 # track_set = post_xy[sortt_id[:len(sortt_id)//2]]  ## compare sorted
-track_set = [post_xy[i] for i in sortt_id[-len(sortt_id)//2:]]
+track_set = [post_xy[i] for i in sortt_id[:len(sortt_id)//3]]
+# track_set = [post_xy[i] for i in sortt_id[len(sortt_id)//3:-len(sortt_id)//3]]
+# track_set = [post_xy[i] for i in sortt_id[-len(sortt_id)//3:]]
 max_lag = max(len(track) for track in track_set)
-
+# max_lag = int(10*1/(1/60))
 # Initialize arrays for MSD and counts
 msd = np.zeros(max_lag)
 counts = np.zeros(max_lag)
+msd_std = msd*0
 
 # Compute MSD
 for track in track_set:
-    n_points = len(track_set)
+    n_points = len(track)
     for lag in range(1, n_points):
-        displacements = track[lag:] - track[:-lag]  # Displacements for this lag
-        squared_displacement = np.sum(displacements**2, axis=1)  # (dx^2 + dy^2)
+        displacements = track[lag:,:] - track[:-lag,:]  # Displacements for this lag
+        squared_displacement = np.sum(displacements**2)#, axis=1)  # (dx^2 + dy^2)
+        ##############################################################3 TRY <X^2> vs. <R^2>!!!
         msd[lag] += np.sum(squared_displacement)  # Sum displacements
-        counts[lag] += len(squared_displacement)  # Count valid pairs
-
+        counts[lag] += len(displacements)  # Count valid pairs
+        msd_std[lag] += np.sum(squared_displacement**2)
 # Normalize to get the average MSD for each lag
-msd = msd / counts
 
+# %%
+msd_mean = msd / counts
+variance_msd = (msd_std / counts) - (msd_mean**2)
+sem_msd = np.sqrt(variance_msd) / counts**0.5 * 1
+
+# %%
 # Plot MSD
-lag_times = np.arange(max_lag)  # Lag times
+lag_times = np.arange(max_lag)*1/60  # Lag times
 plt.figure(figsize=(8, 6))
-plt.plot(lag_times, msd, marker='o', linestyle='-', color='b')
-plt.xlabel("Lag Time")
-plt.ylabel("Mean Squared Displacement (MSD)")
-plt.title("MSD vs Lag Time")
+plt.loglog(lag_times, msd_mean, marker='o', linestyle='-', color='k', label='top')
+plt.loglog(lag_times_mid, msd_mean_mid, marker='o', linestyle='-', color='r', label='middle')
+plt.loglog(lag_times_last, msd_mean_last, marker='o', linestyle='--', color='b', label='last')
+# plt.loglog(lag_times, lag_times**2 + msd_mean[1], marker='o', linestyle='-', color='g')
+# plt.fill_between(
+#     lag_times,
+#     msd_mean - sem_msd,  # Lower bound of shaded region
+#     msd_mean + sem_msd,  # Upper bound of shaded region
+#     color='red',
+#     alpha=0.5,
+#     label='1 Std Dev'
+# )
+plt.xlabel("lag time (s)")
+plt.ylabel(r"MSD (mm$^2$)")
+plt.title("MSD scaling")
 plt.grid(True)
-plt.show()
+plt.xlim([0,70]); plt.ylim([0.001, 9000])
+# plt.show()
+plt.legend()
 
