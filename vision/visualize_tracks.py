@@ -28,7 +28,8 @@ from scipy.sparse.linalg import eigs
 ### plot tracks and kinematics to visualize results...
 
 # %% for perturbed data
-root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-14/'
+# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-14/'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-11-22'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -43,7 +44,7 @@ for subfolder in subfolders:
             pkl_files.append(full_path)
             print(full_path)
 
-# pkl_files = pkl_files[8:]
+# pkl_files = pkl_files[6:9]
 # pkl_files = pkl_files[4:]
 print(pkl_files) 
 
@@ -52,7 +53,11 @@ ff = np.array([1,2,3])+0 ### bar-only
 # ff = np.array([4,5,6])+0 ### wind
 # ff = np.array([7,0]) ### after
 
-# ff = [3 +0]
+ff = np.array([7,8,9,10])  ### short edge
+ff = np.array([1,2, 11])  ### inverted short
+ff = np.array([3,4,5])  ### inverted long
+ff = np.array([18,19,20])
+ff = np.array([13,16,12])
 
 threshold_track_l = 60 * 2 
 times = []
