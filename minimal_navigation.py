@@ -23,16 +23,19 @@ sns.set_context("talk")
 
 # %% parameter setup
 dt = 1   # characteristic time scale
-t_M = 1  # memory
+t_M = 10  # memory
 N = 1  # receptor gain
 H = 1  # motor gain
 F0 = 0.5  # adapted internal state
-v0 = 1  # run speed
+v0 = 1.  # run speed
 
 target = np.array([100,100])  ### location of source
 tau_env = 10   ### fluctuation time scale of the environment
 C0 = 100
 sigC = 50
+
+lt = 10000   #max time lapse
+eps = 3  # criteria to reach sourc
 
 # %% kinematics
 def r_F(F):
@@ -58,21 +61,41 @@ def theta2state(pos, theta):
     return pos, vec
     
 # %% factorized environment
+def temporal_ou_process(lt, tau, A, dt=0.01):
+    n_steps = lt*1  # Number of steps
+    x = np.ones(n_steps)  # OU process values
+    
+    # Variance of the noise
+    sigma = A * np.sqrt(2 / tau)
+    
+    for i in range(1, n_steps):
+        # Update step for OU process
+        x[i] = x[i-1] - ((x[i-1]-1) / tau) * dt + sigma * np.sqrt(dt) * np.random.randn()
+    
+    return x
+
+# Parameters
+tau = 10.0      # Correlation time
+A = 0.5        # Amplitude
+# Simulate and plot the process
+fluctuation_t = temporal_ou_process(lt, tau, A)#*.1 + 1
+plt.figure()
+plt.plot(fluctuation_t)
+
 def dist2source(x):
     return np.sum( (x-target)**2 )**0.5
     
-def env_space(x):
-    C = np.exp(-np.sum((x - target)**2)/sigC**2)*C0
-    return C
+def env_space(x, tt=-1):
+    C = np.exp(-np.sum((x - target)**2)/sigC**2)*C0 + np.random.randn()*0.
+    if tt==-1:
+        return C
+    else:
+        return C*fluctuation_t[tt]
 
 def env_space_xy(x,y):
     # C = np.exp(-np.sum((x - target)**2)/sigC**2)*C0
     C = -((x - target[0])**2 / (sigC**2) + (y - target[1])**2 / (sigC**2))
     return C
-
-def odor_profile(self, X,Y):
-        exponent = -((X - self.xs[0])**2 / (self.sigC**2) + (Y - self.xs[1])**2 / (self.sigC**2))
-        return self.C * np.exp(exponent)
 
 def env_time(x):
     return 1   ### let's not have environmental dynamics for now
@@ -80,19 +103,21 @@ def env_time(x):
 def gaussian(x, y, mu_x=0, mu_y=0, sigma_x=1, sigma_y=1):
     return np.exp(-((x - mu_x)**2 / (2 * sigma_x**2) + (y - mu_y)**2 / (2 * sigma_y**2)))
 
-gradient = grad(env_space)
-def grad_env(x, u_x):
-    grad_x = gradient(x)
-    percieved = np.dot(grad_x/np.linalg.norm(grad_x), u_x/(1))  # dot product between motion and local gradient
+gradient = grad(env_space, argnum=0)
+def grad_env(x, u_x, tt=-1):
+    grad_x = gradient(x, tt)
+    if np.linalg.norm(grad_x)==0:
+        percieved = C0
+    else:
+        percieved = np.dot(grad_x/np.linalg.norm(grad_x), u_x/(1))  # dot product between motion and local gradient
+    # print(np.linalg.norm(grad_x))
     return percieved
 
 # # Example point
 # inputs = np.array([1.0, 1.5])
 # grad_values = gradient(inputs)
 
-# %% setup time
-lt = 10000   #max time lapse
-eps = 3  # criteria to reach source
+# %% setup timee
 xys = []
 cs = []
 vecs = []
@@ -106,7 +131,7 @@ tt = 0
 
 while tt<lt and dist2source(pos_t)>eps:
     ### compute impulse
-    d_phi = grad_env(pos_t, vec_t)
+    d_phi = grad_env(pos_t, vec_t, tt)
     ### internal dynamics
     df_dt = df_dt + dt*(-1/t_M*(df_dt - F0) + d_phi)
     ### draw actions
@@ -196,13 +221,13 @@ plt.plot(vec_xy[-1,0], vec_xy[-1,1],'r*')
 # %% now test inference!
 ###############################################################################
 # %% setup design matrix 
-lags = 10
+lags = 15
 X_s = hankel(vec_cs[:lags], vec_cs[lags-1:]).T  ### time by lag
 vec_causal = vec_tumb[:-1]
 vec_causal = np.insert(vec_causal, 0, 0)
 X_a = hankel(vec_causal[:lags], vec_causal[lags-1:]).T  ### time by lag
 X = np.concatenate((X_s,X_a), 1)
-X = np.concatenate((X, np.ones((X_s.shape[0],1))), 1)
+X = np.concatenate((X, 0*np.ones((X_s.shape[0],1))), 1)
 y = vec_tumb[:-lags+1]*1  # actions
 
 # %% likelihood function and optimization
@@ -223,9 +248,9 @@ res = sp.optimize.minimize( neg_ll, theta0, args=(y, X), options={'disp':True,'g
 # %% plot sensory and history kernels
 betas = res.x
 K_s, K_a, base = betas[:lags], betas[lags:lags*2], betas[-1]
-plt.figure()
-plt.plot(K_s)
-plt.plot(K_a)
+plt.figure(figsize=(12, 4))
+plt.subplot(121); plt.plot(K_s)
+plt.subplot(122); plt.plot(K_a)
 
 # %% group analysis
 ###############################################################################
@@ -243,7 +268,7 @@ def group_nll(theta, tracks, lamb):
     for ii in range(len(tracks)):
         tracki = tracks[ii]
         _, vec_cs, _, vec_tumb = tracki['xy'], tracki['cs'], tracki['Fs'], tracki['tumb']
-        lags = 10
+        # lags = 10
         X_s = hankel(vec_cs[:lags], vec_cs[lags-1:]).T  ### time by lag
         vec_causal = vec_tumb[:-1]
         vec_causal = np.insert(vec_causal, 0, 0)
