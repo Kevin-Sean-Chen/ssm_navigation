@@ -30,7 +30,7 @@ sns.set_context("talk")
 dt = 0.1              # Time step
 T = 100000            # Total time
 kBT = 0.001           # temperature
-gamma = 2             # drag coefficient
+gamma = 1.5             # drag coefficient
 lt = int(T / dt)
 time = np.linspace(0, T, lt)
 D = np.sqrt(2 * gamma * kBT / dt)  # effective diffusion coefficient
@@ -47,7 +47,7 @@ x = np.zeros(lt)
 bt = x*0
 
 # generate a stochastic input
-b = .9             # input strength
+b = .3             # input strength
 stim_dur = 30     # input duration
 n_stims = 1000     # number of input
 vector = np.arange(lt-stim_dur)
@@ -60,20 +60,20 @@ for ii in range(n_stims):
 for t in range(1, lt):
     # noise = np.sqrt(2 * D) * np.random.normal()
     noise = np.random.normal(0, D)
-    x[t] = x[t-1] - grad_potential(x[t-1], b=bt[t]) * dt/gamma + noise# * np.sqrt(dt)  # Langevin eqn
+    x[t] = x[t-1] - grad_potential(x[t-1], b=b) * dt/gamma + noise# * np.sqrt(dt)  # Langevin eqn
 
 # Plot results
 plt.figure(figsize=(10, 5))
 # Trajectory plot
 plt.subplot(1, 2, 1)
-plt.plot(time[:10000], x[:10000], color='blue')
+plt.plot(time[:3000], x[:3000], color='blue')
 plt.xlabel('Time')
 plt.ylabel('Position')
 plt.title('Particle Trajectory')
 
 # Potential energy landscape
 x_vals = np.linspace(-2, 2, 500)
-U_vals = potential(x_vals)
+U_vals = potential(x_vals, b=b)
 
 plt.subplot(1, 2, 2)
 plt.plot(x_vals, U_vals, color='black', label='Potential $U(x)$')
@@ -188,15 +188,16 @@ plt.yscale('log')
 
 # %% checking the modes
 imode = 1
-window_show = np.arange(0,50000) 
+window_show = np.arange(0,3000) 
 R = get_reversible_transition_matrix(Pij)
 eigvals,eigvecs = sorted_spectrum(R,k=7)  # choose the top k modes
 phi2 = eigvecs[test_label,imode].real
 color_abs = np.max(np.abs(phi2))
 x_back = X[:, 0]
 plt.figure()
-plt.scatter(window_show, x_back[window_show],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
-plt.title(f'mode#{imode}') 
+plt.plot(window_show, x_back[window_show],'k--',alpha=0.2)
+plt.scatter(window_show, x_back[window_show],c=phi2[window_show],cmap='coolwarm',s=1.5,vmin=-color_abs,vmax=color_abs)
+plt.title(f'mode#{imode}') ; plt.xlabel('Time'); plt.ylabel('Position')
 
 # %% analyze stim...
 ###############################################################################
@@ -220,7 +221,7 @@ beta_x = lin_reg(X_x, y)
 
 # %%
 plt.figure()
-plt.plot(beta_phi/np.linalg.norm(beta_phi), label=r'$K_{\phi}$')
-plt.plot(beta_x/np.linalg.norm(beta_x), label=r'$K_x$')
+plt.plot(-beta_phi/np.linalg.norm(beta_phi), label=r'$R_{\phi}$')
+plt.plot(beta_x/np.linalg.norm(beta_x), label=r'$R_x$')
 plt.xlabel('time lag'); plt.ylabel('weights')
 plt.legend()
