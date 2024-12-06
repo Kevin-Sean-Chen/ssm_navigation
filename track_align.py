@@ -160,13 +160,13 @@ for nn in range(len(data4fit)):
         
         ### number of encounter
         # odor_feature.append( len(np.where(temp>0)[0]) )  # number of encounters
-        # odor_feature.append(np.mean(vxy_i[pos_stim[0]:pos,:]**2))  # past behavior
+        odor_feature.append(np.nanmean(vxy_i[pos_stim[0]:pos,0]**2))  # past behavior
         
         ### encounter time since last one
-        if len(np.where(temp>0)[0])>0:
-            odor_feature.append( pos - np.where(temp>0)[0][-1] - 0*pos_stim[0])
-        else:
-            odor_feature.append( pos - pos_stim[0])
+        # if len(np.where(temp>0)[0])>0:
+        #     odor_feature.append( pos - np.where(temp>0)[0][-1] - 0*pos_stim[0])
+        # else:
+        #     odor_feature.append( pos - pos_stim[0])
         
 # %% sorted plots
 dispy = 2
@@ -231,9 +231,9 @@ lag_times = np.arange(max_lag)*1/60  # Lag times
 # %%
 # Plot MSD
 plt.figure(figsize=(8, 6))
-plt.loglog(lag_times, msd_mean, marker='o', linestyle='-', color='k', label='short')
-# plt.loglog(lag_times_mid, msd_mean_mid, marker='o', linestyle='-.', color='r', label='middle')
-# plt.loglog(lag_times_last, msd_mean_last, marker='o', linestyle='--', color='b', label='long')
+plt.loglog(lag_times, msd_mean, marker='o', linestyle='-', color='k', label='long')
+plt.loglog(lag_times_mid, msd_mean_mid, marker='o', linestyle='-.', color='r', label='middle')
+plt.loglog(lag_times_last, msd_mean_last, marker='o', linestyle='--', color='b', label='short')
 # plt.loglog(lag_times, lag_times**2 + msd_mean[1], marker='o', linestyle='-', color='g')
 # plt.fill_between(
 #     lag_times,

@@ -75,7 +75,9 @@ ff = np.arange(22,30)  # iso-d1
 # ff = np.arange(51,54)
 
 ### 12/2
-ff = np.arange(21,25)
+ff = np.arange(0,1) #0,8
+# ff = np.arange(9,10) #9,16
+ff = np.arange(16,21) #21,25
 ff = np.arange(25,30)
 
 threshold_track_l = 60 * 2 
@@ -125,12 +127,17 @@ for ii in range(len(tracks)):
     time_i = times[ii]
     # pos = np.where((times[ii]>60) & (times[ii]<90))[0]
     # pos = np.where((times[ii]<30))[0]
-    pos = np.where((times[ii]>0))[0]
-    plt.plot(xy_i[pos,0], xy_i[pos,1],'k',alpha=.5)
+    # pos = np.where((times[ii]>0))[0]
+    # plt.plot(xy_i[pos,0], xy_i[pos,1],'k',alpha=.5)
     
-    # plt.plot(xy_i[:,0], xy_i[:,1],'k')
+    plt.plot(xy_i[:,0], xy_i[:,1],'k')
     # plt.scatter(xy_i[:,0],xy_i[:,1],c=time_i,cmap='coolwarm',s=.1,vmin=np.min(time_i),vmax=np.max(time_i))
     # plt.scatter(xy_i[:,0],xy_i[:,1],c=time_i,cmap='coolwarm',s=.1,vmin=np.min(vec_time),vmax=np.max(vec_time))
+
+# %% showing counts
+plt.figure()
+g = sns.jointplot(x=vec_xy[::30,0], y=vec_xy[::30,1], kind="kde")
+g.set_axis_labels('x (mm)', 'y (mm)')
 
 # %% turning analysis
 ###############################################################################
