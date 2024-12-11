@@ -30,9 +30,10 @@ from scipy.sparse.linalg import eigs
 # %% for perturbed data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-14/'
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-11-22'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-11-25'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-11-25'
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-11-29'
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-2'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-2'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-5'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -75,10 +76,16 @@ ff = np.arange(22,30)  # iso-d1
 # ff = np.arange(51,54)
 
 ### 12/2
-ff = np.arange(0,1) #0,8
-# ff = np.arange(9,10) #9,16
-ff = np.arange(16,21) #21,25
-ff = np.arange(25,30)
+# ff = np.arange(0,1) #0,8
+# # ff = np.arange(9,10) #9,16
+# ff = np.arange(16,21) #21,25
+# ff = np.arange(25,30)
+
+### 12/5
+# ff = np.array([1,3,4,5,6]) ### blue bar
+# ff = np.array([10, 7,8,9,10]) ### invsere blue
+# ff = np.arange(10,15) ### green with LED
+# ff = np.arange(15,20) ### green without LED
 
 threshold_track_l = 60 * 2 
 times = []
@@ -122,7 +129,7 @@ vec_theta = np.concatenate(thetas)  # theta
 
 # %% plot tracks
 plt.figure()
-for ii in range(len(tracks)):
+for ii in range(240,300):#(len(tracks)):
     xy_i = tracks[ii]
     time_i = times[ii]
     # pos = np.where((times[ii]>60) & (times[ii]<90))[0]
@@ -130,7 +137,7 @@ for ii in range(len(tracks)):
     # pos = np.where((times[ii]>0))[0]
     # plt.plot(xy_i[pos,0], xy_i[pos,1],'k',alpha=.5)
     
-    plt.plot(xy_i[:,0], xy_i[:,1],'k')
+    plt.plot(xy_i[:,0], xy_i[:,1],'k', alpha=1)
     # plt.scatter(xy_i[:,0],xy_i[:,1],c=time_i,cmap='coolwarm',s=.1,vmin=np.min(time_i),vmax=np.max(time_i))
     # plt.scatter(xy_i[:,0],xy_i[:,1],c=time_i,cmap='coolwarm',s=.1,vmin=np.min(vec_time),vmax=np.max(vec_time))
 
