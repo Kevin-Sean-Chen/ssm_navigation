@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Nov 15 08:47:06 2024
+Created on Thu Dec 26 11:27:48 2024
 
 @author: ksc75
 """
@@ -24,20 +24,15 @@ from scipy.sparse import diags
 from scipy.sparse.linalg import eigs
 
 # %% check tracks
-### inital analysis for tracks during bar presentation and with or without wind
-### plot tracks and kinematics to visualize results...
+### used to analyze a number of negative controls
+### to plot tacks for showing bias to screen
+### or to show time-aligned kinmetics to show response to stiumuli across trials
 
 # %% for perturbed data
-# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-14/'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-11-22'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-11-25'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-11-29'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-2'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-5'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-10'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-12'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-19'
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-23'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-23\moving_bars'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-23\full_field_flash'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-23\blank'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-26'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -57,73 +52,20 @@ print(pkl_files)
 pkl_files = sorted(pkl_files, key=lambda x: int(''.join(filter(str.isdigit, x))))
 
 # %% filing
-### 11/14
-ff = np.array([1,2,3])+0 ### bar-only
-# ff = np.array([4,5,6])+0 ### wind
-# ff = np.array([7,0]) ### after
-
-### 11/22
-ff = np.array([7,8,9,10])  ### short edge
-ff = np.array([1,2, 11])  ### inverted short
-ff = np.array([3,4,5])  ### inverted long
-ff = np.array([18,19,20])
-ff = np.array([13,16,12])
-
-### 11/25
-ff = np.arange(22,30)  # iso-d1
-# ff = np.arange(14,22)  # OCL flies
-
-### 11/29
-# ff = np.arange(8,22)  # LED on
-# ff = np.arange(23,32)
-# ff = np.arange(44,51)
-# ff = np.arange(41,47)
-# ff = np.arange(51,54)
-
-### 12/2
-# ff = np.arange(0,1) #0,8
-# # ff = np.arange(9,10) #9,16
-# ff = np.arange(16,21) #21,25
-# ff = np.arange(25,30)
-
-### 12/5
-# ff = np.array([1,3,4,5,6]) ### blue bar
-# ff = np.array([10, 7,8,9,10]) ### invsere blue
-# ff = np.arange(10,15) ### green with LED
-# ff = np.arange(15,20) ### green without LED
-
-### 12/10
-# ff = np.arange(0,7)  ### only bar
-# ff = np.arange(7,15)  ### bar+proj
-# ff = np.arange(15,23) ### bar+proj
-# ff = np.arange(7,23)
-# ff = np.arange(23,31)  ### bar+proj w/ LED
-# ff = np.arange(31,38)  ### proj w/ LED
-# ff = np.arange(38,45)  ### proj w/o LED
-
-### 12/12
-# ff = np.arange(2,7)  ### 0.2
-# ff = np.array([0,1,8,9]) ###1
-# ff = np.arange(10,15) ### 0.4
-
-### 12/20
-# ff = np.arange(15,25)  # v+o w/ LED
-# ff = np.arange(30,45) # v+o w/o LED
-ff = np.arange(68,74)  # v negative w/ LED
-# ff = np.arange(74,79)  # v negative  w/o LED
-ff = np.arange(98,108)  # visual only 80,93
-# ff = np.array([93,94,95,96,101,102,103,104,105,106,107])
-# ff = np.arange(7,10)
-
 ### 12/23
-ff = np.arange(0,10)  #f=1
-# ff = np.arange(10,19)  #f=.5
-# ff = np.arange(20,28)  #f=2
-# ff = np.arange(29,38)  #f=0.2
-ff = np.arange(41,47)
-ff = np.arange(53,64)
+specific_number = {0,1,2,3}#{4,5} #{0,3,4}#{1,2}#
+### for blank
+# ff = [
+#     i for i, name in enumerate(pkl_files) 
+#     if int(name.split("_")[-2][0]) in specific_number
+# ]
+### for flash
+ff = [
+    i for i, name in enumerate(pkl_files) 
+    if int(name.split("_")[5][-1]) in specific_number
+]  # 5,7
 
-threshold_track_l = 60 * 1 #2 
+threshold_track_l = 60 * .51 #2 
 times = []
 tracks = []
 thetas = []
@@ -159,7 +101,7 @@ for ii in range(len(ff)):
                 vxys.append(temp_v)
                 track_id.append(np.zeros(len(pos))+jj) 
                 thetas.append(theta)
-                signals.append(signal)
+                # signals.append(signal)
                 
                 n = len(pos)
                 msd_x.append(np.array([np.mean((temp_x[t:,0] - temp_x[:n-t,0])**2) for t in range(n)]))
@@ -187,29 +129,13 @@ for ii in range(len(tracks)):
     # plt.scatter(xy_i[:,0],xy_i[:,1],c=time_i,cmap='coolwarm',s=.1,vmin=np.min(time_i),vmax=np.max(time_i))
     # plt.scatter(xy_i[:,0],xy_i[:,1],c=time_i,cmap='coolwarm',s=.1,vmin=np.min(vec_time),vmax=np.max(vec_time))
 
-# %% all dot-x for visual work
-# x_vec = np.zeros((len(vec_vxy),2))
-# x_vec[:,0] = 1
-# # test = np.sum(np.abs(vec_vxy/np.linalg.norm(vec_vxy,axis=1)[:,None]) * x_vec, axis=1)
-# test = np.sum((vec_vxy) * x_vec, axis=1)
-
-# # %%
-# bins = np.arange(-20,20,1)
-# plt.figure()
-# x_ = [np.zeros(len(test_02))+0.2, np.zeros(len(test_04))+0.4,np.zeros(len(test_10))+1]
-# y_ = [test_02, test_04, test_10]
-# label = [0.2,0.4,1.0]
-# for ii in range(3):
-#     plt.subplot(3,1,ii+1)
-#     plt.hist(y_[ii],bins=bins, density='True', alpha=0.5)
-#     plt.xlim([-20,20])
-#     plt.yscale('log')
-# plt.xlabel('vx (mm/s)')
-
 # %% showing counts
 plt.figure()
 g = sns.jointplot(x=vec_xy[::30,0], y=vec_xy[::30,1], kind="kde")
 g.set_axis_labels('x (mm)', 'y (mm)')
+
+bias = len(np.where(vec_xy[:,1]>100)[0])/len(vec_xy)
+print('bias: ', bias)
 
 # %% turning analysis
 ###############################################################################
@@ -224,7 +150,7 @@ for ii in range(len(tracks)):
     dtheta_i = thetas[ii]
     speed_i = speeds[ii]
     vx_i = vxys[ii][:,0]
-    pos = np.where(time_i<50)[0]
+    pos = np.where(time_i<90)[0]
     # pos_v = np.where(vx_i>0)[0]
     # pos = np.intersect1d(pos, pos_v)
     # plt.plot(time_i[pos], np.abs(dtheta_i[pos]),'k', alpha=0.2)
@@ -252,30 +178,8 @@ for tt in range(len(time_stim)-1):
 plt.figure()
 plt.plot(time_stim, mean_dtheta)
 plt.xlabel('time (s)'); plt.ylabel('|degree|/s'); 
-plt.ylim([25, 80])
+plt.ylim([10, 70])
 plt.figure()
 plt.plot(time_stim, mean_speed)
 plt.xlabel('time (s)'); plt.ylabel('speed (mm/s)'); 
-plt.ylim([4, 8])
-
-# %%
-###############################################################################
-
-# %%
-v_bins = np.arange(-15,15,.1)
-plt.figure()
-# aa,bb = np.histogram(vec_vxy[:,1], bins=v_bins);
-# plt.plot(bb[:-1],aa)
-plt.hist(vec_vxy[:,0],50)
-plt.yscale('log')
-
-# %% checking for speeding
-plt.figure()
-for ii in range(len(tracks)):
-    xy_i = tracks[ii]
-    vxy_i = vxys[ii]
-    # plt.plot(xy_i[:,1], vxy_i[:,1],'k-.',alpha=0.2)
-    plt.plot(xy_i[:,0], thetas[ii],'k-.',alpha=0.04)
-# plt.ylim([-30,30])
-# plt.xlabel('x (mm)'); plt.ylabel('vy (mm/s)')
-plt.xlabel('x (mm)'); plt.ylabel('heading (degrees from wind)')
+plt.ylim([2, 8])
