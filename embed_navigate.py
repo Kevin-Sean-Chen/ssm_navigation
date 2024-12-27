@@ -65,6 +65,7 @@ track_ids = []  # record track id (file and track)
 rec_tracks = []  # record the full track x,y
 rec_signal = []  # record opto signal
 times = []   # record time in epoch
+speeds = []
 
 for tr in range(n_tracks):
     print(tr)
@@ -79,16 +80,17 @@ for tr in range(n_tracks):
     rec_tracks.append(temp_xy)  # get raw tracksd
     track_ids.append(np.zeros(len(pos))+tr) 
     rec_signal.append(signal[pos])
+    speeds.append(speed_smooth[pos])
     # masks.append(thetas)
     # times.append(data['t'][pos])
 
 # %% set parameters (for now, need to scan later...)
-K_star = 5* (90/down_samp)
+K_star = int(5* (90/down_samp))
 N_star = 1000
 tau_star = 2  ### data is at 90 Hz
     
 # %% functionals
-def build_signal(data, K=K_star, tau=tau_star):
+def build_signal(data, K=K_star, tau=tau_star, return_id=False):
     K = int(K)
     features = []
     ids = []
@@ -102,7 +104,17 @@ def build_signal(data, K=K_star, tau=tau_star):
             vs_windowed = vs.reshape(-1, K)
             features.append(vs_windowed)   ### might have problems here across tracks!!!
             ids.append(tr)
-    return np.concatenate(features)
+    if return_id:
+        feats = np.concatenate(features) 
+        ids = np.array(ids)
+        jumps = ids[1:]==ids[:-1]
+        pos = np.where(jumps==False)[0]
+        mask = feats*0
+        mask[pos, :] = True
+        masked_data = np.ma.masked_array(feats, mask)
+        return masked_data , ids
+    else:
+        return np.concatenate(features)
 
 def build_X(data, return_id=False, K=K_star , tau=tau_star, use_dtheta=False):
     K = int(K)
@@ -194,7 +206,7 @@ def compute_transition_matrix(time_series, track_id, n_states):
 
 def get_steady_state(transition_matrix):
     # Find the eigenvalues and eigenvectors
-    eigenvalues, eigenvectors = np.linalg.eig(transition_matrix.T)
+    eigenvalues, eigenvectors = np.linalg.eig(transition_matrix.T) #.T
     # Find the index of the eigenvalue that is approximately 1
     idx = np.argmin(np.abs(eigenvalues - 1))
     # The corresponding eigenvector (steady-state)
@@ -226,6 +238,41 @@ def sorted_spectrum(R,k=5,which='LR'):
 Pij = compute_transition_matrix(test_label, ids, N_star)
 h_est = trans_entropy(Pij)
 print(h_est)
+
+# %%
+###############################################################################
+# %% scanning
+tau = 2
+Ks = np.array([.5, 1, 2, 4, 6, 8])*int(5* (90/down_samp))/tau
+Ns = np.array([10, 100, 250, 500, 1000, 2000, 3000])
+nats = np.zeros((len(Ks), len(Ns)))
+
+for kk in range(len(Ks)):
+    for nn in range(len(Ns)):
+        ### build delay embedding
+        # Xi,idsi = build_signal(rec_signal, return_id=True, K=Ks[kk],tau=tau)   ### for signal
+        Xi,idsi = build_X(data4fit, return_id=True, K=Ks[kk])  #### for behavior
+        ### cluster
+        time_series = kmeans_knn_partition(Xi, Ns[nn])  ### mask the transition ones too!
+        ### build matrix
+        Pij = compute_transition_matrix(time_series, idsi, Ns[nn])
+        ### compute entropy
+        nati = trans_entropy(Pij)
+        
+        nats[kk,nn] = nati / (tau/90)  ### nats per second for transitions
+        print(kk,nn)
+
+# %% plot entropy rates
+plt.figure()
+colors_K = plt.cm.viridis(np.linspace(0,1,len(Ks)))
+for k,K in enumerate(Ks):
+    temp = K/90*tau
+    plt.plot(Ns, nats[k]/1,c=colors_K[k],marker='o',label=f'K={temp:.1f} s')
+# plt.plot(Ns, nats.T)
+plt.xlabel('N')
+plt.ylabel('nats/s')
+plt.legend()
+plt.title('behavior embedding')
 
 # %% bulding Markov model
 ###############################################################################
@@ -277,18 +324,47 @@ plt.xlabel('eigenvalue index')
 
 # %% color code tracks]
 imode = 1
-phi2 = eigvecs[labels,imode].real
-window_show = np.arange(1,30000,2)
+phi2 = -eigvecs[labels,imode].real
+window_show = np.arange(1,50000,3)
 X_xy, track_id = build_X(rec_tracks, return_id=True)
 xy_back = X_xy[:, [0,int(K_star)]]
 plt.figure()
 plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
 plt.title(f'mode#{imode}')
 
+# %% modes back to velocity
+X_speed = build_signal(speeds, K_star)
+plt.figure()
+plt.scatter(X_traj[window_show, 1+K_star*1], phi2[window_show],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs) # veloctiy
+plt.scatter(X_traj[window_show, 1+K_star*0], X_traj[window_show, 1+K_star*1],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
+# plt.scatter(X_speed[window_show,0], phi2[window_show],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)  # speed
+plt.xlabel('vx'); plt.ylabel('vy')
+
+# %% symmetry measurement
+################################################################################################################
+################################################################################################################
+A = 0.5*(P-R)
+# Reversibility Score
+# Detailed Balance Violation: Quantifies how far the matrix deviates from detailed balance.
+# Non-Reversible Flux: Total flux arising from the non-reversible component.
+# Eigenvalue Gap
+score = np.linalg.norm(R)**2/np.linalg.norm(P)**2 ### compare to shuffle?  ### random is around .85?
+print(score)
+### random control
+testP = np.random.rand(N_star,N_star)  # random transition
+testM = P*0
+testM[P>0] = 1
+testP = testP*testM  # masking for sparsity
+row_sums = testP.sum(axis=1, keepdims=True)
+testP = np.divide(testP, row_sums, where=row_sums!=0)  # normalization
+testR = get_reversible_transition_matrix(testP)
+score_control = np.linalg.norm(testR)**2/np.linalg.norm(testP)**2 ### compare to shuffle?  ### random is around .85?
+print(score_control)
+
 # %% study driven-modes
 ###############################################################################
 # %% y=beta X
-lags = 101
+lags = 401
 n_top_modes = 5
 phi_top = eigvecs[labels,1:n_top_modes].real
 X_odor = build_signal(rec_signal, K_star)
@@ -302,6 +378,7 @@ X_odor[X_odor>2] = 1
 X = (hankel(X_odor[:lags], X_odor[lags-1:]).T)
 X = np.concatenate((X, np.ones((X.shape[0],1))), 1)
 
+time_vec = np.arange(lags)*0.011*down_samp
 plt.figure()
 for ii in range(n_top_modes-1):
     # y = phi_top[lags-1:,ii]*1  ### future
@@ -311,12 +388,11 @@ for ii in range(n_top_modes-1):
     invxx = np.linalg.inv(xxt)
     beta = invxx @ X.T @ y
     beta_phi = beta[:-1] #.reshape(n_top_modes-1, lags)
-    time_vec = np.arange(lags)*0.011*down_samp
     plt.plot(time_vec, beta_phi,  label=f'mode: {ii+1}')
 
 plt.legend()
 plt.xlabel('time (s)'); plt.ylabel('weights')
-plt.xlim([-0.051,2])
+plt.xlim([-0.051,4])
 
 # %% start with simple regression
 # X_odor = build_signal(rec_signal, K_star)
@@ -417,10 +493,13 @@ def gen_tracks_given_substates(subid, n_steps, return_v=False, init=False):
     else:
         return subsample_xy
 
+### all ids
 subid = np.arange(N_star)
+### sub-strategies
+imode = 2
+subid = np.where(eigvecs[:,imode].real>0)[0]
 subsample_xy = gen_tracks_given_substates(subid, 500)
 plt.plot(subsample_xy[:,0], subsample_xy[:,1])
-
 
 # %% validating full Makov model...
 ###############################################################################
@@ -434,12 +513,12 @@ def compute_autocorrelation(data, max_lag):
         autocorrelation = numerator / denominator
         autocorr_values.append(autocorrelation)
     return np.arange(1, max_lag + 1), np.array(autocorr_values)/max(autocorr_values)
-samp_xy, samp_vxy = gen_tracks_given_substates(np.arange(N_star), 100000, return_v=True)
+samp_xy, samp_vxy = gen_tracks_given_substates(subid, 100000, return_v=True)
 
 # %% autocorr
-xy_id = 1
-# lags, acf_data = compute_autocorrelation(vx_smooth[::tau_star], 1000)
-lags, acf_data = compute_autocorrelation(vy_smooth[::tau_star], 1000)
+xy_id = 0
+lags, acf_data = compute_autocorrelation(vx_smooth[::tau_star], 1000)
+# lags, acf_data = compute_autocorrelation(vy_smooth[::tau_star], 1000)
 lags, acf_mark = compute_autocorrelation(samp_vxy[:, xy_id], 1000)
 plt.figure()
 plt.plot(np.arange(len(lags))*tau_star/90*1, acf_data, label='data')
@@ -461,4 +540,11 @@ plt.xlabel(r'$v_x$'); plt.ylabel('count'); plt.legend(); plt.yscale('log')
 ### autcorr
 ### navigation sim
 ### use these as RL basis of action!!
+
+# %% test with simple metastable state clustering (not the coherent set method)
+# eigenvalues, left_eigenvectors = np.linalg.eig(P.T)
+# idx = eigenvalues.argsort()[::-1]  # Get indices to sort eigenvalues
+# sorted_eigenvalues_left = np.real(eigenvalues[idx])
+top_n_values_left = 100
+eigvals_left,eigvecs_left = sorted_spectrum(P.T, k=top_n_values_left)
 

@@ -178,8 +178,8 @@ jj = jj-1;
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% plot some results
-cols = ['k','r','b'];
-stateK = 2;
+cols = ['k','r','b','g'];
+stateK = 1;
 flip = 1;
 x = squeeze(mmhat.wts(:,:,stateK));
 alpha_s = flip*x(1:nb);
@@ -199,6 +199,7 @@ set(gca, 'FontSize', 14, 'XColor', 'k', 'YColor', 'k', 'LineWidth', 1.5);set(gcf
 pos_state1 = find(bb==1);
 pos_state2 = find(bb==2);
 % pos_state3 = find(bb==3);
+% pos_state4 = find(bb==4);
 
 % pos_state1 = find(gams(1,:)>0.5);
 % pos_state2 = find(gams(2,:)>0.5);
@@ -208,7 +209,9 @@ figure;
 scatter(data_x(pos_state1), data_y(pos_state1), 2, 'k', 'filled', 'MarkerFaceAlpha', 1, 'MarkerEdgeAlpha', 1); hold on
 scatter(data_x(pos_state2), data_y(pos_state2), 4, 'r', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);set(gcf, 'Color', 'w');
 % scatter(data_x(pos_state3), data_y(pos_state3), 2, 'b', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);
+% scatter(data_x(pos_state4), data_y(pos_state4), 2, 'g', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);
 
+%%
 figure;
 subplot(211); h = histogram(data_speed(pos_state1),100); h.FaceColor = 'black'; xlim([0,29]);set(gca, 'FontSize', 14, 'XColor', 'k', 'YColor', 'k', 'LineWidth', 1.5)
 subplot(212); h = histogram(data_speed(pos_state2),100); h.FaceColor = 'red'; set(gcf, 'Color', 'w');xlim([0,29]); set(gca, 'FontSize', 14, 'XColor', 'k', 'YColor', 'k', 'LineWidth', 1.5)
