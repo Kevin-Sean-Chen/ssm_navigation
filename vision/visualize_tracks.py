@@ -38,6 +38,7 @@ from scipy.sparse.linalg import eigs
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-12'
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-19'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-23'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-1-24'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -122,6 +123,10 @@ ff = np.arange(0,10)  #f=1
 # ff = np.arange(29,38)  #f=0.2
 ff = np.arange(41,47)
 ff = np.arange(53,64)
+
+### 01/24
+ff = np.arange(0,7)
+ff = np.arange(8,23)
 
 threshold_track_l = 60 * 1 #2 
 times = []
