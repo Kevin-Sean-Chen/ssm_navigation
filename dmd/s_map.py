@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import Ridge
 from scipy.linalg import hankel
 import scipy.sparse
+from scipy.linalg import svd
+from sklearn.decomposition import FastICA
 
 # %% functional
 ### Logistic
@@ -152,7 +154,7 @@ def Wxx_sparse(Xe, theta, k):
 ### consturction of embedded state and kernel
 lags = 100  ### embedding window
 theta = 1  ### nonlinearity
-tau = 10  ### prediction time step
+tau = 25  ### prediction time step
 k = lags+1  ### k nearest neighbors
 Xe = delay_embed(Xt[:-tau,:], lags)
 W = Wxx_sparse(Xe, theta, k)
@@ -170,22 +172,35 @@ err = np.mean(np.linalg.norm(Ye - Y_pred, axis=1))
 print(err)
 
 # %% scanning tests
-Ks = np.arange(tau+1,110,10)
+Ks = np.arange(5,50,5) #np.arange(5+1,110,10)
+ms = np.arange(2,15)
 err_ks = np.zeros(len(Ks))
-for kk in range(len(Ks)):
+err_ms = np.zeros(len(ms))
+# for kk in range(len(Ks)):
+for kk in range(len(ms)):
     print(kk)
-    lags = Ks[kk]
+    lags = 25 #Ks[kk]
+    dim = ms[kk]
     Xe = delay_embed(Xt[:-tau,:], lags)  # embedd
+    ### try dimension reduction process
+    uu,ss,vv = svd(Xe)
+    Xe = uu[:,:dim] @ np.diag(ss[:dim]) @ vv[:dim, :]  # lower dimension reconstruction
+    # ica = FastICA(n_components=dim, random_state=0)
+    # S_estimated = ica.fit_transform(Xe)  ##### this is probably wrong we need to do it in the mode space... 
     W = Wxx_sparse(Xe, theta, lags+1)  # kernel trick
     Ye = (hankel(yp[:lags], yp[lags-1:]).T)  # target
     weights = np.linalg.pinv(Xe.T @ W @ Xe) @ Xe.T @ W @ Ye  # regresion
     Y_pred = Xe @ weights  # prediction
-    err_ks[kk] = np.mean(np.linalg.norm(Ye - Y_pred, axis=1)) # record error
+    # err_ks[kk] = np.mean(np.linalg.norm(Ye[:,0] - Y_pred[:,0]))#, axis=1)) # record error
+    err_ms[kk] = np.mean(np.linalg.norm(Ye[:,0] - Y_pred[:,0]))
+    print(err_ms[kk])
 
 # %%
 plt.figure()
-plt.plot(Ks, err_ks, '-o')
-plt.xlabel('time delay'); plt.ylabel('error')
+# plt.plot(Ks, (err_ks), '-o')
+plt.plot(ms, (err_ms), '-o')
+# plt.xlabel('time delay'); plt.ylabel('error')
+plt.xlabel('m modes'); plt.ylabel('error')
 
 # %% gpt...
 
