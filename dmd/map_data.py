@@ -118,36 +118,40 @@ Ks = np.arange(5,100,10) #np.arange(5+1,110,10)
 ms = np.arange(2,15)
 err_ks = np.zeros(len(Ks))
 err_ms = np.zeros(len(ms))
-for kk in range(len(Ks)):
-# for kk in range(len(ms)):
+# for kk in range(len(Ks)):
+for kk in range(len(ms)):
     print(kk)
-    lags = Ks[kk]
-    # dim = ms[kk]
+    # lags = Ks[kk]
+    dim = ms[kk]
     
     ### training
     Xe = delay_embed(Xtrain[:-tau,:], lags)  # embedd training
-    Xp = Xe[:-tau-0,:]
+    uu,ss,vv = svd(Xe)
+    Xe_red = uu[:,:dim] @ np.diag(ss[:dim]) @ vv[:dim, :]
+    Xp = Xe_red[:-tau-0,:]
     Yf = Xe[tau+0:,[0,lags]]  # make future predictions, just for vx and vy!
     W = Wxx_sparse(Xp, theta, lags+0)  # kernel trick
     weights = np.linalg.pinv(Xp.T @ W @ Xp) @ Xp.T @ W @ Yf  # regresion
     
     ### testing
     Xe = delay_embed(Xtrain[:-tau,:], lags)  # embedd testing
-    Xp = Xe[:-tau-0,:]
-    Yf = Xe[tau+0:,[0,lags]]  # make future predictions!
+    Xp = Xe[:-tau-lags,:]
+    Yf = Xe[tau+lags:,[0,lags]]  # make future predictions!
     Y_pred = Xp @ weights  # prediction
     # err_ks[kk] = np.mean(np.linalg.norm(Yf - Y_pred, axis=1)) # record error
     corr_matrix = np.corrcoef(Yf.T, Y_pred.T)  # Transpose to get pairs of rows
-    err_ks[kk] = corr_matrix[0, 2]  # measure R2
+    # err_ks[kk] = corr_matrix[0, 2]  # measure R2
+    err_ms[kk] = corr_matrix[0, 2]  # measure R2
     # err_ms[kk] = np.mean(np.linalg.norm(Ye[:,0] - Y_pred[:,0]))
-    print(err_ks[kk])
+    # print(err_ks[kk])
+    print(err_ms[kk])
 
 # %%
 plt.figure()
-plt.plot(Ks*1/30, (err_ks), '-o')
-# plt.plot(ms, (err_ms), '-o')
-plt.xlabel('time delay (s)'); plt.ylabel('R^2')
-# plt.xlabel('m modes'); plt.ylabel('error')
+# plt.plot(Ks*1/30, (err_ks), '-o')
+plt.plot(ms, (err_ms), '-o')
+# plt.xlabel('time delay (s)'); plt.ylabel('R^2')
+plt.xlabel('m modes'); plt.ylabel('R^2')
 
 # %% track-based
 ###############################################################################
@@ -164,8 +168,10 @@ def IRLS_Smap(data4fit, lags, dim=None):
         ### dim reduction
         if dim is not None:
             uu,ss,vv = svd(Xei)
-            Xei = uu[:,:dim] @ np.diag(ss[:dim]) @ vv[:dim, :]
-        Xpi = Xei[:-tau,:]
+            Xei_red = uu[:,:dim] @ np.diag(ss[:dim]) @ vv[:dim, :]
+            Xpi = Xei_red[:-tau,:]
+        else:
+            Xpi = Xei[:-tau,:]
         Yfi = Xei[tau:,[0,lags]]  # make future predictions, just for vx and vy!
         Wi = Wxx_sparse(Xpi, theta, lags)  # kernel trick
         ### init with weighted OLS
@@ -179,22 +185,25 @@ def IRLS_Smap(data4fit, lags, dim=None):
             # P = P - (P @ Xpi.T @ Wi @ Xpi @ P) / (1 + Xpi.T @ Wi @ Xpi @ P)   ### Woodbury lemma
             # print(weights[0,0])
         ### testing
-        Xe = delay_embed(Xi[:-tau,:], lags)  # embedd testing
+        Xe = Xei*1 #delay_embed(Xi[:-tau,:], lags)  # embedd testing
         Xpi = Xe[:-tau-lags*1,:]
         Yfi = Xe[tau+lags*1:,[0,lags]]  # make future predictions!
         Y_pred = Xpi @ weights  # prediction
         corr_matrix = np.corrcoef(Yfi.T, Y_pred.T)  # Transpose to get pairs of rows
         test_errors[ii] = corr_matrix[0, 2]
         # print(test_errors[ii])
+    print(np.mean(test_errors))
     return weights, test_errors
     
 # %% scanning lags via IRLS
 Ks = np.arange(5,100,10) #np.arange(5+1,110,10)
-ms = np.arange(2,12)
+ms = np.arange(2,30,3)
 err_ks = np.zeros(len(Ks))
 err_ms = np.zeros(len(ms))
 err_ks_irls = np.zeros((len(Ks), len(data4fit)))
-for kk in range(len(Ks)):
+err_ks_irls = np.zeros((len(ms), len(data4fit)))
+# for kk in range(len(Ks)):
+for kk in range(len(ms)):
     print(kk)
     # ww, ei = IRLS_Smap(data4fit, Ks[kk])
     ww, ei = IRLS_Smap(data4fit, 35, dim=ms[kk])
@@ -203,7 +212,18 @@ for kk in range(len(Ks)):
 # %%
 plt.figure()
 # plt.plot(Ks/30, (err_ks_irls),'k-o')
-plt.plot(ms/30, np.mean(err_ks_irls,1),'k-o')
-plt.errorbar(ms/30, np.mean(err_ks_irls,1), np.std(err_ks_irls,1)/1)
+# plt.plot(ms/1, np.mean(err_ks_irls[:,:],1),'k-o')
+plt.errorbar(Ks/1, np.mean(err_ks_irls[:,:],1), np.std(err_ks_irls[:,:],1)/100)
 plt.xlabel('time delay (s)'); plt.ylabel('R^2')
 plt.xlabel('m modes'); plt.ylabel('R^2')
+
+# %% visualize the modes
+uu,ss,vv = svd(Xe)
+mode = vv[:5,:]
+plt.figure()
+plt.imshow(mode)
+
+# %% NEXT:
+# show action
+# show intregrated trace
+# show weights on these modes!
