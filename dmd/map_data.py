@@ -19,8 +19,10 @@ with open("example_data.pkl", "rb") as file:
     vec_vxy, vec_xy, vec_signal, rec_signal, data4fit, rec_tracks = pickle.load(file)
 
 # %% process data
-Xtrain = vec_vxy[::3][:10000] ### concatenate fiest... but it is important to do track-based embedding later!!
+Xtrain = vec_vxy[::3][0:15000] ### concatenate fiest... but it is important to do track-based embedding later!!
 Xtest = vec_vxy[::3][25000:30000]
+Xsig = vec_signal[::3][0:15000]
+Xsig[np.isnan(Xsig)] = 0
 
 # %% S-map from scratch
 ### delay embedding
@@ -31,6 +33,12 @@ def delay_embed(Xt, lags):
         X.append((hankel(Xt[:lags,dd], Xt[lags-1:,dd]).T))
     X = np.concatenate(X, axis=1)
     return X
+
+def delay_emb_signal(Xt, lags):
+    T,d = Xt.shape
+    X = (hankel(Xt[:lags,0], Xt[lags-1:,0]).T)
+    return X
+
 ### build local kernel
 def Wxx(Xe, theta):
     T_, Kd = Xe.shape  ### embedded coordinate
@@ -103,6 +111,17 @@ Xp = Xe[:-tau-lags,:]
 W = Wxx_sparse(Xp, theta, k)
 Yf = Xe[tau+lags:,[0,lags]]
 weights = np.linalg.pinv(Xp.T @ W @ Xp) @ Xp.T @ W @ Yf
+
+# %% testing SVD and ICA
+# Next, we perform ICA on the space formed by the first m singular vectors of Y_k using the FastICA algorithm to obtain an 
+# m-dimensional state space spanned by the independent basis vectors Γ
+top_m = 7
+uu,ss,vv = svd(Xp)
+sing_vec = vv[:top_m, :].T
+ica = FastICA(n_components=top_m, random_state=42)
+Gamm = ica.fit_transform(sing_vec)  # Estimated sources
+A_estimated = ica.mixing_
+X_m = Xp @ Gamm
 
 # %% making predictions #######################################################
 ### scan for K, m, and tau (tau should have some type of scaling)
@@ -218,12 +237,96 @@ plt.xlabel('time delay (s)'); plt.ylabel('R^2')
 plt.xlabel('m modes'); plt.ylabel('R^2')
 
 # %% visualize the modes
+top_m = 5
 uu,ss,vv = svd(Xe)
-mode = vv[:5,:]
+mode = vv[:top_m,:]
+sing_vec = vv[:top_m, :].T
+ica = FastICA(n_components=top_m, random_state=42)
+Gamm = ica.fit_transform(sing_vec)  # Estimated sources
+A_estimated = ica.mixing_
+X_m = Xp @ Gamm
 plt.figure()
-plt.imshow(mode)
+plt.imshow(mode, aspect='auto')
+plt.figure()
+plt.imshow(Gamm.T, aspect='auto')
 
 # %% NEXT:
-# show action
-# show intregrated trace
-# show weights on these modes!
+# show action (can bootstrap Xe)
+# show intregrated trace (also bootstrap)
+# show weights on these modes! (find events!)
+
+### solid steps:
+    # ICA for modes
+    # check tau or T_pred
+    # the IMPORTANT aspect is the dynamical properties: LE, Jac, spectrum ...
+
+# %% across tracks
+top_n = 5
+mode_tracks = np.zeros((len(data4fit), top_n, lags*2))
+for ii in range(len(data4fit)):
+    print(ii)
+    ### load data
+    Xi = data4fit[ii][::3]
+    ### build embedding material
+    Xei = delay_embed(Xi[:-tau,:], lags)
+    ### collect top modes
+    uu,ss,vv = svd(Xei)
+    mode_tracks[ii,:,:] = vv[:top_n, :]
+    
+# %% plotting
+plt.figure()
+for ii in range(top_m):
+    # modei = (mode_tracks[ii,4,:].squeeze())
+    modei = mode[ii,:]
+    # modei = Gamm[:,ii]
+    vxyi = -modei.reshape(2,lags)
+    vxyi -= vxyi[:,0][:,None]*1
+    plt.plot(vxyi[0,:], vxyi[1,:], '-o')  ### try density!!
+plt.xlabel('vx')
+plt.ylabel('vy')
+plt.title('top modes')    
+
+# %% adding control for the first time
+###############################################################################
+lags = 60
+tau = 10
+Xb = delay_embed(Xtrain[:,[0,1]], lags)
+Xo = delay_embed(Xsig, lags)[:-tau-lags:] ## odor
+Xbp = Xb[:-tau-lags]
+Ybf = Xb[tau+lags:,:]
+
+Omega = np.concatenate((Xbp, Xo),1)
+uu,ss,vv = svd(Omega.T, full_matrices=False)
+ux,sx,vx = svd(Ybf.T, full_matrices=False)
+u1, u2 = uu[:lags*2,:], uu[lags*2:,:]
+
+# %% DMDc solution
+A_matrix = ux.T.conj() @ Ybf.T @ vv.T @ np.diag(np.reciprocal(ss)) @ u1.T.conj() @ ux
+B_matrix = ux.T.conj() @ Ybf.T @ vv.T @ np.diag(np.reciprocal(ss)) @ u2.T.conj()
+
+# %% analyze matrix
+A_real = ux @ A_matrix
+B_real = ux @ B_matrix
+
+plt.figure()
+plt.subplot(121); plt.plot(B_real[:lags,:])#plt.plot(uu[:lags,:5])
+plt.subplot(122); plt.plot(B_real[-lags:,:])#plt.plot(uu[-lags:,:5])
+
+plt.figure()
+plt.subplot(121); plt.plot(A_real[:lags, :])#plt.plot(uu[:lags,:5])
+plt.subplot(122); plt.plot(A_real[-lags:, :])#plt.plot(uu[-lags:,:5])
+
+# %% analyze matrix
+uu,ss,vv = svd(A_real)
+plt.figure()
+plt.subplot(121); plt.plot(uu[:lags,:3])
+plt.subplot(122); plt.plot(uu[-lags:,:3])
+
+# %% test reconstruction
+X_pred = ux @ (A_matrix @ (ux.T @ Xbp.T) + B_matrix @ (Xo.T))
+
+T_wind = 500
+plt.figure()
+plt.plot(X_pred[lags,tau:T_wind+tau], label='data')
+plt.plot(Ybf[:T_wind,lags],'--', label='prediction')
+plt.legend()
