@@ -31,7 +31,7 @@ F0 = 0.  # adapted internal state
 v0 = 1.  # run speed
 vn = .1
 
-target = np.array([100,-100])  ### location of source
+target = np.array([100,100])  ### location of source
 tau_env = 10   ### fluctuation time scale of the environment
 C0 = 100
 sigC = 50
@@ -144,9 +144,10 @@ while tt<lt and dist2source(pos_t)>eps:
     new_pos, new_vec = theta2state(pos_t, theta)
     ### record
     xys.append(pos_t)
-    # cs.append(env_space(pos_t))
+    cs.append(env_space(pos_t))
     # cs.append(np.log(env_space(pos_t)))
-    cs.append(d_phi)
+    # cs.append(d_phi)
+    # cs.append(env_space(new_pos) - env_space(pos_t))
     vecs.append(vec_t)
     Fs.append(df_dt)
     tumbles.append(tumb_t)
@@ -181,9 +182,10 @@ def gen_tracks():
         ### record
         xys.append(pos_t)
         ### choose input
-        # cs.append(env_space(pos_t))
-        cs.append(np.log(env_space(pos_t)))
+        cs.append(env_space(pos_t))
+        # cs.append(np.log(env_space(pos_t)))
         # cs.append(d_phi)
+        # cs.append(env_space(new_pos) - env_space(pos_t))
         ####
         vecs.append(vec_t)
         Fs.append(df_dt)
@@ -224,9 +226,36 @@ def delay_embed(Xt, lags):
     X = np.concatenate(X, axis=1)
     return X
 
+# %% scan delays
+def err_given_delay(behavior, stimuli, lags):
+    tau = 1
+    Xb = delay_embed(behavior[:,[0,1]], lags)
+    Xo = delay_embed(stimuli[:,None], lags)[:-tau-lags:] ## odor
+    Xbp = Xb[:-tau-lags]
+    Ybf = Xb[tau+lags:,:]
+    Omega = np.concatenate((Xbp, Xo),1)
+    uu,ss,vv = np.linalg.svd(Omega.T, full_matrices=False)
+    ux,sx,vx = np.linalg.svd(Ybf.T, full_matrices=False)
+    u1, u2 = uu[:lags*2,:], uu[lags*2:,:]
+    A_matrix = ux.T.conj() @ Ybf.T @ vv.T @ np.diag(np.reciprocal(ss)) @ u1.T.conj() @ ux
+    B_matrix = ux.T.conj() @ Ybf.T @ vv.T @ np.diag(np.reciprocal(ss)) @ u2.T.conj()
+    
+    X_pred = ux @ (A_matrix @ (ux.T @ Xbp.T)*1 + B_matrix @ (Xo.T)*1)
+    err = np.linalg.norm(X_pred[lags,tau:] - Ybf[:-tau,lags])
+    return err
+    
+scan_d = np.arange(5,200,20)
+errs = np.zeros(len(scan_d))
+for ii in range(len(scan_d)):
+    print(ii)
+    errs[ii] = err_given_delay(behavior, stimuli, scan_d[ii])
+
+plt.figure()
+plt.plot(scan_d, errs,'-o')
+    
 # %% # DMDc
-lags = 30
-tau = 5
+lags = 60
+tau = 1
 Xb = delay_embed(behavior[:,[0,1]], lags)
 Xo = delay_embed(stimuli[:,None], lags)[:-tau-lags:] ## odor
 Xbp = Xb[:-tau-lags]
@@ -261,7 +290,7 @@ T_wind = 500
 plt.figure()
 plt.plot(X_pred[lags,tau:T_wind+tau], label='data')
 plt.plot(Ybf[:T_wind,lags],'--', label='prediction')
-plt.legend()
+plt.legend(); plt.xlabel('time steps'); plt.ylabel('v_x')
 
 # %% show modes
 top_m = 15
@@ -275,7 +304,7 @@ plt.figure()
 plt.imshow(modeo, aspect='auto')
 
 # %%
-plt.figure()
+plt.figure(figsize=(14,6))
 for ii in range(5):
     # modei = (mode_tracks[ii,4,:].squeeze())
     modei = mode[ii,:]
@@ -292,7 +321,21 @@ for ii in range(5):
     plt.ylabel('weight')
 plt.title('top modes')  
 
+# %% plot tracks
+plt.figure()
+x_range = np.linspace(-10, 140, 150)  # 100 points along the x-axis
+y_range = np.linspace(-10, 140, 150)  # 100 points along the y-axis
+
+# Create meshgrid for the grid points
+X, Y = np.meshgrid(x_range, y_range)
+
+# Compute Z values for each grid point
+Z = env_space_xy(X, Y)
+plt.imshow(Z, origin='lower')
+for ii in range(reps):
+    temp = tracks_dic[ii]['xy']
+    plt.plot(temp[:,0], temp[:,1])
 # %%
 ###############################################################################
 # %% can we chemotaxis with DMDc??
-
+#### try this!!
