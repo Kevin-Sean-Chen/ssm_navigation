@@ -24,7 +24,7 @@ sns.set_context("talk")
 
 # %% parameter setup
 dt = 1   # characteristic time scale
-t_M = 10  # memory
+t_M = 2  # memory
 N = 1  # receptor gain
 H = 1  # motor gain
 F0 = 0.  # adapted internal state
@@ -88,7 +88,7 @@ def dist2source(x):
     return np.sum( (x-target)**2 )**0.5
     
 def env_space(x, tt=-1):
-    C = np.exp(-np.sum((x - target)**2)/sigC**2)*C0 + np.random.randn()*0.
+    C = np.exp(-np.sum((x - target)**2)/sigC**2)*C0 + np.random.randn()*0.1
     if tt==-1:
         return C
     else:
@@ -182,10 +182,10 @@ def gen_tracks():
         ### record
         xys.append(pos_t)
         ### choose input
-        cs.append(env_space(pos_t))
+        # cs.append(env_space(pos_t))
         # cs.append(np.log(env_space(pos_t)))
         # cs.append(d_phi)
-        # cs.append(env_space(new_pos) - env_space(pos_t))
+        cs.append(env_space(new_pos) - env_space(pos_t))
         ####
         vecs.append(vec_t)
         Fs.append(df_dt)
@@ -254,7 +254,7 @@ plt.figure()
 plt.plot(scan_d, errs,'-o')
     
 # %% # DMDc
-lags = 60
+lags = 50
 tau = 1
 Xb = delay_embed(behavior[:,[0,1]], lags)
 Xo = delay_embed(stimuli[:,None], lags)[:-tau-lags:] ## odor
@@ -335,7 +335,93 @@ plt.imshow(Z, origin='lower')
 for ii in range(reps):
     temp = tracks_dic[ii]['xy']
     plt.plot(temp[:,0], temp[:,1])
+    
+# %% projection analysis for controlled modes
+ui,si,vi = np.linalg.svd(A_real, full_matrices=False)
+# idx = ui.argsort()[::-1]   
+# ui = ui[idx]
+# vi = vi[:,idx]
+projs = np.zeros(len(ui))
+ub,sb,vb = np.linalg.svd(B_real, full_matrices=False)
+
+plt.figure()
+for ii in range(len(ui)):
+    plt.plot(ii, ui[:,ii] @ ub[:,0],'o')
+plt.xlabel('sorted'); plt.ylabel('projection (input on modes)')
+
+# %% plot in state space
+plt.figure()
+for ii in range(4):
+    vec_action = ui[:,ii].reshape(2,-1)
+    plt.plot(vec_action[0,:]-vec_action[0,-1], vec_action[1,:]-vec_action[1,-1],'-o')
+plt.title('action mode')
+
+plt.figure()
+for ii in range(4):
+    vec_drive = ub[:,ii].reshape(2,-1)
+    plt.plot(vec_drive[0,:], vec_drive[1,:],'-o')
+plt.title('driving modes')
+
 # %%
 ###############################################################################
 # %% can we chemotaxis with DMDc??
 #### try this!!
+def DMD_taxis(A, B):
+    A, B = A_real*1, B_real*1
+    lags = B.shape[1]
+    eps = 5  # criteria to reach source
+    xys = []
+    cs = []
+    vecs = []
+    vec_behavior_t = np.random.randn(lags*2)
+    vec_stimuli_t = np.random.randn(lags)
+    pos_t = np.random.randn(2)*0  # random init location
+    tt = 0
+    
+    while tt<lt and dist2source(pos_t)>eps:
+        ### use DMDc for next step
+        # vec_behavior_next = (A @ vec_behavior_t + B @ vec_stimuli_t)*1
+        # vec_behavior_next = (ui @ vec_behavior_t + ub @ vec_stimuli_t)*1
+        vec_behavior_next = ux @ (A @ (ux.T @ vec_behavior_t) + B @ (vec_stimuli_t))
+        
+        ### update next value
+        vxy = vec_behavior_t.reshape(2,-1)
+        vxy = np.roll(vxy, shift=1, axis=1)  # Shift elements left
+        vxy_next = vec_behavior_next.reshape(2,-1)[:,0]*1
+        vxy[:, -0] = vxy_next
+        vec_behavior_t = vxy.reshape(-1)
+        
+        ### update location
+        new_pos = pos_t + vxy_next*1
+        
+        ### stim signal
+        new_stim = env_space(new_pos) - env_space(pos_t)
+        vec_stimuli_t = np.roll(vec_stimuli_t, shift=1)  # Shift elements left
+        vec_stimuli_t[-0] = new_stim
+    
+        ### record
+        xys.append(pos_t)
+        ### choose input
+        # cs.append(env_space(pos_t))
+        # cs.append(np.log(env_space(pos_t)))
+        # cs.append(d_phi)
+        cs.append(env_space(new_pos) - env_space(pos_t))
+        ####
+        vecs.append(vxy_next)
+        ### update
+        pos_t = new_pos*1
+        tt += 1
+    ### vectorize
+    vec_xy = np.array(xys)
+    vec_cs = np.array(cs)
+    vec_vxy = np.array(vecs)
+    return vec_xy, vec_cs, vec_vxy
+
+plt.figure()
+# plt.imshow(Z, origin='lower')
+# plt.plot(vec_xy[:,0], vec_xy[:,1])
+reps = 10
+for rr in range(reps):
+    vec_xy, vec_cs, vec_vxy = DMD_taxis(A_matrix, B_matrix)
+    plt.plot(vec_xy[:,0], vec_xy[:,1])
+    print(rr)

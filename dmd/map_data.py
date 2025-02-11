@@ -317,7 +317,7 @@ plt.subplot(121); plt.plot(A_real[:lags, :])#plt.plot(uu[:lags,:5])
 plt.subplot(122); plt.plot(A_real[-lags:, :])#plt.plot(uu[-lags:,:5])
 
 # %% analyze matrix
-uu,ss,vv = svd(A_real)
+uu,ss,vv = svd(B_real)
 plt.figure()
 plt.subplot(121); plt.plot(uu[:lags,:3])
 plt.subplot(122); plt.plot(uu[-lags:,:3])
@@ -329,4 +329,4 @@ T_wind = 500
 plt.figure()
 plt.plot(X_pred[lags,tau:T_wind+tau], label='data')
 plt.plot(Ybf[:T_wind,lags],'--', label='prediction')
-plt.legend()
+plt.legend(); plt.xlabel('time steps'); plt.ylabel('vx (mm/s)')
