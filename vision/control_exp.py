@@ -55,15 +55,15 @@ pkl_files = sorted(pkl_files, key=lambda x: int(''.join(filter(str.isdigit, x)))
 ### 12/23
 specific_number = {0,1,2,3}#{4,5} #{0,3,4}#{1,2}#
 ### for blank
-# ff = [
-#     i for i, name in enumerate(pkl_files) 
-#     if int(name.split("_")[-2][0]) in specific_number
-# ]
-### for flash
 ff = [
     i for i, name in enumerate(pkl_files) 
-    if int(name.split("_")[5][-1]) in specific_number
-]  # 5,7
+    if int(name.split("_")[-2][0]) in specific_number
+]
+### for flash
+# ff = [
+#     i for i, name in enumerate(pkl_files) 
+#     if int(name.split("_")[5][-1]) in specific_number
+# ]  # 5,7
 
 threshold_track_l = 60 * .51 #2 
 times = []
@@ -178,8 +178,8 @@ for tt in range(len(time_stim)-1):
 plt.figure()
 plt.plot(time_stim, mean_dtheta)
 plt.xlabel('time (s)'); plt.ylabel('|degree|/s'); 
-plt.ylim([10, 70])
+# plt.ylim([10, 70])
 plt.figure()
 plt.plot(time_stim, mean_speed)
 plt.xlabel('time (s)'); plt.ylabel('speed (mm/s)'); 
-plt.ylim([2, 8])
+# plt.ylim([2, 8])

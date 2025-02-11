@@ -39,6 +39,9 @@ from scipy.sparse.linalg import eigs
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-19'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2024-12-23'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-1-24'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-3'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-5'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-6'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -128,6 +131,28 @@ ff = np.arange(53,64)
 ff = np.arange(0,7)
 ff = np.arange(8,23)
 
+### 02/03
+ff = np.arange(0,7)  ### screen on right
+# ff = np.arange(7,14) ## on the left
+# ff = np.arange(29,40)## flashes
+
+### 02/05
+ff = np.arange(6,12)  ### 50, 100
+ff = np.arange(12,20) ### 50, 1K
+# ff = np.arange(20,28) ### 50, full blue
+# ff = np.arange(28,36) ### 50, 0.5 blue 
+# ff = np.arange(36,41) ### 255, 100
+# ff = np.arange(42,49)
+# ff = np.arange(50,56) ### 255, full blue
+# ff = np.arange(57,64) ### 255, 0.5 blue
+
+## 02/06
+# ff = np.arange(0,16) ### bars
+# ff = np.arange(16,26)  ### proj and bars
+# ff = np.arange(26,35)  ### full blue
+# ff = np.arange(34,42)  ### use LED
+# ff = np.arange(42,56)  ### use LED at 255
+
 threshold_track_l = 60 * 1 #2 
 times = []
 tracks = []
@@ -164,7 +189,7 @@ for ii in range(len(ff)):
                 vxys.append(temp_v)
                 track_id.append(np.zeros(len(pos))+jj) 
                 thetas.append(theta)
-                signals.append(signal)
+                # signals.append(signal)
                 
                 n = len(pos)
                 msd_x.append(np.array([np.mean((temp_x[t:,0] - temp_x[:n-t,0])**2) for t in range(n)]))
@@ -229,7 +254,7 @@ for ii in range(len(tracks)):
     dtheta_i = thetas[ii]
     speed_i = speeds[ii]
     vx_i = vxys[ii][:,0]
-    pos = np.where(time_i<50)[0]
+    pos = np.where(time_i<90)[0]
     # pos_v = np.where(vx_i>0)[0]
     # pos = np.intersect1d(pos, pos_v)
     # plt.plot(time_i[pos], np.abs(dtheta_i[pos]),'k', alpha=0.2)
@@ -257,11 +282,11 @@ for tt in range(len(time_stim)-1):
 plt.figure()
 plt.plot(time_stim, mean_dtheta)
 plt.xlabel('time (s)'); plt.ylabel('|degree|/s'); 
-plt.ylim([25, 80])
+# plt.ylim([40, 90])
 plt.figure()
 plt.plot(time_stim, mean_speed)
 plt.xlabel('time (s)'); plt.ylabel('speed (mm/s)'); 
-plt.ylim([4, 8])
+# plt.ylim([4, 10])
 
 # %%
 ###############################################################################
