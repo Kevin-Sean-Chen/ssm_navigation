@@ -24,7 +24,7 @@ sns.set_context("talk")
 
 # %% parameter setup
 dt = 1   # characteristic time scale
-t_M = 2  # memory
+t_M = 5  # memory
 N = 1  # receptor gain
 H = 1  # motor gain
 F0 = 0.  # adapted internal state
@@ -34,9 +34,9 @@ vn = .1
 target = np.array([100,100])  ### location of source
 tau_env = 10   ### fluctuation time scale of the environment
 C0 = 100
-sigC = 50
+sigC = 2
 
-lt = 10000   #max time lapse
+lt = 5000   #max time lapse
 eps = 5  # criteria to reach sourc
 
 # %% kinematics
@@ -85,10 +85,13 @@ plt.figure()
 plt.plot(fluctuation_t)
 
 def dist2source(x):
-    return np.sum( (x-target)**2 )**0.5
+    # dist = np.sum( (x-target)**2 )**0.5  ### for point source
+    dist = np.sum( (x[0]-target[0])**2 )**0.5  ### for one direction
+    return dist
     
 def env_space(x, tt=-1):
-    C = np.exp(-np.sum((x - target)**2)/sigC**2)*C0 + np.random.randn()*0.1
+    # C = np.exp(-np.sum((x - target)**2)/sigC**2)*C0 + np.random.randn()*0.1  ### point source
+    C = C0*np.exp(x[0]/sigC)   ### exp graident
     if tt==-1:
         return C
     else:
@@ -96,7 +99,8 @@ def env_space(x, tt=-1):
 
 def env_space_xy(x,y):
     # C = np.exp(-np.sum((x - target)**2)/sigC**2)*C0
-    C = -((x - target[0])**2 / (sigC**2) + (y - target[1])**2 / (sigC**2))
+    # C = -((x - target[0])**2 / (sigC**2) + (y - target[1])**2 / (sigC**2))
+    C = C0*np.exp(x[0]/sigC) + y*0
     return C
 
 def env_time(x):
@@ -133,7 +137,8 @@ tt = 0
 
 while tt<lt and dist2source(pos_t)>eps:
     ### compute impulse
-    d_phi = grad_env(pos_t, vec_t, tt)
+    # d_phi = grad_env(pos_t, vec_t, tt)
+    d_phi = np.log(env_space(pos_t+vec_t)) - np.log(env_space(pos_t))  ### for simple log sensing
     ### internal dynamics
     df_dt = df_dt + dt*(-1/t_M*(df_dt - F0) + d_phi)
     ### draw actions
@@ -144,9 +149,9 @@ while tt<lt and dist2source(pos_t)>eps:
     new_pos, new_vec = theta2state(pos_t, theta)
     ### record
     xys.append(pos_t)
-    cs.append(env_space(pos_t))
+    # cs.append(env_space(pos_t))
     # cs.append(np.log(env_space(pos_t)))
-    # cs.append(d_phi)
+    cs.append(d_phi)
     # cs.append(env_space(new_pos) - env_space(pos_t))
     vecs.append(vec_t)
     Fs.append(df_dt)
@@ -170,7 +175,8 @@ def gen_tracks():
 
     while tt<lt and dist2source(pos_t)>eps:
         ### compute impulse
-        d_phi = grad_env(pos_t, vec_t)
+        # d_phi = grad_env(pos_t, vec_t)
+        d_phi = np.log(env_space(pos_t+vec_t)) - np.log(env_space(pos_t))  ### for simple log sensing
         ### internal dynamics
         df_dt = df_dt + dt*(-1/t_M*(df_dt - F0) + d_phi)
         ### draw actions
@@ -183,9 +189,9 @@ def gen_tracks():
         xys.append(pos_t)
         ### choose input
         # cs.append(env_space(pos_t))
-        # cs.append(np.log(env_space(pos_t)))
+        cs.append(np.log(env_space(pos_t)))
         # cs.append(d_phi)
-        cs.append(env_space(new_pos) - env_space(pos_t))
+        # cs.append(env_space(new_pos) - env_space(pos_t))
         ####
         vecs.append(vec_t)
         Fs.append(df_dt)
@@ -200,6 +206,10 @@ def gen_tracks():
     vec_vxy = np.array(vecs)
     vec_tumb = np.array(tumbles)
     return vec_xy, vec_cs, vec_Fs, vec_tumb, vec_vxy
+
+### simple test
+plt.figure()
+plt.plot(np.array(xys)[:,0], np.array(xys)[:,1])
 
 # %% measure track statistics
 reps = 30
@@ -227,34 +237,34 @@ def delay_embed(Xt, lags):
     return X
 
 # %% scan delays
-def err_given_delay(behavior, stimuli, lags):
-    tau = 1
-    Xb = delay_embed(behavior[:,[0,1]], lags)
-    Xo = delay_embed(stimuli[:,None], lags)[:-tau-lags:] ## odor
-    Xbp = Xb[:-tau-lags]
-    Ybf = Xb[tau+lags:,:]
-    Omega = np.concatenate((Xbp, Xo),1)
-    uu,ss,vv = np.linalg.svd(Omega.T, full_matrices=False)
-    ux,sx,vx = np.linalg.svd(Ybf.T, full_matrices=False)
-    u1, u2 = uu[:lags*2,:], uu[lags*2:,:]
-    A_matrix = ux.T.conj() @ Ybf.T @ vv.T @ np.diag(np.reciprocal(ss)) @ u1.T.conj() @ ux
-    B_matrix = ux.T.conj() @ Ybf.T @ vv.T @ np.diag(np.reciprocal(ss)) @ u2.T.conj()
+# def err_given_delay(behavior, stimuli, lags):
+#     tau = 1
+#     Xb = delay_embed(behavior[:,[0,1]], lags)
+#     Xo = delay_embed(stimuli[:,None], lags)[:-tau-lags:] ## odor
+#     Xbp = Xb[:-tau-lags]
+#     Ybf = Xb[tau+lags:,:]
+#     Omega = np.concatenate((Xbp, Xo),1)
+#     uu,ss,vv = np.linalg.svd(Omega.T, full_matrices=False)
+#     ux,sx,vx = np.linalg.svd(Ybf.T, full_matrices=False)
+#     u1, u2 = uu[:lags*2,:], uu[lags*2:,:]
+#     A_matrix = ux.T.conj() @ Ybf.T @ vv.T @ np.diag(np.reciprocal(ss)) @ u1.T.conj() @ ux
+#     B_matrix = ux.T.conj() @ Ybf.T @ vv.T @ np.diag(np.reciprocal(ss)) @ u2.T.conj()
     
-    X_pred = ux @ (A_matrix @ (ux.T @ Xbp.T)*1 + B_matrix @ (Xo.T)*1)
-    err = np.linalg.norm(X_pred[lags,tau:] - Ybf[:-tau,lags])
-    return err
+#     X_pred = ux @ (A_matrix @ (ux.T @ Xbp.T)*1 + B_matrix @ (Xo.T)*1)
+#     err = np.linalg.norm(X_pred[lags,tau:] - Ybf[:-tau,lags])
+#     return err
     
-scan_d = np.arange(5,200,20)
-errs = np.zeros(len(scan_d))
-for ii in range(len(scan_d)):
-    print(ii)
-    errs[ii] = err_given_delay(behavior, stimuli, scan_d[ii])
+# scan_d = np.arange(5,200,20)
+# errs = np.zeros(len(scan_d))
+# for ii in range(len(scan_d)):
+#     print(ii)
+#     errs[ii] = err_given_delay(behavior, stimuli, scan_d[ii])
 
-plt.figure()
-plt.plot(scan_d, errs,'-o')
+# plt.figure()
+# plt.plot(scan_d, errs,'-o')
     
 # %% # DMDc
-lags = 50
+lags = 60
 tau = 1
 Xb = delay_embed(behavior[:,[0,1]], lags)
 Xo = delay_embed(stimuli[:,None], lags)[:-tau-lags:] ## odor
@@ -324,14 +334,14 @@ plt.title('top modes')
 # %% plot tracks
 plt.figure()
 x_range = np.linspace(-10, 140, 150)  # 100 points along the x-axis
-y_range = np.linspace(-10, 140, 150)  # 100 points along the y-axis
+y_range = np.linspace(-160, 140, 300)  # 100 points along the y-axis
 
 # Create meshgrid for the grid points
 X, Y = np.meshgrid(x_range, y_range)
 
 # Compute Z values for each grid point
 Z = env_space_xy(X, Y)
-plt.imshow(Z, origin='lower')
+plt.imshow(np.log(Z), origin='lower', extent=[-10, 150, -150, 150])
 for ii in range(reps):
     temp = tracks_dic[ii]['xy']
     plt.plot(temp[:,0], temp[:,1])
@@ -346,7 +356,7 @@ ub,sb,vb = np.linalg.svd(B_real, full_matrices=False)
 
 plt.figure()
 for ii in range(len(ui)):
-    plt.plot(ii, ui[:,ii] @ ub[:,0],'o')
+    plt.plot(ii, ui[:,ii] @ ub[:,1],'o')
 plt.xlabel('sorted'); plt.ylabel('projection (input on modes)')
 
 # %% plot in state space
