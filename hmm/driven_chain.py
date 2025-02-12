@@ -75,19 +75,19 @@ class log_linear_Markov:
     def __init__(self, N, u_dim):
         self.N = N
         self.u_dim = u_dim
-        self.P00 = Pij_true #np.random.rand(N, N)  # ### 
+        self.P00 = np.random.rand(N, N)  # ### 
         self.P00 /= self.P00.sum(axis=1, keepdims=True)  ### baseline transition
         self.logP00 = np.log(self.P00)
-        self.w0 = w_true #np.random.randn(N, u_dim)  #  #   ### stimulus weights
+        self.w0 = np.random.randn(N, u_dim)  #  #   ### stimulus weights
         self.w_regu = 0
     
     def transition_prob(self, x, u):
         """
         Compute P(x' | x, u) using log-linear form.
         """
-        correction = np.dot(self.ws, u) #self.ws*u  ### use scalar or vector form
-        P = np.exp(correction + self.logP0)
-        return P / P.sum(axis=1, keepdims=True)
+        correction = np.dot(self.ws[x], u) #self.ws*u  ### use scalar or vector form
+        P = np.exp(correction + self.logP0[x])
+        return P / P.sum() #(axis=1, keepdims=True)
     
     def log_likelihood(self, params, x_seq, u_seq):
         self.logP0 = params[:self.N*self.N].reshape(self.N, self.N)
@@ -96,7 +96,7 @@ class log_linear_Markov:
         ll = 0
         for tt in range(len(x_seq)-1):
             P = self.transition_prob(x_seq[tt], u_seq[tt])
-            tempP = P[ x_seq[tt], x_seq[tt+1] ]
+            tempP = P[x_seq[tt+1]]  #P[ x_seq[tt], x_seq[tt+1] ]
             # ll += tempP
             if tempP>0:
                 ll += np.log(tempP)
