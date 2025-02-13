@@ -14,7 +14,7 @@ a = 0.7
 b = 0.8
 epsilon = 0.08
 dt = 0.1  # Time step for Euler method
-T = 1000  # Total time
+T = 10000  # Total time
 num_steps = int(T / dt)  # Number of steps
 
 # Define input current I(t) (time-dependent input)
@@ -71,4 +71,7 @@ plt.show()
 # recover FHN state space
 # embed with stimuli
 # find modes of bifurcation
+
+# %% embedding Markov
+
 
