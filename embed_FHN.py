@@ -8,6 +8,14 @@ Created on Wed Feb 12 17:38:25 2025
 import numpy as np
 import matplotlib.pyplot as plt
 
+from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import KMeans
+from scipy.sparse import diags
+from scipy.sparse.linalg import eigs
+from scipy.linalg import hankel
+import random
+from scipy.optimize import minimize
+
 # %%
 # FitzHugh-Nagumo model parameters
 a = 0.7
@@ -67,11 +75,154 @@ plt.grid(True)
 plt.tight_layout()
 plt.show()
 
+v_data = v*1
+
 # %% IDEAS
 # recover FHN state space
 # embed with stimuli
 # find modes of bifurcation
 
 # %% embedding Markov
+N_star = 1000
+K_star = 100
+tau_star = 5
 
+# %% functional
+def build_signal(data, K=K_star):
+    features = []
+    T = len(data)
+    samp_vec = data[:-np.mod(T,K)-1]
+    for tt in range(len(samp_vec)-K):
+        vx = samp_vec[tt:tt+K]
+        features.append(vx)
+    return np.vstack(features)
 
+X = build_signal(v_data)#, use_dtheta=True)
+
+# %% clustering and assigning states
+from sklearn.cluster import KMeans
+def discretize(X, n_clusters):
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    kmeans.fit(X)
+    cluster_labels = kmeans.labels_
+    return cluster_labels
+
+def kmeans_knn_partition(tseries,n_seeds,batchsize=None,return_centers=False):
+    if batchsize==None:
+            batchsize = n_seeds*5
+    kmeans = MiniBatchKMeans(batch_size=batchsize,n_clusters=n_seeds).fit(tseries)
+    labels=kmeans.labels_
+    if return_centers:
+        return labels,kmeans.cluster_centers_
+    return labels
+
+n_states = 10
+test_label = kmeans_knn_partition(X, N_star)
+
+# %% compute transition and measure entropy
+def compute_transition_matrix(time_series, n_states, return_count=False):
+    # Initialize the transition matrix (n x n)
+    count_matrix = np.zeros((n_states, n_states))
+    # Loop through the time series and count transitions
+    for (i, j) in zip(time_series[:-1], time_series[1:]):
+        count_matrix[i, j] += 1
+    # Normalize the counts by dividing each row by its sum to get probabilities
+    row_sums = count_matrix.sum(axis=1, keepdims=True)
+    transition_matrix = np.divide(count_matrix, row_sums, where=row_sums!=0)
+    if return_count:
+        return transition_matrix, count_matrix
+    else:
+        return transition_matrix
+
+def get_steady_state(transition_matrix):
+    # Find the eigenvalues and eigenvectors
+    eigenvalues, eigenvectors = np.linalg.eig(transition_matrix.T) #.T
+    # Find the index of the eigenvalue that is approximately 1
+    idx = np.argmin(np.abs(eigenvalues - 1))
+    # The corresponding eigenvector (steady-state)
+    steady_state = np.real(eigenvectors[:, idx])
+    # Normalize the eigenvector so that its elements sum to 1
+    steady_state = steady_state / np.sum(steady_state)
+    return steady_state
+
+def trans_entropy(M):
+    pi = get_steady_state(M)
+    h = 0
+    for ii in range(M.shape[0]):
+        for jj in range(M.shape[0]):
+            h += pi[ii]*M[ii,jj]*np.log(M[ii,jj] + 1e-10)
+    return -h
+
+def get_reversible_transition_matrix(P):
+    probs = get_steady_state(P) + 1e-10
+    probs = probs/np.sum(probs)
+    P_hat = diags(1/probs)*P.transpose()*diags(probs)
+    R=(P+P_hat)/2
+    return R
+
+def sorted_spectrum(R,k=5,which='LR'):
+    eigvals,eigvecs = eigs(R,k=k,which=which)
+    sorted_indices = np.argsort(eigvals.real)[::-1]
+    return eigvals[sorted_indices],eigvecs[:,sorted_indices]
+
+Pij = compute_transition_matrix(test_label, N_star)
+h_est = trans_entropy(Pij)
+print(h_est)
+
+# %%
+labels, centrals = kmeans_knn_partition(X, N_star, return_centers=True)
+P = compute_transition_matrix(labels, N_star)
+
+# %%
+R = get_reversible_transition_matrix(P)
+eigvals,eigvecs = sorted_spectrum(R,k=7)  # choose the top k modes
+phi2=eigvecs[labels,1].real
+u,s,v = np.linalg.svd(X,full_matrices=False)
+
+plt.figure(figsize=(10,7))
+color_abs = np.max(np.abs(phi2))
+plt.scatter(u[:,0],u[:,1],c=phi2,cmap='coolwarm',s=.1,vmin=-color_abs,vmax=color_abs)
+plt.show()
+
+# %% plotting, compared to ground truth!
+import umap
+
+sub_samp = np.random.choice(X.shape[0], 20000, replace=False)
+reducer = umap.UMAP(n_components=3, random_state=42)
+data_2d = reducer.fit_transform(X[sub_samp,:])
+
+# %%
+from mpl_toolkits.mplot3d import Axes3D
+fig=plt.figure(figsize=(10,7))
+ax = fig.add_subplot(111, projection='3d')
+color_abs = np.max(np.abs(phi2[sub_samp]))
+# sc = plt.scatter(data_2d[:,0], data_2d[:,1], c=phi2[sub_samp], cmap='coolwarm', s=.1, vmin=-color_abs, vmax=color_abs)
+sc = ax.scatter(data_2d[:,0], data_2d[:,1],data_2d[:,2], c=phi2[sub_samp], cmap='coolwarm', s=.1, vmin=-color_abs, vmax=color_abs)
+plt.colorbar(sc)
+
+# %% spectral analysis
+# P_shuff = compute_transition_matrix(np.random.permutation(labels), N)
+uu,vv = np.linalg.eig(P)  #P_shuff
+idx = np.real(uu).argsort()[::-1]  # Get indices to sort eigenvalues
+sorted_eigenvalues = uu[idx]
+plt.figure()
+plt.plot((-dt/1*tau_star)/np.log(sorted_eigenvalues[1:30]),'-o')
+plt.ylabel('relaxation time (s)')
+plt.xlabel('eigenvalue index')
+
+# %% color code tracks]
+imode = 2
+phi2 = eigvecs[labels,imode].real
+window_show = np.arange(1,10000)
+plt.figure()
+plt.scatter(window_show, v_data[window_show],c=phi2[window_show],cmap='coolwarm',s=.1,vmin=-color_abs,vmax=color_abs)
+plt.title(f'mode#{imode}')
+
+# %% now, analyze driving part!!!
+###############################################################################
+# %%
+### compute P(x'|x)
+### compute P(x'|x, u)
+### infer weights on the input
+### compute TE
+# %%
