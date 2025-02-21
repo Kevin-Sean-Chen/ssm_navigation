@@ -42,6 +42,10 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_r
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-3'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-5'
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-6'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-6'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-13'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-14'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-17'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -152,8 +156,31 @@ ff = np.arange(12,20) ### 50, 1K
 # ff = np.arange(26,35)  ### full blue
 # ff = np.arange(34,42)  ### use LED
 # ff = np.arange(42,56)  ### use LED at 255
+### VISION
+# ff = np.arange(0,10) ### 30, 2Hz
+# ff = np.arange(11,18)  ### 1 Hz
+# ff = np.arange(19,28)
+# ff = np.arange(28,37)
+# ff = np.arange(38,47)
+# ff = np.arange(48,52) 
+# ff = np.arange(53,60) ## 3 bars!
 
-threshold_track_l = 60 * 1 #2 
+### 02/13
+ff = np.arange(0,8)  ### blue bar
+ff = np.arange(8,16)  ### black bar on blue
+ff = np.arange(16,24)  ### black on green
+ff = np.arange(24,32)  ### green bar
+ff = np.arange(48,56)  ### cross at proj-50
+ff = np.arange(56,64) ### cross at proj=150
+# ff = np.arange(64,72)  ### combined
+ff = np.arange(72,80)
+# ff = np.arange(80,88)
+
+ff = np.arange(24,32)
+ff = np.arange(40,48)
+# ff = np.arange(56,64)
+
+threshold_track_l = 60 * 3*1 #2 
 times = []
 tracks = []
 thetas = []
@@ -178,18 +205,19 @@ for ii in range(len(ff)):
             if len(pos) > threshold_track_l:
                 
                 ### make per track data
-                theta = data['dtheta_smooth'][pos]
+                # theta = data['dtheta_smooth'][pos]
+                theta = data['theta'][pos]
                 temp_v = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]))
                 temp_x = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
                 times.append(data['t'][pos])
                 
-                # signal = data['signal'][pos]  ### if there is signal
+                signal = []#data['signal'][pos]  ### if there is signal
                 speeds.append(np.sqrt(data['vx_smooth'][pos]**2+data['vy_smooth'][pos]**2))
                 tracks.append(temp_x)
                 vxys.append(temp_v)
                 track_id.append(np.zeros(len(pos))+jj) 
                 thetas.append(theta)
-                # signals.append(signal)
+                signals.append(signal)
                 
                 n = len(pos)
                 msd_x.append(np.array([np.mean((temp_x[t:,0] - temp_x[:n-t,0])**2) for t in range(n)]))
@@ -254,6 +282,7 @@ for ii in range(len(tracks)):
     dtheta_i = thetas[ii]
     speed_i = speeds[ii]
     vx_i = vxys[ii][:,0]
+    # stim_i = signal[ii]
     pos = np.where(time_i<90)[0]
     # pos_v = np.where(vx_i>0)[0]
     # pos = np.intersect1d(pos, pos_v)
@@ -270,7 +299,7 @@ vel_align = np.concatenate(vel_align)
 speed_align = np.concatenate(speed_align)
 
 # %%
-time_stim = np.arange(0,20,.1) ###
+# time_stim = np.arange(0,30,.1) ###
 time_stim = np.arange(0,50,.5)
 mean_dtheta = time_stim*0+np.nan
 mean_speed = time_stim*0+np.nan
@@ -282,11 +311,11 @@ for tt in range(len(time_stim)-1):
 plt.figure()
 plt.plot(time_stim, mean_dtheta)
 plt.xlabel('time (s)'); plt.ylabel('|degree|/s'); 
-# plt.ylim([40, 90])
+# plt.ylim([25, 80])
 plt.figure()
 plt.plot(time_stim, mean_speed)
 plt.xlabel('time (s)'); plt.ylabel('speed (mm/s)'); 
-# plt.ylim([4, 10])
+plt.ylim([3, 11])
 
 # %%
 ###############################################################################

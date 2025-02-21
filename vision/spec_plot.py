@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 # Replace 'your_file.xlsx' with the actual path to your Excel file
 spec_file = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\spectrum_test\LED_spectrum_run.xlsx'  # G
 spec_file = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\spectrum_test\LED_spectrum_proj.xlsx' # R
-spec_file = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\spectrum_test\LED_spectrum_screen_blue.xlsx' # B
+# spec_file = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\spectrum_test\LED_spectrum_screen_blue.xlsx' # B
 # Read the Excel file
 df = pd.read_excel(spec_file)
 
@@ -37,3 +37,4 @@ plt.plot(specs[0,:], specs[1,:])
 plt.xlabel('wavelength (nm)')
 plt.ylabel('intensity (a. u.)')
 plt.title('projector, peak at '+ str(max_nm)+' nm')
+plt.xlim([600, 700])
