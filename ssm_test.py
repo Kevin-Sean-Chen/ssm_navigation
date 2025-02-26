@@ -126,7 +126,7 @@ for tracki in range(10):#(len(data4fit)):
 # %% quick ssm test
 ###############################################################################
 # %% setup
-num_states = 5
+num_states = 3
 obs_dim = 2
 
 # %%
@@ -144,6 +144,9 @@ plt.xlabel("EM Iteration")
 plt.ylabel("Log Probability")
 plt.legend(loc="lower right")
 plt.show()
+
+# %% compute ll
+measure_lp = hmm.log_probability(data4fit)
 
 # %% filtering!
 pick_id = 54  # 0,7
@@ -398,3 +401,42 @@ for nn in range(num_states):
     pos = np.where(vec_states==nn)[0]
     plot_kde(vec_vxy[pos,0][::12], vec_vxy[pos,1][::12], cmap=color_kdes[nn])
 plt.title('data | states')
+
+# %% Cross-Valdiation
+###############################################################################
+# %% setup
+scan_n_states = np.arange(1,7)
+obs_dim = 2
+N_iters = 100
+train_ll = np.zeros(len(scan_n_states))
+
+train_data = data4fit[200:]
+test_data = data4fit[:200]
+n_samps = 50
+n_samp_test = 20
+test_vec = np.arange(len(test_data))
+test_ll = np.zeros((len(scan_n_states), n_samp_test))
+
+# %% iteration
+
+for ii in range(len(scan_n_states)):
+    print(ii)
+    hmm_cv = ssm.HMM(scan_n_states[ii], obs_dim, observations="gaussian",  transitions="sticky")
+    hmm_lls = hmm_cv.fit(train_data, method="em", num_iters=N_iters, init_method="kmeans")
+    
+    train_ll[ii] = hmm_cv.log_probability(train_data)
+    
+    for jj in range(n_samp_test):
+        sampled_elements = np.random.choice(test_vec, size=n_samps, replace=False)
+        test_data_i = [test_data[k] for k in sampled_elements]
+        test_ll[ii,jj] = hmm_cv.log_probability(test_data_i)
+
+# %% plotting LLs
+from scipy.stats import ttest_ind
+
+plt.figure()
+# plt.plot(scan_n_states, train_ll,'k-o')
+# plt.plot(scan_n_states, test_ll, 'ko')
+plt.plot(np.tile(scan_n_states, (n_samp_test, 1)).T + np.random.randn(max(scan_n_states), n_samp_test)*0.05, test_ll, 'k.')
+plt.xlabel('number of states')
+plt.ylabel('test LL')

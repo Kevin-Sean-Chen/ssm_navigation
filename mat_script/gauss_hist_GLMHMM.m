@@ -107,7 +107,7 @@ data_dtheta =  [extractfield(Data_train,'dtheta_smooth')];
 
 %% Observation and input
 % Set parameters: transition matrix and emission matrix
-nStates = 3; % number of latent states
+nStates = 2; % number of latent states
 nX = nb*2+2;  % number of input dimensions (i.e., dimensions of regressor)
 nY = 1;  % number of output dimensions 
 nT = length(yy); % number of time bins
@@ -129,7 +129,8 @@ wts0 = rand(nY,nX,nStates); % parameters for the mixture-VonMesis behavioral mod
 %%% Parameters: alpha, base, sigma
 wts0(1,:,1) = [randn(1,nb)*1 randn(1,nb)*1 0, 1]; %single mGLM
 wts0(1,:,2) = [randn(1,nb)*1 randn(1,nb)*1 0, 1];
-wts0(1,:,3) = [randn(1,nb)*1 randn(1,nb)*1 0, 1]; %[.9, .1, 0, randn(1,nB)*10];
+% wts0(1,:,3) = [randn(1,nb)*1 randn(1,nb)*1 0, 1]; %[.9, .1, 0, randn(1,nB)*10];
+% wts0(1,:,4) = [randn(1,nb)*1 randn(1,nb)*1 0, 1];
 
 % Build struct for initial params
 mmhat = struct('A',A0, 'wts',wts0, 'loglifun',loglifun, 'basis',cosBasis, 'lambda',[.0]);
@@ -187,7 +188,7 @@ jj = jj-1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% plot some results
 cols = ['k','r','b'];
-stateK = 3;
+stateK = 1;
 flip = 1;
 x = squeeze(mmhat.wts(:,:,stateK));
 alpha_s = flip*x(1:nb);
@@ -210,7 +211,7 @@ xlabel('time (s)'); ylabel('weights');set(gca, 'FontSize', 14, 'XColor', 'k', 'Y
 [aa,bb] = max( gams_ ,[], 1 );
 pos_state1 = find(bb==1);
 pos_state2 = find(bb==2);
-pos_state3 = find(bb==3);
+% pos_state3 = find(bb==3);
 
 % pos_state1 = find(gams(1,:)>0.5);
 % pos_state2 = find(gams(2,:)>0.5);
@@ -219,7 +220,7 @@ figure;
 % plot(data_x(pos_state2), data_y(pos_state2), 'r.', 'MarkerFaceAlpha',.2);
 scatter(data_x(pos_state1), data_y(pos_state1), 2, 'k', 'filled', 'MarkerFaceAlpha', 1, 'MarkerEdgeAlpha', 1); hold on
 scatter(data_x(pos_state2), data_y(pos_state2), 4, 'r', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);set(gcf, 'Color', 'w');
-scatter(data_x(pos_state3), data_y(pos_state3), 2, 'b', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);
+% scatter(data_x(pos_state3), data_y(pos_state3), 2, 'b', 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeAlpha', 0.5);
 
 %%
 figure;

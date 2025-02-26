@@ -799,3 +799,40 @@ plt.figure()
 plt.hist(np.abs(dur)*1/60, 500)
 plt.xlim([0,5])
 plt.xlabel('stop time (s)')
+
+# %% scoring the matrix
+###############################################################################
+# Generate a random Markov transition matrix
+def random_markov_matrix(N):
+    P = np.random.rand(N, N)
+    P /= P.sum(axis=1, keepdims=True)  # Normalize rows to sum to 1
+    return P
+
+# Compute stationary distribution
+def stationary_distribution(P):
+    evals, evecs = np.linalg.eig(P.T)  # Eigen decomposition of P^T
+    stationary = np.real(evecs[:, np.isclose(evals, 1)])  # Select eigenvector for eigenvalue ~1
+    stationary = stationary[:, 0]
+    stationary /= stationary.sum()  # Normalize to sum to 1
+    return stationary
+
+# Compute reversible component
+def reversible_component(P):
+    pi = stationary_distribution(P)
+    N = P.shape[0]
+    P_rev = np.zeros((N, N))
+    for i in range(N):
+        for j in range(N):
+            P_rev[i, j] = (pi[j] * P[i, j] + pi[i] * P[j, i]) / (2 * pi[i])
+    return P_rev
+
+# Quantify reversibility
+def reversibility_score(P):
+    P_rev = reversible_component(P)
+    frobenius_norm = np.linalg.norm(P_rev - P, 'fro')
+    return frobenius_norm, P_rev
+
+# Example
+N = 1000
+P = random_markov_matrix(N)
+score, P_rev = reversibility_score(P)
