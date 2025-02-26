@@ -531,15 +531,16 @@ plot_hmm_inference(true_states[:seq_length], posterior_probs, seq_length, emissi
 ###############################################################################
 # %%
 import ssm
-from ssm.observations import AutoRegressiveObservations
+from ssm.observations import AutoRegressiveObservations, AutoRegressiveDiagonalNoiseObservations
 # %%
 K = 2
 D = 2
 M = 0
-lags = 2
+lags = 1
 
 test_hmm = ssm.HMM(K, D, M)
 test_hmm.observations = AutoRegressiveObservations(K, D, M, lags=lags)
+# test_hmm.observations = AutoRegressiveDiagonalNoiseObservations(K, D, M, lags=lags)
 
 # %%
 hmm_lls = test_hmm.fit(emissions, method="em", num_iters=50, init_method="kmeans")
