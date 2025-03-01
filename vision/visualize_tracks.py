@@ -45,7 +45,9 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_r
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-6'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-13'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-14'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-17'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-17'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-20'   ### missing dv and dth
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-20'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -176,11 +178,17 @@ ff = np.arange(56,64) ### cross at proj=150
 ff = np.arange(72,80)
 # ff = np.arange(80,88)
 
+### 02/17
 ff = np.arange(24,32)
-ff = np.arange(40,48)
+# ff = np.arange(40,48)
 # ff = np.arange(56,64)
 
-threshold_track_l = 60 * 3*1 #2 
+### 02/20
+ff = np.arange(0,16)
+ff = np.arange(26,35)
+ff = np.arange(38,48)
+
+threshold_track_l = 60 * 2*1 #2 
 times = []
 tracks = []
 thetas = []
@@ -205,8 +213,8 @@ for ii in range(len(ff)):
             if len(pos) > threshold_track_l:
                 
                 ### make per track data
-                # theta = data['dtheta_smooth'][pos]
-                theta = data['theta'][pos]
+                theta = data['dtheta_smooth'][pos]
+                # theta = data['theta'][pos]
                 temp_v = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]))
                 temp_x = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
                 times.append(data['t'][pos])
@@ -300,7 +308,7 @@ speed_align = np.concatenate(speed_align)
 
 # %%
 # time_stim = np.arange(0,30,.1) ###
-time_stim = np.arange(0,50,.5)
+time_stim = np.arange(0,50,.1)
 mean_dtheta = time_stim*0+np.nan
 mean_speed = time_stim*0+np.nan
 for tt in range(len(time_stim)-1):
@@ -315,7 +323,7 @@ plt.xlabel('time (s)'); plt.ylabel('|degree|/s');
 plt.figure()
 plt.plot(time_stim, mean_speed)
 plt.xlabel('time (s)'); plt.ylabel('speed (mm/s)'); 
-plt.ylim([3, 11])
+# plt.ylim([3, 11])
 
 # %%
 ###############################################################################
