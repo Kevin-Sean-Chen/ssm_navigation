@@ -323,7 +323,7 @@ plt.xlabel('eigenvalue index')
 # plt.ylim([0.001, 20])
 
 # %% color code tracks]
-imode = 1
+imode = 2
 phi2 = -eigvecs[labels,imode].real
 window_show = np.arange(1,50000,3)
 X_xy, track_id = build_X(rec_tracks, return_id=True)
@@ -495,9 +495,9 @@ def gen_tracks_given_substates(subid, n_steps, return_v=False, init=False):
 
 ### all ids
 subid = np.arange(N_star)
-### sub-strategies
+### sub-strategies ###
 imode = 2
-subid = np.where(eigvecs[:,imode].real>0)[0]
+# subid = np.where(eigvecs[:,imode].real>0)[0]
 subsample_xy = gen_tracks_given_substates(subid, 500)
 plt.plot(subsample_xy[:,0], subsample_xy[:,1])
 
@@ -528,8 +528,8 @@ plt.legend(); plt.xlabel(r'$\tau$ (s)');  plt.ylabel(r'$<v(t),v(t+\tau)>$')
 # %% distribution
 bins = np.arange(-15,15,0.5)
 plt.figure()
-count_data,_ = np.histogram(vx_smooth, bins)
-# count_data,_ = np.histogram(vy_smooth, bins)
+# count_data,_ = np.histogram(vx_smooth, bins)
+count_data,_ = np.histogram(vy_smooth, bins)
 count_simu,_ = np.histogram(samp_vxy[:, xy_id] /(tau_star/90*down_samp), bins)
 plt.plot(bins[:-1], count_data/count_data.sum(), label='data')
 plt.plot(bins[:-1], count_simu/count_simu.sum(), label='delayed Markov')
