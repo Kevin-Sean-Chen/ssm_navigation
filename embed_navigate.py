@@ -12,6 +12,7 @@ from sklearn.cluster import KMeans
 from scipy.sparse import diags
 from scipy.sparse.linalg import eigs
 from scipy.linalg import hankel
+import scipy as sp
 
 import seaborn as sns
 sns.set_style("white")
@@ -85,8 +86,8 @@ for tr in range(n_tracks):
     # times.append(data['t'][pos])
 
 # %% set parameters (for now, need to scan later...)
-K_star = int(5* (90/down_samp))
-N_star = 1000
+K_star = int(4* (90/down_samp))
+N_star = 1200
 tau_star = 2  ### data is at 90 Hz
     
 # %% functionals
@@ -242,37 +243,37 @@ print(h_est)
 # %%
 ###############################################################################
 # %% scanning
-tau = 2
-Ks = np.array([.5, 1, 2, 4, 6, 8])*int(5* (90/down_samp))/tau
-Ns = np.array([10, 100, 250, 500, 1000, 2000, 3000])
-nats = np.zeros((len(Ks), len(Ns)))
+# tau = 2
+# Ks = np.array([.5, 1, 2, 4, 6, 8])*int(5* (90/down_samp))/tau
+# Ns = np.array([10, 100, 250, 500, 1000, 2000, 3000])
+# nats = np.zeros((len(Ks), len(Ns)))
 
-for kk in range(len(Ks)):
-    for nn in range(len(Ns)):
-        ### build delay embedding
-        # Xi,idsi = build_signal(rec_signal, return_id=True, K=Ks[kk],tau=tau)   ### for signal
-        Xi,idsi = build_X(data4fit, return_id=True, K=Ks[kk])  #### for behavior
-        ### cluster
-        time_series = kmeans_knn_partition(Xi, Ns[nn])  ### mask the transition ones too!
-        ### build matrix
-        Pij = compute_transition_matrix(time_series, idsi, Ns[nn])
-        ### compute entropy
-        nati = trans_entropy(Pij)
+# for kk in range(len(Ks)):
+#     for nn in range(len(Ns)):
+#         ### build delay embedding
+#         # Xi,idsi = build_signal(rec_signal, return_id=True, K=Ks[kk],tau=tau)   ### for signal
+#         Xi,idsi = build_X(data4fit, return_id=True, K=Ks[kk])  #### for behavior
+#         ### cluster
+#         time_series = kmeans_knn_partition(Xi, Ns[nn])  ### mask the transition ones too!
+#         ### build matrix
+#         Pij = compute_transition_matrix(time_series, idsi, Ns[nn])
+#         ### compute entropy
+#         nati = trans_entropy(Pij)
         
-        nats[kk,nn] = nati / (tau/90)  ### nats per second for transitions
-        print(kk,nn)
+#         nats[kk,nn] = nati / (tau/90)  ### nats per second for transitions
+#         print(kk,nn)
 
 # %% plot entropy rates
-plt.figure()
-colors_K = plt.cm.viridis(np.linspace(0,1,len(Ks)))
-for k,K in enumerate(Ks):
-    temp = K/90*tau
-    plt.plot(Ns, nats[k]/1,c=colors_K[k],marker='o',label=f'K={temp:.1f} s')
-# plt.plot(Ns, nats.T)
-plt.xlabel('N')
-plt.ylabel('nats/s')
-plt.legend()
-plt.title('behavior embedding')
+# plt.figure()
+# colors_K = plt.cm.viridis(np.linspace(0,1,len(Ks)))
+# for k,K in enumerate(Ks):
+#     temp = K/90*tau
+#     plt.plot(Ns, nats[k]/1,c=colors_K[k],marker='o',label=f'K={temp:.1f} s')
+# # plt.plot(Ns, nats.T)
+# plt.xlabel('N')
+# plt.ylabel('nats/s')
+# plt.legend()
+# plt.title('behavior embedding')
 
 # %% bulding Markov model
 ###############################################################################
@@ -282,7 +283,7 @@ labels, centrals = kmeans_knn_partition(X_traj, N_star, return_centers=True)
 P = compute_transition_matrix(labels, track_id, N_star)
 
 # %% get reverisble matrix
-top_n_values = 10
+top_n_values = 25
 R = get_reversible_transition_matrix(P)
 eigvals,eigvecs = sorted_spectrum(R,k=top_n_values)  # choose the top k modes
 phi2=eigvecs[labels, 1].real
@@ -311,20 +312,20 @@ plt.colorbar(sc)
 
 # %% spectral analysis
 P_shuff = compute_transition_matrix(np.random.permutation(labels),track_id, N_star)
-uu,vv = np.linalg.eig(P_shuff)  #P_shuff
+# uu,vv = np.linalg.eig(P_shuff)  #P_shuff
 uu,vv = np.linalg.eig(P)
 idx = uu.argsort()[::-1]  # Get indices to sort eigenvalues
 sorted_eigenvalues = np.real(uu[idx])
 plt.figure()
-plt.plot((-1/90*down_samp*tau_star)/np.log(sorted_eigenvalues[1:30]),'-o')
+plt.plot((-1/60*down_samp*tau_star)/np.log(sorted_eigenvalues[1:30]),'-o')
 plt.ylabel('relaxation time (s)')
 plt.xlabel('eigenvalue index')
 # plt.yscale('log')
 # plt.ylim([0.001, 20])
 
 # %% color code tracks]
-imode = 2
-phi2 = -eigvecs[labels,imode].real
+imode = 1
+phi2 = eigvecs[labels,imode].real
 window_show = np.arange(1,50000,3)
 X_xy, track_id = build_X(rec_tracks, return_id=True)
 xy_back = X_xy[:, [0,int(K_star)]]
@@ -339,6 +340,100 @@ plt.scatter(X_traj[window_show, 1+K_star*1], phi2[window_show],c=phi2[window_sho
 plt.scatter(X_traj[window_show, 1+K_star*0], X_traj[window_show, 1+K_star*1],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
 # plt.scatter(X_speed[window_show,0], phi2[window_show],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)  # speed
 plt.xlabel('vx'); plt.ylabel('vy')
+
+# %% traj vs. mode -> functional analysis #####################################
+window_show = np.arange(1,100000,3)
+xys_samp = xy_back[window_show, :]
+vxy_samp = X_traj[:, [0, K_star*1]][window_show]
+dists = np.zeros(len(window_show))
+for tt in range(len(window_show)):
+    dists[tt] = np.linalg.norm(xys_samp[tt,:] - np.array([0,90]))  ### change this to projection towards the goal!!
+    vec_xy = np.array([0,90]) - xys_samp[tt,:]
+    vec_xy = vec_xy/np.linalg.norm(vec_xy)
+    dists[tt] = np.dot(vec_xy, vxy_samp[tt,:])  ### projection onto the goal direction
+### remove jumps
+pos = np.where(np.abs(dists)<50)[0]
+phi_samp = -phi2[window_show]
+plt.figure()
+plt.plot(phi_samp[pos], dists[pos], '.',alpha=0.1) 
+plt.ylabel('projection to goal'); plt.xlabel('behavioral mode')
+
+# %% test LDS fitting!
+import numpy as np
+from scipy.linalg import eig
+from scipy.ndimage import gaussian_filter1d
+
+def estimate_jacobian(x, y, dx_dt, dy_dt):
+    """
+    Estimate the Jacobian matrix using least squares fit:
+    dx/dt ≈ J * [x, y]^T
+    dy/dt ≈ J * [x, y]^T
+    """
+    A = np.vstack([x, y]).T  # Construct feature matrix
+    J11, J12 = np.linalg.lstsq(A, dx_dt, rcond=None)[0]
+    J21, J22 = np.linalg.lstsq(A, dy_dt, rcond=None)[0]
+    
+    return np.array([[J11, J12], [J21, J22]])
+
+# Example: Simulated time series (replace with real data)
+t =window_show*1/60  ### time vector
+pos = np.where(np.abs(dists)<50)[0]
+x,y = phi_samp[pos], dists[pos]
+
+# Estimate time derivatives numerically
+dx_dt = np.gradient(x, t)
+dy_dt = np.gradient(y, t)
+
+# Smooth derivatives to reduce noise
+dx_dt = gaussian_filter1d(dx_dt, sigma=10)
+dy_dt = gaussian_filter1d(dy_dt, sigma=10)
+
+# Estimate Jacobian
+J = estimate_jacobian(x, y, dx_dt, dy_dt)
+
+# Compute eigenvalues to analyze stability
+eigenvalues, _ = eig(J)
+print("Estimated Jacobian matrix:\n", J)
+print("Eigenvalues:", eigenvalues)
+
+# %% transient grouth curve
+t_values = np.arange(1,1000,3)*1/60
+growth = [np.linalg.norm(sp.linalg.expm(J*t)) for t in t_values]
+
+plt.plot(t_values, growth)
+plt.xlabel("Time")
+plt.ylabel("||exp(Jt)|| (Transient Growth)")
+plt.title("Transient Growth of Non-Normal System")
+plt.grid()
+plt.show()
+
+# %% sample traj
+xx = -gaussian_filter1d(x, sigma=1)
+yy = gaussian_filter1d(y, sigma=1)
+from matplotlib.collections import LineCollection
+# Generate sample data (Replace with your real data)
+init_t = 600 #600 #2300  #600 #
+window_show = np.arange(init_t, init_t+650, 1)
+colors = np.linspace(0, 1, len(window_show))  # Color progression
+# Convert points into line segments
+points = np.array([xx[window_show], yy[window_show]]).T.reshape(-1, 1, 2)
+segments = np.concatenate([points[:-1], points[1:]], axis=1)  # Create line segments
+# Create a LineCollection with the color progression
+fig, ax = plt.subplots(figsize=(6, 5))
+lc = LineCollection(segments, cmap='viridis', norm=plt.Normalize(0, 1))
+lc.set_array(colors[:-1])  # Color based on progression
+# Add line collection to plot
+ax.add_collection(lc)
+ax.scatter(xx[window_show[0]], yy[window_show[0]], color="red", edgecolors="black", s=100, label="Start Point", zorder=3)
+ax.autoscale()
+ax.set_xlim([-0.22,.1])
+ax.set_ylim([-21,20])
+# Add colorbar
+cbar = plt.colorbar(lc)
+# Labels
+ax.set_xlabel("mode #2")
+ax.set_ylabel("projected goal")
+ax.set_title("trajectory across 30s")
 
 # %% symmetry measurement
 ################################################################################################################
@@ -365,12 +460,13 @@ print(score_control)
 ###############################################################################
 # %% y=beta X
 lags = 401
-n_top_modes = 5
+n_top_modes = 7
+threshold = 2.
 phi_top = eigvecs[labels,1:n_top_modes].real
 X_odor = build_signal(rec_signal, K_star)
 X_odor = X_odor[:, 0]
-X_odor[X_odor<2] = 0
-X_odor[X_odor>2] = 1
+X_odor[X_odor<threshold] = 0
+X_odor[X_odor>threshold] = 1
 # y_ = np.diff(X_odor)
 # y_ = np.append(y_, 0)
 # X_odor[y_<0] = 0
@@ -393,6 +489,53 @@ for ii in range(n_top_modes-1):
 plt.legend()
 plt.xlabel('time (s)'); plt.ylabel('weights')
 plt.xlim([-0.051,4])
+
+# %% information rank
+### make the full dist vector
+dists = np.zeros(len(phi2))
+for tt in range(len(dists)):
+    xys_i =  X_traj[tt, [0, K_star*1]]
+    vxy_i = X_traj[tt, [0, K_star*1]]
+    dists[tt] = np.linalg.norm(xys_i - np.array([0,90]))  ### change this to projection towards the goal!!
+    vec_xy = np.array([0,90]) - xys_i
+    vec_xy = vec_xy/np.linalg.norm(vec_xy)
+    dists[tt] = np.dot(vec_xy, vxy_i)
+
+pos = np.where(np.abs(dists)<50)[0]
+dists = dists[pos]
+# %% loop through modes
+from sklearn.metrics import mutual_info_score
+def compute_mutual_information(x, y, bins=10):
+    x_binned = np.digitize(x, bins=np.histogram_bin_edges(x, bins=bins))
+    y_binned = np.digitize(y, bins=np.histogram_bin_edges(y, bins=bins))
+    mi = mutual_info_score(x_binned, y_binned)
+    return mi
+n_top_modes = 25
+reps = 10
+segment = 60000
+nbins = 5
+modes_k = eigvecs[labels,1:n_top_modes].real
+MIs = np.zeros((n_top_modes, reps))
+signal = dists*1  ### againts projection to source
+signal = X_odor[pos]*1 ### against odor
+
+for nn in range(n_top_modes):
+    if nn == n_top_modes-1:
+        # phi_samp = np.random.permutation(modes_k[pos, -1])
+        phi_samp = np.roll(modes_k[pos, 0], shift=np.random.randint(0, len(modes_k)))
+    else:
+        phi_samp = modes_k[pos, nn]
+    
+    # MIs[nn] = compute_mutual_information(phi_samp, signal, bins=10)
+    for rr in range(reps):
+        rand_int = np.random.randint(0, len(dists)- segment)
+        MIs[nn, rr] = compute_mutual_information(phi_samp[rand_int:rand_int+segment], signal[rand_int:rand_int+segment], bins=nbins)
+
+plt.figure()
+# plt.plot(MIs,'-o')
+plt.errorbar(np.arange(n_top_modes), np.mean(MIs,1), np.std(MIs,1))#/reps**0.5)
+plt.xlabel('ranked modes')
+plt.ylabel('I(odor; mode)')
 
 # %% start with simple regression
 # X_odor = build_signal(rec_signal, K_star)
@@ -496,7 +639,7 @@ def gen_tracks_given_substates(subid, n_steps, return_v=False, init=False):
 ### all ids
 subid = np.arange(N_star)
 ### sub-strategies ###
-imode = 2
+imode = 1
 # subid = np.where(eigvecs[:,imode].real>0)[0]
 subsample_xy = gen_tracks_given_substates(subid, 500)
 plt.plot(subsample_xy[:,0], subsample_xy[:,1])
@@ -528,12 +671,13 @@ plt.legend(); plt.xlabel(r'$\tau$ (s)');  plt.ylabel(r'$<v(t),v(t+\tau)>$')
 # %% distribution
 bins = np.arange(-15,15,0.5)
 plt.figure()
-# count_data,_ = np.histogram(vx_smooth, bins)
-count_data,_ = np.histogram(vy_smooth, bins)
+count_data,_ = np.histogram(vx_smooth, bins)
+# count_data,_ = np.histogram(vy_smooth, bins)
 count_simu,_ = np.histogram(samp_vxy[:, xy_id] /(tau_star/90*down_samp), bins)
 plt.plot(bins[:-1], count_data/count_data.sum(), label='data')
 plt.plot(bins[:-1], count_simu/count_simu.sum(), label='delayed Markov')
 plt.xlabel(r'$v_x$'); plt.ylabel('count'); plt.legend(); plt.yscale('log')
+
 
 # %% NEXT
 ### scanning
@@ -547,4 +691,78 @@ plt.xlabel(r'$v_x$'); plt.ylabel('count'); plt.legend(); plt.yscale('log')
 # sorted_eigenvalues_left = np.real(eigenvalues[idx])
 top_n_values_left = 100
 eigvals_left,eigvecs_left = sorted_spectrum(P.T, k=top_n_values_left)
+
+# %% computing stimulus conditional transitions
+def compute_transition_matrix_stim(behavior_series, stim_series, track_id, n_states):
+    """
+    modified from previous function to handle track id and not compute those transitions
+    """
+    # Initialize the transition matrix (n x n)
+    transition_matrix = np.zeros((n_states, n_states))
+    # find valid transition that is not across tracks
+    valid_transitions = (track_id[:-1] == track_id[1:]) & (stim_series[:-1] == 1)
+    # Get the current and next state only for valid transitions
+    current_states = behavior_series[:-1][valid_transitions]
+    next_states = behavior_series[1:][valid_transitions]
+    # Use np.add.at to efficiently accumulate transitions
+    np.add.at(transition_matrix, (current_states, next_states), 1)
+    
+    # Normalize the counts by dividing each row by its sum to get probabilities
+    row_sums = transition_matrix.sum(axis=1, keepdims=True)
+    transition_matrix = np.divide(transition_matrix, row_sums, where=row_sums!=0)
+    return transition_matrix 
+
+threshold = 2.
+X_odor = build_signal(rec_signal, K_star)
+X_odor = np.mean(X_odor,1)
+X_odor[X_odor<threshold] = 0
+X_odor[X_odor>threshold] = 1
+P_cond = compute_transition_matrix_stim(test_label, X_odor, ids, N_star)
+
+keep_rows = P_cond.sum(1) == 1
+P_cond = P_cond[np.ix_(keep_rows, keep_rows)]
+row_sums = P_cond.sum(axis=1, keepdims=True)
+P_cond = np.divide(P_cond, row_sums)#, where=row_sums!=0)
+
+# %% get reverisble matrix
+top_n_values = 5
+R_cond = get_reversible_transition_matrix(P_cond)
+eigvals,eigvecs = sorted_spectrum(R_cond, k=top_n_values)  # choose the top k modes
+phi2_cond = eigvecs[labels, 1].real
+u,s,v = np.linalg.svd(X_traj,full_matrices=False)
+
+plt.figure(figsize=(10,7))
+color_abs = np.max(np.abs(phi2_cond))
+plt.scatter(u[:,0],u[:,1],c=phi2_cond,cmap='coolwarm',s=.1,vmin=-color_abs,vmax=color_abs)
+plt.show()
+
+# %%
+uu,vv = np.linalg.eig(P_cond)
+idx = uu.argsort()[::-1]  # Get indices to sort eigenvalues
+sorted_eigenvalues = np.real(uu[idx])
+plt.figure()
+plt.plot((-1/90*down_samp*tau_star)/np.log(sorted_eigenvalues[1:30]),'-o')
+plt.ylabel('relaxation time (s)')
+plt.xlabel('eigenvalue index')
+
+# %%
+score = np.linalg.norm(R_cond)**2/np.linalg.norm(P_cond)**2 ### compare to shuffle?  ### random is around .85?
+print(score)
+# %% sample for Markovianity
+def irreversibility(Pij):
+    pi = get_steady_state(Pij)
+    irr = 0
+    for ii in range(Pij.shape[0]):
+        for jj in range(Pij.shape[1]):
+            # if ii<jj:
+            if Pij[ii, jj] > 0 and Pij[jj, ii] > 0:
+                irr += 0.5* pi[ii]*Pij[ii,jj]*np.log((pi[ii]*Pij[ii,jj])/(pi[jj]*Pij[jj,ii] + 1e-10))
+    return irr
+
+print(irreversibility(P))
+print(irreversibility(P_cond))
+
+# %% fit w weight on input u? joint embedding???
+
+# %% coarse graining?? link back to TE??
 
