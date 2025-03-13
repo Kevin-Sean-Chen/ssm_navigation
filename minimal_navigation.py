@@ -131,7 +131,7 @@ tt = 0
 
 while tt<lt and dist2source(pos_t)>eps:
     ### compute impulse
-    d_phi = grad_env(pos_t, vec_t, tt)
+    d_phi = grad_env(pos_t, vec_t, tt)  #np.random.randn()*1 #
     ### internal dynamics
     df_dt = df_dt + dt*(-1/t_M*(df_dt - F0) + d_phi)
     ### draw actions
@@ -168,7 +168,7 @@ def gen_tracks():
 
     while tt<lt and dist2source(pos_t)>eps:
         ### compute impulse
-        d_phi = grad_env(pos_t, vec_t)
+        d_phi = grad_env(pos_t, vec_t)  #np.random.randn()*1 #
         ### internal dynamics
         df_dt = df_dt + dt*(-1/t_M*(df_dt - F0) + d_phi)
         ### draw actions
@@ -221,13 +221,13 @@ plt.plot(vec_xy[-1,0], vec_xy[-1,1],'r*')
 # %% now test inference!
 ###############################################################################
 # %% setup design matrix 
-lags = 15
+lags = 20
 X_s = hankel(vec_cs[:lags], vec_cs[lags-1:]).T  ### time by lag
 vec_causal = vec_tumb[:-1]
 vec_causal = np.insert(vec_causal, 0, 0)
 X_a = hankel(vec_causal[:lags], vec_causal[lags-1:]).T  ### time by lag
 X = np.concatenate((X_s,X_a), 1)
-X = np.concatenate((X, 0*np.ones((X_s.shape[0],1))), 1)
+X = np.concatenate((X, np.ones((X_s.shape[0],1))*1 ), 1)
 y = vec_tumb[:-lags+1]*1  # actions
 
 # %% likelihood function and optimization
@@ -240,14 +240,76 @@ def neg_ll(theta,   y, X):
     nll = -log_likelihood
     return nll
 
+def neg_ll_parametric(theta,   y, X):
+    a_s, tau_s, a_h, tau_h, b = theta
+    xl = (X.shape[1]-1)//2  # vector length, removing the intersect
+    tvec = np.arange(0, xl)
+    K_s = a_s*np.exp(-tvec*(tau_s))
+    K_h = a_h*np.exp(-tvec*(tau_h))
+    beta = np.concatenate([K_s, K_h, [b]])
+    p = X @ beta
+    eps = 1e-10  # Small value to prevent log(0)
+    p = np.clip(p, eps, 1 - eps)
+    # Compute the log-likelihood
+    log_likelihood = np.sum(y * np.log(p) + (1 - y) * np.log(1 - p))
+    nll = -log_likelihood
+    return nll
+
+def grad_neg_log_likelihood(theta, y, X):
+    # a_s, tau_s, a_h, tau_h, b = theta
+    # xl = (X.shape[1]-1)//2  # vector length, removing the intersect
+    # tvec = np.arange(0, xl)
+    # K_s = a_s*np.exp(-tvec*(tau_s))
+    # K_h = a_h*np.exp(-tvec*(tau_h))
+    # beta = np.concatenate([K_s, K_h, [b]])
+    linear_pred = X @ theta
+    p = 1 / (1 + np.exp(-linear_pred))  # Sigmoid function
+    gradient = X.T @ (p - y)  # Gradient
+    return gradient
+
+# %%
+# %% test gradient
+beta_init = np.zeros(lags*2 + 1)
+# Minimize the negative log-likelihood with gradient
+result = sp.optimize.minimize(
+    neg_ll, 
+    beta_init, 
+    args=(y, X), 
+    method='BFGS', 
+    jac=grad_neg_log_likelihood
+)
+
+# %% IDEAS.... Gradient or basis function...
+###############################################################################
+###############################################################################
+
+# %% optimization (non-parametric)
 n_params = lags*2 + 1  ### two kernels and one offset
 theta0 = np.ones(n_params)*0
 res = sp.optimize.minimize( neg_ll, theta0, args=(y, X), options={'disp':True,'gtol':1e-9})
                             # , method='Nelder-Mead',options={'disp':True,'maxiter':3000})#
                             # method="BFGS") #, tol=1e-3, options={'disp':True,'gtol':1e-2})#
+                            
 # %% plot sensory and history kernels
 betas = res.x
 K_s, K_a, base = betas[:lags], betas[lags:lags*2], betas[-1]
+plt.figure(figsize=(12, 4))
+plt.subplot(121); plt.plot(K_s)
+plt.subplot(122); plt.plot(K_a)
+
+# %% optimization (non-parametric)
+n_params = 2*2 + 1  ### two kernels and one offset
+theta0 = np.ones(n_params)*.0
+bounds = ([-100,100],[0.1,100],[-100,100],[0.1,100], [-100, 100])
+res = sp.optimize.minimize( neg_ll_parametric, theta0, args=(y, X), options={'disp':True,'gtol':1e-9})#,
+                           # bounds = bounds, method='SLSQP')
+
+# %% plot for parametric inference
+betas = res.x
+a_s, tau_s, a_h, tau_h, b = betas
+tvec = np.arange(0,lags)
+K_s = a_s*np.exp(-tvec*(tau_s))
+K_a = a_h*np.exp(-tvec*(tau_h))
 plt.figure(figsize=(12, 4))
 plt.subplot(121); plt.plot(K_s)
 plt.subplot(122); plt.plot(K_a)
@@ -263,7 +325,7 @@ for rr in range(reps):
         tracks_dic[rr] = {'xy':vec_xy, 'cs':vec_cs, 'Fs':vec_Fs, 'tumb': vec_tumb}
     print(rr)
 # %% group nll
-def group_nll(theta, tracks, lamb):
+def group_nll(theta, tracks, lamb, nll_function):
     gnll = 0
     for ii in range(len(tracks)):
         tracki = tracks[ii]
@@ -271,24 +333,80 @@ def group_nll(theta, tracks, lamb):
         # lags = 10
         X_s = hankel(vec_cs[:lags], vec_cs[lags-1:]).T  ### time by lag
         vec_causal = vec_tumb[:-1]
-        vec_causal = np.insert(vec_causal, 0, 0)
+        vec_causal = np.insert(vec_causal, 0, 0)*1
         X_a = hankel(vec_causal[:lags], vec_causal[lags-1:]).T  ### time by lag
         X = np.concatenate((X_s,X_a), 1)
-        X = np.concatenate((X, np.ones((X_s.shape[0],1))), 1)
+        X = np.concatenate((X, np.ones((X_s.shape[0],1))*1  ), 1)
         y = vec_tumb[:-lags+1]*1  # actions
         
-        gnll += neg_ll(theta, y, X)
+        gnll += nll_function(theta, y, X)
     return gnll + lamb*np.sum(np.diff(theta)**2)
 
 # %% optimize for group
 n_params = lags*2 + 1  ### two kernels and one offset
+n_params = 2*2 + 1  ### if it is for non-parametric
 lamb = 0
-theta0 = np.ones(n_params)*0
-res = sp.optimize.minimize( group_nll, theta0, args=(tracks_dic, lamb), options={'disp':True,'gtol':1e-9})
+theta0 = np.ones(n_params)*5
+# theta0 = np.array([-1, 10, 1, 10, 0])
+bounds = ([-100,100],[0.1,100],[-100,100],[0.1,100], [-100, 100])
+### non-parametric
+# res = sp.optimize.minimize( group_nll, theta0, args=(tracks_dic, lamb, neg_ll), options={'disp':True,'gtol':1e-9})
+### parametric 
+res = sp.optimize.minimize( group_nll, theta0, args=(tracks_dic, lamb, neg_ll_parametric), options={'disp':True,'gtol':1e-9})#,
+                            # bounds = bounds, method='SLSQP')
+
+# %% plot for parametric inference
+betas = res.x
+a_s, tau_s, a_h, tau_h, b = betas
+tvec = np.arange(0,lags)
+K_s = a_s*np.exp(-tvec/(tau_s))
+K_a = a_h*np.exp(-tvec/(tau_h))
+plt.figure(figsize=(12, 4))
+plt.subplot(121); plt.plot(K_s)
+plt.subplot(122); plt.plot(K_a)
 
 # %% plot sensory and history kernels
 betas = res.x
 K_s, K_a, base = betas[:lags], betas[lags:lags*2], betas[-1]
 plt.figure(figsize=(12, 4))
 plt.subplot(121); plt.plot(K_s); plt.title('K_s'); plt.xlabel('time lag')
-plt.subplot(122); plt.plot(K_a); plt.title('K_a'); plt.xlabel('time lag') 
+plt.subplot(122); plt.plot(K_a); plt.title('K_a'); plt.xlabel('time lag')
+
+# %% test inference matching
+###############################################################################
+# %% scanning
+
+Tms = np.array([1,2,4,8])  # scanning memory
+reps_sims = 5  # repeated inference
+reps_tracks = 50  # repeated tracks
+n_params = 2*2 + 1  ### if it is for non-parametric
+ks_tau = np.zeros((reps_sims, len(Tms), n_params))  # inferred time scale
+bounds = ([-100,100],[0,100],[-100,100],[0,100], [-100, 100])
+
+for ss in range(reps_sims):
+    print('repeats:', ss)
+    for mm in range(len(Tms)):
+        print('memory', Tms[mm])
+        t_M = Tms[mm]
+        ### group tracks for inference
+        tracks_dic = {}
+        for rr in range(reps):
+            vec_xy, vec_cs, vec_Fs, vec_tumb = gen_tracks()
+            if len(vec_xy)<lt:  ### if reached goal...
+                tracks_dic[rr] = {'xy':vec_xy, 'cs':vec_cs, 'Fs':vec_Fs, 'tumb': vec_tumb}
+            # print(rr)
+        
+        ### doing group inference
+        lamb = 0
+        theta0 = np.ones(n_params)*5
+        res = sp.optimize.minimize( group_nll, theta0, args=(tracks_dic, lamb, neg_ll_parametric))#, 
+                                   # options={'disp':True,'gtol':1e-9}, bounds = bounds, method='SLSQP')
+        ks_tau[ss,mm, :] = res.x
+            
+
+# %% plotting inferred parameters versus true time scales
+plt.figure()
+plt.plot(Tms, -(ks_tau[:,:,1].T),'.')
+plt.xlabel(r'true $\tau_M$')
+plt.ylabel(r'inferred $\hat{\tau}$')
+plt.ylim([0,10])
