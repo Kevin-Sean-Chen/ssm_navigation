@@ -47,7 +47,8 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_r
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-14'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-17'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-20'   ### missing dv and dth
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-20'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-27'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-6' 
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -188,6 +189,12 @@ ff = np.arange(0,16)
 ff = np.arange(26,35)
 ff = np.arange(38,48)
 
+### 03/06
+# ff = np.arange(0,8)  ### odor +BP
+# ff = np.arange(9,16) ### odor
+# ff = np.arange(32,40)  ### w/o ATR +BP
+ff = np.arange(40,56) ### w/o ATR
+
 threshold_track_l = 60 * 2*1 #2 
 times = []
 tracks = []
@@ -307,8 +314,8 @@ vel_align = np.concatenate(vel_align)
 speed_align = np.concatenate(speed_align)
 
 # %%
-# time_stim = np.arange(0,30,.1) ###
-time_stim = np.arange(0,50,.1)
+time_stim = np.arange(0,50,.2) ###
+# time_stim = np.arange(0,120*2,.1)
 mean_dtheta = time_stim*0+np.nan
 mean_speed = time_stim*0+np.nan
 for tt in range(len(time_stim)-1):
@@ -319,11 +326,11 @@ for tt in range(len(time_stim)-1):
 plt.figure()
 plt.plot(time_stim, mean_dtheta)
 plt.xlabel('time (s)'); plt.ylabel('|degree|/s'); 
-# plt.ylim([25, 80])
+plt.ylim([25, 90])
 plt.figure()
 plt.plot(time_stim, mean_speed)
 plt.xlabel('time (s)'); plt.ylabel('speed (mm/s)'); 
-# plt.ylim([3, 11])
+plt.ylim([3, 11])
 
 # %%
 ###############################################################################
