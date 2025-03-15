@@ -96,7 +96,7 @@ def reduce_and_sample_markov(P, num_clusters=10, num_steps=1000):
 # P /= P.sum(axis=1, keepdims=True)  # Normalize rows to make it stochastic
 
 # Reduce to 10 states and simulate 1000 time steps
-num_clusters = 4
+num_clusters = 20
 reduced_P, state_sequence, cluster_labels, mapping_matrix = reduce_and_sample_markov(P, num_clusters=num_clusters, num_steps=1000)
 
 # Plot the sampled time series
@@ -208,4 +208,5 @@ for ii in range(len(pi)):
             irr += J_ij[ii,jj]* (np.log(P[jj,ii] + 1e-10) - np.log(P[ii,jj] + 1e-10))
 # %%
 plt.figure()
-plt.bar(['sticky', 'traffic','irreversible'], [stick, traffic, irr])
+plt.bar(['sticky', 'traffic','irreversible'], [-stick, -traffic, -irr])
+plt.ylabel('entropy')
