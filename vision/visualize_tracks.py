@@ -49,6 +49,7 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_r
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-20'   ### missing dv and dth
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-27'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-6' 
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-20'  ### jittered ribbon
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -195,6 +196,8 @@ ff = np.arange(38,48)
 # ff = np.arange(32,40)  ### w/o ATR +BP
 ff = np.arange(40,56) ### w/o ATR
 
+ff = np.arange(0,18)
+
 threshold_track_l = 60 * 2*1 #2 
 times = []
 tracks = []
@@ -315,7 +318,7 @@ speed_align = np.concatenate(speed_align)
 
 # %%
 time_stim = np.arange(0,50,.2) ###
-# time_stim = np.arange(0,120*2,.1)
+# time_stim = np.arange(0,120*2,.4)
 mean_dtheta = time_stim*0+np.nan
 mean_speed = time_stim*0+np.nan
 for tt in range(len(time_stim)-1):

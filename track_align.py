@@ -53,6 +53,7 @@ root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_s
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-5'
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-11-7'  ### for full field
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-10-31'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-20'  ### jittered ribbon
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -131,7 +132,16 @@ vec_vxy = np.concatenate(data4fit)  # velocity
 vec_xy = np.concatenate(rec_tracks)  # position
 vec_ids = np.concatenate(track_id)  # track ID
 
+# %% visulization
+ii = 275 #tracks_stimed[50]
+plt.figure()
+plt.plot(rec_tracks[ii][:,0], rec_tracks[ii][:,1],'.'); 
+pos=np.where(rec_signal[ii]>10)[0]; 
+plt.plot(rec_tracks[ii][pos,0], rec_tracks[ii][pos,1],'r.'); plt.plot(rec_tracks[ii][0,0], rec_tracks[ii][0,1],'*')
+
 # %% measuring base on tracks
+pre_t = 0#45
+stim_t = 30
 odor_feature = []
 post_vxy = []
 post_xy = []
@@ -140,7 +150,7 @@ for nn in range(len(data4fit)):
     signal_i = rec_signal[nn]
     xy_i = rec_tracks[nn]
     vxy_i = data4fit[nn]
-    pos_stim = np.where((time_i>45) & (time_i<45+30))[0]
+    pos_stim = np.where((time_i>pre_t) & (time_i<pre_t+stim_t))[0]
     if np.nansum(signal_i)>0 and len(pos_stim)>0:  # some odor encounter
         pos = np.where(signal_i>0)[0][-1]  # last encounter
         # pos = pos_stim[-1]
@@ -148,19 +158,19 @@ for nn in range(len(data4fit)):
         post_xy.append(xy_i[pos:,:])
         
         ### building features
-        signal_vec = np.zeros_like(signal_i[pos_stim,0])
-        signal_vec[signal_i[pos_stim,0]>0] = 1
+        signal_vec = np.zeros_like(signal_i[pos_stim]) #,0]
+        signal_vec[signal_i[pos_stim]>0] = 1  #,0]
         temp = (np.diff(signal_vec))
         # odor_feature.append(np.nanmean(signal_i))  # mean encounter
         
         ### pre-off behavior
-        # xy_during = xy_i[pos_stim[0]:pos,:]
-        # dxdy2 = np.linalg.norm(np.diff(xy_during), axis=0)
-        # odor_feature.append(np.nanmean(dxdy2))
+        xy_during = xy_i[pos_stim[0]:pos,:]
+        dxdy2 = np.linalg.norm(np.diff(xy_during), axis=0)
+        odor_feature.append(np.nanmean(dxdy2))
         
         ### number of encounter
         # odor_feature.append( len(np.where(temp>0)[0]) )  # number of encounters
-        odor_feature.append(np.nanmean(vxy_i[pos_stim[0]:pos,0]**2))  # past behavior
+        # odor_feature.append(np.nanmean(vxy_i[pos_stim[0]:pos,0]**2))  # past behavior
         
         ### encounter time since last one
         # if len(np.where(temp>0)[0])>0:
@@ -169,7 +179,7 @@ for nn in range(len(data4fit)):
         #     odor_feature.append( pos - pos_stim[0])
         
 # %% sorted plots
-dispy = 2
+dispy = 3
 offset = 1
 post_window = 20*60
 
