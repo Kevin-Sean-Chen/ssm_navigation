@@ -26,11 +26,12 @@ import h5py
 # %% load large matrix Pij and the corresponsding centroids
 P = P*1
 centrals = centrals*1
+vx_smooth, vy_smooth, acf_data = vx_smooth, vy_smooth*1, acf_data*1
 
 K_star = centrals.shape[1]//2
 tau_star = 3
 down_samp = 3
-kmean_seed = 42
+kmean_seed = 37 #42
 
 # %% reduced model exploration... ############################################
 from scipy.linalg import eig
@@ -96,7 +97,7 @@ def reduce_and_sample_markov(P, num_clusters=10, num_steps=1000):
 # P /= P.sum(axis=1, keepdims=True)  # Normalize rows to make it stochastic
 
 # Reduce to 10 states and simulate 1000 time steps
-num_clusters = 20
+num_clusters = 5
 reduced_P, state_sequence, cluster_labels, mapping_matrix = reduce_and_sample_markov(P, num_clusters=num_clusters, num_steps=1000)
 
 # Plot the sampled time series
@@ -117,9 +118,10 @@ plt.title("Mapping of Original States to Reduced States")
 plt.show()
 
 # %% generative from reduced model
-def gen_data_from_redused_states(P_reduced, lt):
+def gen_data_from_redused_states(reduced_P, lt):
     # Step 5: Sample from the reduced Markov model
     state_sequence = np.zeros(lt, dtype=int)
+    num_clusters = reduced_P.shape[0]
     state_sequence[0] = np.random.choice(num_clusters)  # Start from a random reduced state
 
     for t in range(1, lt):
@@ -210,3 +212,74 @@ for ii in range(len(pi)):
 plt.figure()
 plt.bar(['sticky', 'traffic','irreversible'], [-stick, -traffic, -irr])
 plt.ylabel('entropy')
+
+# %%
+###############################################################################
+# %% two types of analysis for reduced Markov model
+### how many clusters?
+### what are the clusters?
+# %%
+n_reduced = np.array([2,3,4, 5,7,11,20])
+errs = np.zeros((len(n_reduced), 4))  ### n-states by the metrics
+
+for ns in range(len(n_reduced)):
+    print('n-states=', n_reduced[ns])
+    reduced_P, state_sequence, cluster_labels, mapping_matrix = reduce_and_sample_markov(P, num_clusters=n_reduced[ns], num_steps=1000)
+    samp_vxy, samp_xy = gen_data_from_redused_states(reduced_P, 70000)
+    ### x-stats
+    xy_id = 0
+    lags, acf_mark = compute_autocorrelation(samp_vxy[:, xy_id], 1000)
+    count_simu,_ = np.histogram(samp_vxy[:, xy_id] /(tau_star/90*down_samp), bins)
+    errs[ns, 0] = np.sum((acf_data - acf_mark)**2)**0.5
+    errs[ns, 1] = np.sum((count_data - count_simu)**2)**0.5
+    ### y-stats
+    xy_id = 1
+    lags, acf_mark = compute_autocorrelation(samp_vxy[:, xy_id], 1000)
+    count_simu,_ = np.histogram(samp_vxy[:, xy_id] /(tau_star/90*down_samp), bins)
+    errs[ns, 2] = np.sum((acf_data - acf_mark)**2)**0.5
+    errs[ns, 3] = np.sum((count_data - count_simu)**2)**0.5
+    
+    #### add fraction of successs???? #########################################
+
+# %%
+plt.figure()
+plt.plot(n_reduced, errs[:, 0], '-o', label='Vx')
+plt.plot(n_reduced, errs[:, 2], '-o', label='Vy')
+plt.yscale('log')
+plt.xlabel('reduced states'); plt.ylabel('acf error'); plt.legend()
+
+plt.figure()
+plt.plot(n_reduced, errs[:, 1], '-o')
+plt.plot(n_reduced, errs[:, 3], '-o')
+plt.xlabel('reduced states'); plt.ylabel('density error')
+
+# %% test with simulated performances
+def sim_performance(red_P, sim_len=1500, reps=100,  x_range=(-300, -200), y_range=(-50, 50)):
+    n_success = 0
+    for rr in range(reps):
+        _, sim_xy = gen_data_from_redused_states(reduced_P, sim_len)
+        xi, yi = sim_xy[:,0], sim_xy[:,1]
+        if np.any( (xi > x_range[0]) & (xi < x_range[1]) & (yi > y_range[0]) & (yi < y_range[1]) ):
+            n_success+=1
+    return n_success/reps
+
+hit_rate = np.zeros(len(n_reduced))  ### n-states by the metrics
+
+for ns in range(len(n_reduced)):
+    print('n-states=', n_reduced[ns])
+    reduced_P, state_sequence, cluster_labels, mapping_matrix = reduce_and_sample_markov(P, num_clusters=n_reduced[ns], num_steps=1000)
+    hit_rate[ns] = sim_performance(reduced_P)
+
+# %%
+plt.figure()
+plt.plot(n_reduced, hit_rate, '-o')
+plt.xlabel('reduced states'); plt.ylabel('navigation hit rate')
+
+# %% visualize states
+for st in range(mapping_matrix.shape[0]):
+    plt.figure()
+    pos = np.where(mapping_matrix[st,:]==1)[0]
+    vxyi = centrals[pos, :]
+    plt.plot(vxyi[:,:120], vxyi[:,120:],'k.', alpha=0.1)
+    plt.xlim([-30, 30]); plt.ylim([-30, 30])
+    
