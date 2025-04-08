@@ -152,9 +152,9 @@ model.fit(states, stim)
 
 # %%
 plt.figure()
-plt.plot(Pij_true.flatten(), model.P0.flatten(),'.'); plt.xlabel('true P0'); plt.ylabel('inferred P0')
+plt.plot(Pij_true.flatten(), model.P0.flatten(),'o'); plt.xlabel('true P0'); plt.ylabel('inferred P0')
 plt.figure()
-plt.plot(w_true.flatten(), model.ws.flatten(),'.'); plt.xlabel('true w'); plt.ylabel('inferred w')
+plt.plot(w_true.flatten(), model.ws.flatten(),'o'); plt.xlabel('true w'); plt.ylabel('inferred w')
 
 # %% simulate
 def compute_markov_transition_matrix(states):
