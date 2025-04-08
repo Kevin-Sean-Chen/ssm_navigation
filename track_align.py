@@ -54,6 +54,7 @@ root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_s
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-11-7'  ### for full field
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-10-31'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-20'  ### jittered ribbon
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-31'  ### jittered ribbon
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -69,7 +70,8 @@ for subfolder in subfolders:
             print(full_path)
 
 # pkl_files = pkl_files[8:]
-# pkl_files = pkl_files[:30]
+# pkl_files = pkl_files[:25]
+pkl_files = pkl_files[8:]
 print(pkl_files) 
 
     
@@ -133,14 +135,14 @@ vec_xy = np.concatenate(rec_tracks)  # position
 vec_ids = np.concatenate(track_id)  # track ID
 
 # %% visulization
-ii = 275 #tracks_stimed[50]
+ii = 0 #275 #tracks_stimed[50]
 plt.figure()
 plt.plot(rec_tracks[ii][:,0], rec_tracks[ii][:,1],'.'); 
 pos=np.where(rec_signal[ii]>10)[0]; 
 plt.plot(rec_tracks[ii][pos,0], rec_tracks[ii][pos,1],'r.'); plt.plot(rec_tracks[ii][0,0], rec_tracks[ii][0,1],'*')
 
 # %% measuring base on tracks
-pre_t = 0#45
+pre_t = 30#45
 stim_t = 30
 odor_feature = []
 post_vxy = []
@@ -164,12 +166,12 @@ for nn in range(len(data4fit)):
         # odor_feature.append(np.nanmean(signal_i))  # mean encounter
         
         ### pre-off behavior
-        xy_during = xy_i[pos_stim[0]:pos,:]
-        dxdy2 = np.linalg.norm(np.diff(xy_during), axis=0)
-        odor_feature.append(np.nanmean(dxdy2))
+        # xy_during = xy_i[pos_stim[0]:pos,:]
+        # dxdy2 = np.linalg.norm(np.diff(xy_during), axis=0)
+        # odor_feature.append(np.nanmean(dxdy2))
         
         ### number of encounter
-        # odor_feature.append( len(np.where(temp>0)[0]) )  # number of encounters
+        odor_feature.append( len(np.where(temp>0)[0]) )  # number of encounters
         # odor_feature.append(np.nanmean(vxy_i[pos_stim[0]:pos,0]**2))  # past behavior
         
         ### encounter time since last one
@@ -181,9 +183,9 @@ for nn in range(len(data4fit)):
 # %% sorted plots
 dispy = 3
 offset = 1
-post_window = 20*60
+post_window = 15*60
 
-sortt_id = np.argsort(odor_feature)[::-1]
+sortt_id = np.argsort(odor_feature)#[::-1]
 import matplotlib.cm as cm
 colors = cm.viridis(np.linspace(0, 1, len(sortt_id)))
 
@@ -210,7 +212,7 @@ for kk in range(0,len(sortt_id),1):
 
 sortt_id = np.array(sortt_id, dtype=int)
 # track_set = post_xy[sortt_id[:len(sortt_id)//2]]  ## compare sorted
-track_set = [post_xy[i] for i in sortt_id[:len(sortt_id)//3]]
+track_set = [post_xy[i] for i in sortt_id[:len(sortt_id)//2]]
 # track_set = [post_xy[i] for i in sortt_id[len(sortt_id)//3:-len(sortt_id)//3]]
 # track_set = [post_xy[i] for i in sortt_id[-len(sortt_id)//3:]]
 max_lag = max(len(track) for track in track_set)
@@ -242,8 +244,8 @@ lag_times = np.arange(max_lag)*1/60  # Lag times
 # Plot MSD
 plt.figure(figsize=(8, 6))
 plt.loglog(lag_times, msd_mean, marker='o', linestyle='-', color='k', label='long')
-plt.loglog(lag_times_mid, msd_mean_mid, marker='o', linestyle='-.', color='r', label='middle')
-plt.loglog(lag_times_last, msd_mean_last, marker='o', linestyle='--', color='b', label='short')
+# plt.loglog(lag_times_mid, msd_mean_mid, marker='o', linestyle='-.', color='r', label='middle')
+# plt.loglog(lag_times_last, msd_mean_last, marker='o', linestyle='--', color='b', label='short')
 # plt.loglog(lag_times, lag_times**2 + msd_mean[1], marker='o', linestyle='-', color='g')
 # plt.fill_between(
 #     lag_times,
