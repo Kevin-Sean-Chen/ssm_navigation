@@ -278,3 +278,287 @@ for ii in range(N):
 plt.figure()
 plt.plot(info_vec,'-o')
 plt.xlabel('input along the sorted eigenvec'); plt.ylabel('entropy')
+
+# %% torch test
+###############################################################################
+# %%
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+from scipy.special import logsumexp
+
+class LogLinearMarkovTorch(nn.Module):
+    def __init__(self, N, u_dim, w_regu=0.0):
+        super().__init__()
+        self.N = N
+        self.u_dim = u_dim
+        self.w_regu = w_regu
+
+        # Initialize log P0 and weights
+        P00 = np.random.rand(N, N)
+        P00 /= P00.sum(axis=1, keepdims=True)
+        logP00 = np.log(P00)
+        w0 = np.random.randn(N, u_dim)
+
+        # Parameters to optimize (log transition probs and stimulus weights)
+        self.logP0 = nn.Parameter(torch.tensor(logP00, dtype=torch.float32))
+        self.ws = nn.Parameter(torch.tensor(w0, dtype=torch.float32))
+
+    def transition_log_prob(self, x, u):
+        """
+        Compute log-probabilities P(x' | x, u) for given state x and input u.
+        """
+        correction = torch.matmul(self.ws, u)  # (N,)
+        logP = correction + self.logP0[x]       # (N,)
+        logZ = torch.logsumexp(logP, dim=0)
+        log_probs = logP - logZ                 # normalized log-probs
+        return log_probs
+
+    def negative_log_likelihood_slow(self, x_seq, u_seq):
+        """
+        Compute negative log-likelihood for a given sequence of (x, u).
+        """
+        nll = 0.0
+        for t in range(len(x_seq) - 1):
+            log_probs = self.transition_log_prob(x_seq[t], u_seq[t])
+            nll -= log_probs[x_seq[t+1]]
+
+        # Regularization
+        nll += self.w_regu * torch.sum(self.ws**2)
+        return nll
+    
+    def negative_log_likelihood(self, x_seq, u_seq):
+        """
+        Fully vectorized negative log-likelihood.
+        """
+    
+        x_seq = torch.tensor(x_seq, dtype=torch.long)
+        u_seq = torch.tensor(u_seq, dtype=torch.float32)
+    
+        x_curr = x_seq[:-1]   # current states
+        x_next = x_seq[1:]    # next states
+        u_curr = u_seq[:-1]   # control inputs at current time
+    
+        # Compute correction terms: (batch_size, N)
+        corrections = torch.matmul(u_curr, self.ws.T)  # (T-1, N)
+    
+        # Select baseline logP0 based on current states x_curr
+        baseline = self.logP0[x_curr]  # (T-1, N)
+    
+        logits = corrections + baseline  # (T-1, N)
+    
+        # Normalize
+        logZ = torch.logsumexp(logits, dim=1, keepdim=True)  # (T-1, 1)
+        log_probs = logits - logZ                            # (T-1, N)
+    
+        # Pick the probability assigned to actual next state
+        selected_log_probs = log_probs.gather(1, x_next.unsqueeze(1)).squeeze()
+    
+        # Negative log-likelihood
+        nll = -selected_log_probs.sum()
+    
+        # Regularization
+        nll += self.w_regu * torch.sum(self.ws**2)
+    
+        return nll
+
+
+    def row_normalization(self):
+        """
+        Project logP0 so that exp(logP0) rows sum to 1.
+        (log-sum-exp normalization)
+        """
+        with torch.no_grad():
+            logZ = torch.logsumexp(self.logP0, dim=1, keepdim=True)
+            self.logP0.data -= logZ
+
+    def fit(self, x_seq, u_seq, n_epochs=500, lr=1e-2, verbose=True):
+        """
+        Fit the model using Adam optimizer in PyTorch.
+        """
+        optimizer = optim.Adam(self.parameters(), lr=lr)
+
+        # Convert data to torch
+        x_seq = torch.tensor(x_seq, dtype=torch.long)
+        u_seq = torch.tensor(u_seq, dtype=torch.float32)
+
+        losses = []
+        for epoch in range(n_epochs):
+            optimizer.zero_grad()
+            loss = self.negative_log_likelihood(x_seq, u_seq)
+            loss.backward()
+            optimizer.step()
+
+            # Renormalize logP0
+            self.row_normalization()
+
+            losses.append(loss.item())
+
+            if verbose and (epoch % 50 == 0 or epoch == n_epochs-1):
+                print(f"Epoch {epoch}: loss = {loss.item():.6f}")
+
+        return losses
+
+    def transition_prob(self, x, u):
+        """
+        Return transition probabilities P(x' | x, u) in numpy array.
+        """
+        with torch.no_grad():
+            correction = torch.matmul(self.ws, torch.tensor(u, dtype=torch.float32))
+            logP = correction + self.logP0[x]
+            logZ = torch.logsumexp(logP, dim=0)
+            log_probs = logP - logZ
+            probs = torch.exp(log_probs)
+        return probs.numpy()
+# %%
+class LogLinearMarkovWithBaseline(nn.Module):
+    def __init__(self, N, u_dim, w_regu=0.0):
+        super().__init__()
+        self.N = N
+        self.u_dim = u_dim
+        self.w_regu = w_regu
+
+        # Initialize baseline logP0: shape (N, N)
+        P0 = np.random.rand(N, N)
+        P0 /= P0.sum(axis=1, keepdims=True)
+        logP0_init = np.log(P0)
+        self.logP0 = nn.Parameter(torch.tensor(logP0_init, dtype=torch.float32))
+
+        # Initialize W: shape (N, N-1, u_dim)
+        self.W = nn.Parameter(torch.randn(N, N-1, u_dim) * 0.01)
+
+    def transition_log_probs(self, x_curr, u_curr):
+        """
+        Compute log-probabilities for all transitions given batch of (current states and stimulus inputs).
+        """
+        T = x_curr.shape[0]
+        logits = torch.zeros((T, self.N), device=u_curr.device)
+
+        for curr_state in range(self.N):
+            mask = (x_curr == curr_state)
+            if torch.any(mask):
+                u_selected = u_curr[mask]  # (n_selected, u_dim)
+
+                # Stimulus correction for non-self-transitions
+                w_selected = self.W[curr_state]  # (N-1, u_dim)
+                stimulus_logits = torch.matmul(u_selected, w_selected.T)  # (n_selected, N-1)
+
+                # Full logits: start from baseline logP0
+                baseline_logits = self.logP0[curr_state].unsqueeze(0).expand(u_selected.shape[0], -1)  # (n_selected, N)
+
+                # Insert stimulus logits into the right places
+                idx = torch.arange(self.N)
+                idx_no_self = idx[idx != curr_state]  # non-self transitions
+
+                full_logits = baseline_logits.clone()
+                full_logits[:, idx_no_self] += stimulus_logits
+
+                logits[mask] = full_logits
+
+        # Normalize
+        logZ = torch.logsumexp(logits, dim=1, keepdim=True)
+        log_probs = logits - logZ
+
+        return log_probs
+
+    def negative_log_likelihood(self, x_seq, u_seq, lag):
+        """
+        Fully vectorized negative log-likelihood.
+        """
+        x_seq = torch.tensor(x_seq, dtype=torch.long)
+        u_seq = torch.tensor(u_seq, dtype=torch.float32)
+        
+        x_seq, u_seq = x_seq[lag:], u_seq[:-lag]
+        x_curr = x_seq[:-1]
+        x_next = x_seq[1:]
+        u_curr = u_seq[:-1]
+
+        log_probs = self.transition_log_probs(x_curr, u_curr)
+
+        selected_log_probs = log_probs.gather(1, x_next.unsqueeze(1)).squeeze()
+
+        nll = -selected_log_probs.sum()
+
+        # Regularization term
+        nll += self.w_regu * torch.sum(self.W**2)
+
+        return nll
+
+    def row_normalization(self):
+        """
+        Normalize logP0 row-wise using log-sum-exp trick.
+        """
+        with torch.no_grad():
+            logZ = torch.logsumexp(self.logP0, dim=1, keepdim=True)
+            self.logP0.data -= logZ
+
+    def fit(self, x_seq, u_seq, lag=1, n_epochs=500, lr=1e-2, verbose=True):
+        """
+        Fit the model using Adam optimizer in PyTorch.
+        """
+        optimizer = optim.Adam(self.parameters(), lr=lr)
+
+        x_seq = torch.tensor(x_seq, dtype=torch.long)
+        u_seq = torch.tensor(u_seq, dtype=torch.float32)
+
+        losses = []
+        for epoch in range(n_epochs):
+            optimizer.zero_grad()
+            loss = self.negative_log_likelihood(x_seq, u_seq, lag)
+            loss.backward()
+            optimizer.step()
+
+            # Normalize baseline logP0 after each step
+            self.row_normalization()
+
+            losses.append(loss.item())
+
+            if verbose and (epoch % 50 == 0 or epoch == n_epochs-1):
+                print(f"Epoch {epoch}: loss = {loss.item():.6f}")
+
+        return losses
+
+    def predict_transition_probs(self, x, u):
+        """
+        Predict transition probabilities P(x'|x,u) for a single (x,u).
+        """
+        x = int(x)
+        u = torch.tensor(u, dtype=torch.float32)
+
+        logits = self.logP0[x].clone()
+
+        idx = torch.arange(self.N)
+        idx_no_self = idx[idx != x]
+
+        logits[idx_no_self] += torch.matmul(self.W[x], u)
+
+        logZ = torch.logsumexp(logits, dim=0)
+        log_probs = logits - logZ
+        probs = torch.exp(log_probs)
+
+        return probs.detach().cpu().numpy()
+
+
+# %% test fitting
+# Create model
+# model = LogLinearMarkovTorch(N=5, u_dim=1, w_regu=0.01)
+model = LogLinearMarkovWithBaseline(N=5, u_dim=1, w_regu=0.0)
+
+# Fit the model
+losses = model.fit(reduced_behavior, reduced_behavior[:,None], lag=5, n_epochs=1000, lr=1e-2)
+
+# %% build matrix
+plt.figure()
+plt.imshow(torch.exp(model.logP0).detach())
+
+ww = model.W.detach().numpy()[:,:,0]
+Ws = np.zeros((5,5))
+for i in range(5):
+    idx = np.arange(5)
+    idx_no_self = idx[idx != i]  # indices excluding self-transition
+    Ws[i, idx_no_self] = ww[i]
+plt.figure()
+plt.imshow(Ws)
+
+# %% validation

@@ -36,7 +36,7 @@ with h5py.File(file_dir, 'r') as file:
     # print(col.keys())
 
 # %% now extract track data
-chop = 500000
+chop = 1000000 #500000 #4331205
 down_samp = 3
 trjNum = expmat[0,:][::down_samp][:chop]
 signal = expmat[12,:][::down_samp][:chop]
@@ -492,7 +492,7 @@ plt.xlabel('N'); plt.ylabel('nats'); plt.title('first vs. seoncd order entropy, 
 # %% entropy as a function of coarse grained dynamics!
 from scipy.linalg import eig
 from sklearn.cluster import SpectralClustering
-kmean_seed = 37
+kmean_seed = 1 #37 #1
 
 def reduce_and_sample_markov(P, num_clusters=10, num_steps=1000):
     """
@@ -662,15 +662,16 @@ plt.xlabel('reduced N'); plt.ylabel('nats')
 # %% analyze reduced model
 ###############################################################################
 # %% load time sereis of x and s
-np.random.seed(37)
+np.random.seed(42) #42
 Xi_behavior, idsi = build_X(data4fit, return_id=True, K=K_star, tau=tau_star)  #### for behavior
 Xi_stim,_ = build_signal(rec_signal, return_id=True, K=K_star,tau=tau_star)  ### for signal!
 
 # %% reduce dim for both
 base_odor = 5
-odor_threshold = 5.
+odor_threshold = 2.
 reduced_n_state = 5
-stim_bin_ = np.mean(Xi_stim,1)
+stim_bin_ = np.mean(Xi_stim,1)  ### avarage of window
+stim_bin_ = Xi_stim[:,0]  ### just the recent index
 stim_bin = stim_bin_*0
 stim_bin[stim_bin_ < base_odor] = 0
 stim_bin[stim_bin_ > odor_threshold] = 1
@@ -702,11 +703,12 @@ reduced_behavior = map_time_series(mapping_matrix, time_series)
 
 # %%
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-pos = np.where(stim_bin < 200)[0]
-A = compute_transition_matrix(reduced_behavior[pos], idsi[pos], reduced_n_state)
-pos = np.where(stim_bin==1)[0]
-B = compute_transition_matrix(reduced_behavior[pos], idsi[pos], reduced_n_state)
+lag_ = 5
+stim_bin_, reduced_behavior_, idsi_ = stim_bin[:-lag_], reduced_behavior[lag_:], idsi[lag_:]
+pos = np.where(stim_bin_ < 200)[0]
+A = compute_transition_matrix(reduced_behavior_[pos], idsi_[pos], reduced_n_state)
+pos = np.where(stim_bin_==1)[0]
+B = compute_transition_matrix(reduced_behavior_[pos], idsi_[pos], reduced_n_state)
 A,B = np.log(A+1e-9), np.log(B+1e-9)
 
 fig, axs = plt.subplots(1, 2, figsize=(10, 5))
@@ -796,3 +798,39 @@ for i in range(stim_kl.shape[1]):
     l = lags[i]
     plt.plot(thres, stim_kl[:,i], '-o',label=f"lag= {l}")
 plt.xlabel('odor threshold'); plt.ylabel('KL(stim|non-stim)'); plt.legend()
+
+# %% test input-driven state model!
+###############################################################################
+# %%
+### try SSM? pytorch?
+### just regression?
+# %% simple looping
+window_back = 400
+filts = np.zeros((reduced_n_state, reduced_n_state, window_back))
+trans_counts = np.zeros((reduced_n_state, reduced_n_state))
+shifts = np.where(idsi[:-1] != idsi[1:])[0]+0 ### remoe transition from tracks
+for ii in range(reduced_n_state):
+    print(ii)
+    for jj in range(reduced_n_state):
+        if ii is not jj:
+            indices = np.where((reduced_behavior[:-1] == ii) & (reduced_behavior[1:] == jj))[0] + 0
+            indices = indices[~np.isin(indices, shifts)]
+            indices = indices[indices >= window_back]
+            for tt in range(len(indices)):
+                filts[ii,jj,:] += stim_bin[indices[tt]-window_back: indices[tt]]
+            filts[ii,jj,:] = filts[ii,jj,:]/tt ### triggered average
+            trans_counts[ii,jj] = tt
+# %%
+plt.figure(figsize=(15, 15))
+
+for i in range(reduced_n_state):
+    for j in range(reduced_n_state):
+        # Subplot index needs to be (i * 5 + j + 1)
+        plt.subplot(reduced_n_state, reduced_n_state, i * reduced_n_state + j + 1)
+        plt.plot(filts[i, j, :])
+        plt.title(f'({i},{j})', fontsize=8)
+        plt.xticks([])  # remove x ticks
+        plt.yticks([])  # remove y ticks
+
+plt.tight_layout()
+plt.show()

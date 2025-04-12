@@ -25,7 +25,7 @@ import h5py
 
 # %% load large matrix Pij and the corresponsding centroids
 P = P*1
-centrals = centrals*1
+labels, centrals = labels*1, centrals*1
 vx_smooth, vy_smooth, acf_data = vx_smooth, vy_smooth*1, acf_data*1
 
 K_star = centrals.shape[1]//2
@@ -283,3 +283,60 @@ for st in range(mapping_matrix.shape[0]):
     plt.plot(vxyi[:,:120], vxyi[:,120:],'k.', alpha=0.1)
     plt.xlim([-30, 30]); plt.ylim([-30, 30])
 
+# %% compare markovness through n-reduction
+###############################################################################
+# %%
+def autocorrelation_discrete(time_series, max_lag=None):
+    time_series = np.asarray(time_series)
+    n = len(time_series)
+    
+    if max_lag is None:
+        max_lag = n // 2  # default
+
+    # One-hot encoding
+    unique_states = np.unique(time_series)
+    state_to_index = {state: idx for idx, state in enumerate(unique_states)}
+    encoded = np.zeros((n, len(unique_states)))
+    for t, state in enumerate(time_series):
+        encoded[t, state_to_index[state]] = 1.0
+
+    # Mean-center
+    encoded = encoded - np.mean(encoded, axis=0)
+
+    # Compute variance (normalizer)
+    var = np.mean(np.sum(encoded**2, axis=1))
+
+    # Autocorrelation
+    autocorr = np.zeros(max_lag)
+    for lag in range(max_lag):
+        prod = np.sum(encoded[lag:] * encoded[:n-lag], axis=1)
+        autocorr[lag] = np.mean(prod) / var  # normalize by variance
+
+    lags = np.arange(max_lag)
+    return lags, autocorr
+
+def map_time_series(mapping_matrix, time_series):
+    mapping_matrix = np.asarray(mapping_matrix)
+    time_series = np.asarray(time_series)
+
+    # Find for each original state its mapped group
+    state_map = np.argmax(mapping_matrix, axis=0)  # shape: (1000,)
+    
+    # Map the whole time series
+    mapped_series = state_map[time_series]
+    return mapped_series
+
+# %% scanning
+n_reduced = np.array([2,3,5,10,20])
+
+for ns in range(len(n_reduced)):
+    plt.figure()
+    reduced_P, state_sequence, cluster_labels, mapping_matrix = reduce_and_sample_markov(P, num_clusters=n_reduced[ns], num_steps=2000)
+    reduced_states = map_time_series(mapping_matrix, labels)
+    lags, acf_data = autocorrelation_discrete(reduced_states, max_lag=1000)
+    lags, acf_mark = autocorrelation_discrete(state_sequence, max_lag=1000)
+    plt.loglog(lags, acf_data)
+    plt.loglog(lags, acf_mark)
+    plt.xlabel('Lag'); plt.ylabel('Autocorrelation'); plt.title('Autocorrelation of Discrete States')
+    plt.grid(True)
+    
