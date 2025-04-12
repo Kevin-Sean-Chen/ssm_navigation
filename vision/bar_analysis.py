@@ -61,8 +61,8 @@ def filter_files_by_number(file_list, target_number):
     return matching_indices
 
 ### extract files
-bar_speed = 72 ### 18, 72, 180, 360
-stim_duration = 5  ### 1, 2, 5, 20 for 360, 180, 72, 18 deg/s
+bar_speed = 360 ### 18, 72, 180, 360
+stim_duration = 1  ### 1, 2, 5, 20 for 360, 180, 72, 18 deg/s
 ff = filter_files_by_number(pkl_files, bar_speed)
 threshold_track_l = 60 * 3 #2   #### set lenght criteria (in seconds)
 min_mean_speed = 1
@@ -295,11 +295,50 @@ def angle_between_vector_series(U, V):
     cross = U[:, 0] * V[:, 1] - U[:, 1] * V[:, 0]  # Scalar value per pair
     signed_angles = angles * np.sign(cross)
     return np.degrees(signed_angles) 
-    
+
+# %% test code in real space
+stim_pix = np.linspace(0, 640, num=len(time_stim))
+post_stim_values = np.full(len(time_full)-len(time_stim), np.nan)
+stim_pix_vector = np.concatenate([post_stim_values, stim_pix, post_stim_values])
+time_vec = np.arange(0, pre_stim_duration+stim_duration+post_stim_duration, dt)
+pix2mm = 1.5#1.5
+def map_to_rectangle_path(n_points=641):
+    """
+    Map indices 0 to n_points-1 along a rectangle path.
+
+    Rectangle vertices:
+    (-96,64) -> (96,64) -> (96,-64) -> (-96,-64) -> (-96,64)
+    """
+    x = np.zeros(n_points)
+    y = np.zeros(n_points)
+
+    for idx in range(n_points):
+        if idx <= 191:  # top edge
+            x[idx] = -96 + (192 / 192) * idx  # linear from -96 to 96
+            y[idx] = 64
+        elif idx <= 319:  # right edge
+            x[idx] = 96
+            y[idx] = 64 - (128 / 128) * (idx - 192)  # linear from 64 to -64
+        elif idx <= 511:  # bottom edge
+            x[idx] = 96 - (192 / 192) * (idx - 320)  # linear from 96 to -96
+            y[idx] = -64
+        else:  # left edge
+            x[idx] = -96
+            y[idx] = -64 + (128 / 128) * (idx - 512)  # linear from -64 to 64
+
+    return (x[:-1] + 96)*pix2mm, (y[:-1] + 64)*pix2mm  #### adding offset and rescale for now to apply to the same reference ###
+
+x_bar,y_bar = map_to_rectangle_path()  ### get the real-space x,y coordinates
+
+def find_stim_location_at_time_t(time,  time_vec=time_vec, stim_pix_vector=stim_pix_vector, x=x_bar, y=y_bar):
+    index = np.argmin(np.abs(time_vec - time)) # fine index with time
+    pixel_location = int(stim_pix_vector[index])  # find pixel index
+    stim_location = np.array([x[pixel_location], y[pixel_location]]) # return x,y location
+    return stim_location
 
 # %% rebuild the stim angle
 pre_window = 30  # steps of 1/60 frame-rate
-delay = 20*1  ### test this here
+delay = 1*1  ### test this here
 stim_angle = []
 fly_angle = []
 rec_time = []
@@ -311,6 +350,7 @@ for ii in range(len(tracks)):
     theta_i = thetas[ii]
     speed_i = speeds[ii]
     head_i = heading[ii]
+    pos_i = tracks[ii]
     pos_stim_ = np.where((time_i>pre_stim_duration) & (time_i<pre_stim_duration+stim_duration))[0]
     if len(pos_stim_)>delay:  # measurement during stim exists
     # if len(pos_stim)>0:
@@ -318,11 +358,17 @@ for ii in range(len(tracks)):
         pos_resp = pos_stim_[delay:]
         stim_angi = np.zeros(len(pos_stim))
         for tt in range(len(pos_stim)):
-            stim_angi[tt] = find_stim_angle_at_time_t(time_i[pos_stim[tt]])
+            # stim_angi[tt] = find_stim_angle_at_time_t(time_i[pos_stim[tt]])  ### use angle directly
+            
+            ### test with bar location to calculate view angle
+            stim_xyt = find_stim_location_at_time_t(time_i[pos_stim[tt]])
+            view_angle = angle_between_vectors(  head_i[pos_stim[tt],:] , stim_xyt - pos_i[pos_stim[tt]]) # angle between bar and heading
+            stim_angi[tt] = view_angle
         
         fly_angle.append(theta_i[pos_resp])  # dtheta_i
         stim_angle.append( wrap_heading( stim_angi - theta_i[pos_resp]) )
-        stim_angle_vector.append(angle_between_vector_series(np.array([np.cos(stim_angi), np.sin(stim_angi)]).T, head_i[pos_resp,:]))
+        # stim_angle_vector.append(angle_between_vector_series(np.array([np.cos(stim_angi), np.sin(stim_angi)]).T, head_i[pos_resp,:]))
+        stim_angle_vector.append(stim_angi)
         fly_response.append(dtheta_i[pos_stim])  # dtheta_i
         rec_time.append(time_i[pos_stim])
         
@@ -371,7 +417,7 @@ def bin_and_average_with_error(x, y, bins):
     return bin_edges[valid_bins], y_means[valid_bins], y_sem[valid_bins]
 
 # Bin and compute averages with error bars
-delay = 1  ### need to think about how to choose this time lag for response
+# delay = 5  ### need to think about how to choose this time lag for response
 # bin_centers, y_means, y_sem = bin_and_average_with_error(stim_angle[:-delay], fly_response[delay:], bins=20) ### through angles
 bin_centers, y_means, y_sem = bin_and_average_with_error(stim_angle_vector[:-delay], fly_response[delay:], bins=20)  ### through vectors
 

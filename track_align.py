@@ -55,6 +55,7 @@ root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_s
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-10-31'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-20'  ### jittered ribbon
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-31'  ### jittered ribbon
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-4'  ### jittered ribbon
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -71,7 +72,7 @@ for subfolder in subfolders:
 
 # pkl_files = pkl_files[8:]
 # pkl_files = pkl_files[:25]
-pkl_files = pkl_files[8:]
+# pkl_files = pkl_files[8:]
 print(pkl_files) 
 
     
