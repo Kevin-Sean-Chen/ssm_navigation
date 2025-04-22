@@ -35,7 +35,7 @@ matplotlib.rc('ytick', labelsize=20)
 
 # %% for Kiri's data
 ### cutoff for short tracks
-threshold_track_l = 60 * 15  # 20 # look at long-enough tracks
+threshold_track_l = 60 * 10  # 20 # look at long-enough tracks
 
 # # Define the folder path
 # folder_path = 'C:/Users/ksc75/Downloads/ribbon_data_kc/'
@@ -48,14 +48,14 @@ threshold_track_l = 60 * 15  # 20 # look at long-enough tracks
 #     print(file)
 
 # %% for perturbed data
-# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'  ### for OU-ribbons
 root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-5'
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-11-7'  ### for full field
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-10-31'
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-20'  ### jittered ribbon
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-31'  ### jittered ribbon
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-4'  ### jittered ribbon
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\100424_new'  ### OU ribbons
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-10-31' ### OU ribbons... need signal!
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-20'  ### jittered ribbon
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-31'  ### jittered ribbon
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-14'  ### jittered ribbon and OU
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -70,11 +70,13 @@ for subfolder in subfolders:
             pkl_files.append(full_path)
             print(full_path)
 
-# pkl_files = pkl_files[8:]
 # pkl_files = pkl_files[:25]
-# pkl_files = pkl_files[8:]
-print(pkl_files) 
+# pkl_files = pkl_files[30:]
 
+pkl_files = pkl_files[:29]  # OU
+# pkl_files = pkl_files[40:50] + pkl_files[70:80] # jittered
+# pkl_files = pkl_files[30:40] + pkl_files[50:70] # straight
+print(pkl_files) 
     
 # %% concatenate across files in a folder
 data4fit = []  # list of tracks with its vx,vy,theta signal recorded;  conditioned on behavior and long-tracks
@@ -116,7 +118,7 @@ for ff in range(nf):
                 mean_v = np.nanmean(np.sum(temp**2,1)**0.5)
                 max_v = np.max(np.sum(temp**2,1)**0.5)
                 # print(mean_v)
-                if np.prod(mask_i)==1 and np.prod(mask_j)==1 and mean_v>.2 and max_v<20:  ###################################### removing nan for now
+                if np.prod(mask_i)==1 and np.prod(mask_j)==1 and mean_v>.1 and max_v<20:  ###################################### removing nan for now
                     data4fit.append(temp)  # get data for ssm fit
                     rec_tracks.append(temp_xy)  # get raw tracks
                     # track_id.append(np.array([ff,ii]))  # get track id
@@ -143,7 +145,7 @@ pos=np.where(rec_signal[ii]>10)[0];
 plt.plot(rec_tracks[ii][pos,0], rec_tracks[ii][pos,1],'r.'); plt.plot(rec_tracks[ii][0,0], rec_tracks[ii][0,1],'*')
 
 # %% measuring base on tracks
-pre_t = 30#45
+pre_t = 30 #45 30
 stim_t = 30
 odor_feature = []
 post_vxy = []
@@ -156,7 +158,9 @@ for nn in range(len(data4fit)):
     pos_stim = np.where((time_i>pre_t) & (time_i<pre_t+stim_t))[0]
     if np.nansum(signal_i)>0 and len(pos_stim)>0:  # some odor encounter
         pos = np.where(signal_i>0)[0][-1]  # last encounter
-        # pos = pos_stim[-1]
+        # pos = pos_stim[-1] # last stim
+        # pos = np.random.randint(0,len(vxy_i),1)[0]  # random control
+        
         post_vxy.append(vxy_i[pos:,:])
         post_xy.append(xy_i[pos:,:])
         
@@ -184,9 +188,9 @@ for nn in range(len(data4fit)):
 # %% sorted plots
 dispy = 3
 offset = 1
-post_window = 15*60
+post_window = 20*60
 
-sortt_id = np.argsort(odor_feature)#[::-1]
+sortt_id = np.argsort(odor_feature)[::-1]
 import matplotlib.cm as cm
 colors = cm.viridis(np.linspace(0, 1, len(sortt_id)))
 
@@ -207,13 +211,30 @@ for kk in range(0,len(sortt_id),1):
     # post_feature = ((traji[0,1] - traji[-1,1]))
     # plt.plot(odor_feature[sortt_id[kk]], post_feature,'o')
 
+# %% analyze speed
+process_post = []
+window = 5*60
+for ii in range(len(post_vxy)):
+    if len(post_vxy[ii])<window:
+        process_post.append(post_vxy[ii])
+    else:
+        process_post.append(post_vxy[ii][:window, :])
+post_action = np.concatenate(process_post)#[:,0]
+post_action = np.sum(post_action**2,1)**0.5
+plt.figure()
+plt.hist(post_action, bins=30, density=True, alpha=0.7, color='skyblue', edgecolor='black')
+
+full_action = np.sum(vec_vxy**2,1)**0.5
+plt.hist(full_action, bins=30, density=True, alpha=0.5, color='k', edgecolor='black')
+plt.xlim([-.5, 20]); plt.ylim([0,0.9])
+
 # %%
 ###############################################################################    
 # %% MSD analysis!
 
 sortt_id = np.array(sortt_id, dtype=int)
 # track_set = post_xy[sortt_id[:len(sortt_id)//2]]  ## compare sorted
-track_set = [post_xy[i] for i in sortt_id[:len(sortt_id)//2]]
+track_set = [post_xy[i] for i in sortt_id[:len(sortt_id)//1]]
 # track_set = [post_xy[i] for i in sortt_id[len(sortt_id)//3:-len(sortt_id)//3]]
 # track_set = [post_xy[i] for i in sortt_id[-len(sortt_id)//3:]]
 max_lag = max(len(track) for track in track_set)
@@ -244,7 +265,7 @@ lag_times = np.arange(max_lag)*1/60  # Lag times
 # %%
 # Plot MSD
 plt.figure(figsize=(8, 6))
-plt.loglog(lag_times, msd_mean, marker='o', linestyle='-', color='k', label='long')
+plt.loglog(lag_times, msd_mean, marker='o', linestyle='-', color='r', label='fluc')
 # plt.loglog(lag_times_mid, msd_mean_mid, marker='o', linestyle='-.', color='r', label='middle')
 # plt.loglog(lag_times_last, msd_mean_last, marker='o', linestyle='--', color='b', label='short')
 # plt.loglog(lag_times, lag_times**2 + msd_mean[1], marker='o', linestyle='-', color='g')
@@ -253,14 +274,12 @@ plt.loglog(lag_times, msd_mean, marker='o', linestyle='-', color='k', label='lon
 #     msd_mean - sem_msd,  # Lower bound of shaded region
 #     msd_mean + sem_msd,  # Upper bound of shaded region
 #     color='red',
-#     alpha=0.5,
-#     label='1 Std Dev'
-# )
+#     alpha=0.5,)
+#     # label='1 Std Dev')
 plt.xlabel("lag time (s)")
 plt.ylabel(r"MSD (mm$^2$)")
 plt.title("MSD scaling")
 plt.grid(True)
-plt.xlim([0,70]); plt.ylim([0.001, 13000])
+plt.xlim([0,90]); plt.ylim([0.001, 20000])
 # plt.show()
 plt.legend()
-

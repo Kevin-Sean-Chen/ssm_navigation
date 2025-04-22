@@ -338,7 +338,7 @@ def find_stim_location_at_time_t(time,  time_vec=time_vec, stim_pix_vector=stim_
 
 # %% rebuild the stim angle
 pre_window = 30  # steps of 1/60 frame-rate
-delay = 1*1  ### test this here
+delay = 1*5  ### test this here
 stim_angle = []
 fly_angle = []
 rec_time = []

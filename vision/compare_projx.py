@@ -26,8 +26,9 @@ from scipy.sparse.linalg import eigs
 # %% vx projection across sensory environments
 
 # %% for perturbed data
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-13'  ### V+O exp
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-17'  ### O or empty exp
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-13'  ### V+O exp
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-17'  ### O or empty exp
+root_dir = r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-4-4'  ### O or empty exp
  
 target_file = "exp_matrix.pklz"
 
@@ -43,18 +44,22 @@ for subfolder in subfolders:
             pkl_files.append(full_path)
             print(full_path)
 
-# pkl_files = pkl_files[6:9]
+# pkl_files = pkl_files[10:20]
 print(pkl_files) 
 pkl_files = sorted(pkl_files, key=lambda x: int(''.join(filter(str.isdigit, x))))
 
 # %% filing
 ### 3/13
-ff = np.arange(10,20) ### ribbon
+ff = np.arange(40,59) ### ribbon
 # ff = np.arange(0,10)  ### edge
 
 ### 3/17
 ff = np.arange(20,40) ### ribbon
 # ff = np.arange(0,15)  ### edge
+
+### 4/4
+ff = np.arange(10,20)  ### landscape
+# ff = np.arange(20,30)
 
 threshold_track_l = 60 * 2*1 #2 
 times = []
@@ -104,7 +109,7 @@ vec_vxy = np.concatenate(vxys)  # velocity
 vec_xy = np.concatenate(tracks)  # position
 vec_ids = np.concatenate(track_id)  # track ID
 vec_theta = np.concatenate(thetas)  # theta
-vec_signal = np.concatenate(signal)  # odor signal
+vec_signal = np.concatenate(signals)  # odor signal
 vec_msd_x = np.concatenate(msd_x)
 
 vec_speed = np.linalg.norm(vec_vxy,axis=1)
@@ -120,10 +125,10 @@ for ii in range(len(tracks)):
     plt.plot(xy_i[pos,0], xy_i[pos,1],'k',alpha=.5)
     
 # %% compute projection
-speed_threshold = 2
+speed_threshold = 5
 pos_boundary = np.where((vec_xy[:,0]<260) & (vec_xy[:,0]>15) & (vec_xy[:,1]>15) & (vec_xy[:,1]<160))[0]
 pos_time = np.where((vec_time<30) & (vec_speed>speed_threshold))[0]
-pos_time = np.where((vec_time>30) & (vec_speed>speed_threshold))[0]
+# pos_time = np.where((vec_time>30) & (vec_speed>speed_threshold))[0]
 pos = np.intersect1d(pos_boundary, pos_time)
 def compute_angle(v, reference=np.array([-1,0])):
     vx, vy = v[:, 0], v[:, 1]  # Extract vx and vy components
@@ -135,44 +140,44 @@ vx_angs = np.abs(compute_angle(vec_vxy[pos,:]))
 
 plt.figure()
 plt.hist(vx_angs,bins=50, density=True)
-plt.xlabel('angle to x axis')
+plt.xlabel('angle to x axis'); plt.ylim([0,0.013])
 
 # %% make independent model
-import numpy as np
-import matplotlib.pyplot as plt
+# import numpy as np
+# import matplotlib.pyplot as plt
 
-# Example data
-np.random.seed(0)
-data1 = vx_angs_odor*1
-data2 = vx_angs_vision*1
-data3 = vx_angs_combined
+# # Example data
+# np.random.seed(0)
+# data1 = vx_angs_odor*1
+# data2 = vx_angs_vision*1
+# data3 = vx_angs_combined
 
-# Create histograms
-bins = np.linspace(0, 180, 100)
+# # Create histograms
+# bins = np.linspace(0, 180, 100)
 
-h1, edges = np.histogram(data1, bins=bins, density=True)
-h2, _ = np.histogram(data2, bins=bins, density=True)
-h3, _ = np.histogram(data3, bins=bins, density=True)
+# h1, edges = np.histogram(data1, bins=bins, density=True)
+# h2, _ = np.histogram(data2, bins=bins, density=True)
+# h3, _ = np.histogram(data3, bins=bins, density=True)
 
-# Combine densities by summing
-h_combined = h1 + h2
+# # Combine densities by summing
+# h_combined = h1 + h2
 
-# Normalize combined histogram to be a valid density
-bin_width = edges[1] - edges[0]
-h_combined /= np.sum(h_combined) * bin_width
+# # Normalize combined histogram to be a valid density
+# bin_width = edges[1] - edges[0]
+# h_combined /= np.sum(h_combined) * bin_width
 
-# Plotting
-bin_centers = (edges[:-1] + edges[1:]) / 2
+# # Plotting
+# bin_centers = (edges[:-1] + edges[1:]) / 2
 
-plt.figure(figsize=(8,5))
-plt.plot(bin_centers, h1, label='olfaction data')
-plt.plot(bin_centers, h2, label='vision data')
-plt.plot(bin_centers, h3, label='V+O data')
-plt.plot(bin_centers, h_combined, label='V+O sum', linestyle='--', color='k')
-plt.xlabel('angle to x axis')
-plt.ylabel('Density')
-plt.legend()
-plt.grid(True)
+# plt.figure(figsize=(8,5))
+# plt.plot(bin_centers, h1, label='olfaction data')
+# plt.plot(bin_centers, h2, label='vision data')
+# plt.plot(bin_centers, h3, label='V+O data')
+# plt.plot(bin_centers, h_combined, label='V+O sum', linestyle='--', color='k')
+# plt.xlabel('angle to x axis')
+# plt.ylabel('Density')
+# plt.legend()
+# plt.grid(True)
 
 # %%
 def linear_regression_two_predictors(a, b, c):
@@ -200,7 +205,7 @@ sigs = np.zeros(len(tracks))
 for ii in range(len(tracks)):
     sigs[ii] = np.nanvar(signals[ii])
 
-interesting_tracks = np.where(sigs>15000)[0]
+interesting_tracks = np.where(sigs>2000)[0] #15000
 
 # %% visualize
 for ii in range(len(interesting_tracks)):
@@ -211,3 +216,104 @@ for ii in range(len(interesting_tracks)):
     pos = np.where(sigi>0)[0]
     plt.plot(xyi[pos,0], xyi[pos,1],'ro')
     plt.plot(xyi[0,0], xyi[0,1],'k*')
+    plt.xlim([0,300]); plt.ylim([0,190])
+    
+# %% compare projx, projy, condition on stim
+proj_up = []
+proj_down = []
+
+for ii in range(len(tracks)):
+    xy_i = tracks[ii]
+    vxy_i = vxys[ii]
+    time_i = times[ii]
+    stim_i = signals[ii]
+    pos_time = np.where((time_i<30))[0]
+    pos_time = np.where((time_i>30))[0]
+    pos_signal = np.where(stim_i>1)[0]
+    pos_boundary = np.where((xy_i[:,0]<260) & (xy_i[:,0]>15) & (xy_i[:,1]>15) & (xy_i[:,1]<160))[0]
+    pos = np.intersect1d(pos_boundary, pos_signal)
+    pos = np.intersect1d(pos_boundary, pos_time)
+    # if len(pos)>0 and len(pos_signal)>0 and np.mean(speeds[ii])>1:
+    if len(pos)>0 and np.mean(speeds[ii])>1:
+        vyi = vxy_i[pos,1]  ### velocity along y
+        
+        dx = xy_i[pos_time[0],0] - xy_i[pos_time[-1],0]
+        
+        if dx>0:
+            proj_up.append(np.var(vyi))
+        elif dx<=0:
+            proj_down.append(np.var(vyi))
+            
+## %%
+from scipy.stats import sem  # for standard error of mean
+
+group1 = proj_up
+group2 = proj_down
+
+# ----------------------------------------------------------
+# Compute means and SEMs
+means = [np.mean(group1), np.mean(group2)]
+sems = [sem(group1), sem(group2)]
+
+# ----------------------------------------------------------
+# Plot
+fig, ax = plt.subplots(figsize=(8,6))
+
+x_positions = np.arange(2)
+
+# Bar plot (means)
+ax.bar(x_positions, means, yerr=sems, capsize=5, color=['skyblue', 'salmon'], edgecolor='black', width=0.6)
+
+# Overlay raw data points
+jitter_strength = 0.08  # to spread dots horizontally
+x1_jittered = np.random.normal(0, jitter_strength, size=len(group1)) + x_positions[0]
+x2_jittered = np.random.normal(0, jitter_strength, size=len(group2)) + x_positions[1]
+
+ax.plot(x1_jittered, group1, 'o', color='blue', alpha=0.7, label='Group 1')
+ax.plot(x2_jittered, group2, 'o', color='red', alpha=0.7, label='Group 2')
+
+# Customize
+ax.set_xticks(x_positions)
+ax.set_xticklabels(['up wind', 'down wind'])
+ax.set_ylabel('displacement (mm/s)^2')
+ax.grid(True, axis='y')
+
+plt.tight_layout()
+
+# %% compute velocity distribution
+speed_up = []
+speed_down = []
+
+for ii in range(len(tracks)):
+    xy_i = tracks[ii]
+    vxy_i = vxys[ii]
+    time_i = times[ii]
+    stim_i = signals[ii]
+    pos_time = np.where((time_i<30))[0]
+    # pos_time = np.where((time_i>30))[0]
+    pos_signal = np.where(stim_i>1)[0]
+    pos_boundary = np.where((xy_i[:,0]<260) & (xy_i[:,0]>15) & (xy_i[:,1]>15) & (xy_i[:,1]<160))[0]
+    pos = np.intersect1d(pos_boundary, pos_signal)
+    # pos = np.intersect1d(pos_boundary, pos_time)
+    if len(pos)>0 and len(pos_signal)>0 and np.mean(speeds[ii])>1:
+    # if len(pos)>0 and np.mean(speeds[ii])>1:
+        speed_i = np.sum(vxy_i[pos,:]**2,1)**0.5
+        
+        ### track based
+        # dx = xy_i[pos_time[0],0] - xy_i[pos_time[-1],0] 
+        # if dx>0:
+        #     speed_up.append(speed_i)
+        # elif dx<=0:
+        #     speed_down.append(speed_i)
+            
+        ### vector based
+        pos_up = np.where(vxy_i[pos,0]<0)[0]
+        pos_down = np.where(vxy_i[pos,0]>0)[0]
+        speed_up.append(speed_i[pos_up])
+        speed_down.append(speed_i[pos_down])
+# %%
+bins = np.linspace(0,30,30)
+plt.figure()
+plt.hist(np.concatenate(speed_up), bins=bins, density=True, alpha=0.7, color='skyblue', edgecolor='black', label='up')
+plt.hist(np.concatenate(speed_down), bins=bins, density=True, alpha=0.5, color='k', edgecolor='black', label='down')
+plt.xlim([-.5, 35]); plt.ylim([0,0.6]); plt.legend()
