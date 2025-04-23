@@ -35,7 +35,7 @@ matplotlib.rc('ytick', labelsize=20)
 
 # %% for Kiri's data
 ### cutoff for short tracks
-threshold_track_l = 60 * 10  # 20 # look at long-enough tracks
+threshold_track_l = 60 * 15  # 20 # look at long-enough tracks
 
 # # Define the folder path
 # folder_path = 'C:/Users/ksc75/Downloads/ribbon_data_kc/'
@@ -50,11 +50,15 @@ threshold_track_l = 60 * 10  # 20 # look at long-enough tracks
 # %% for perturbed data
 root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-5'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-11-7'  ### for full field
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-11-7'  ### for full field and OU
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\100424_new'  ### OU ribbons
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-10-31' ### OU ribbons... need signal!
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-20'  ### jittered ribbon
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-20'  ### jittered ribbon
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-24'  ### jittered ribbon
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-31'  ### jittered ribbon
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-4'  ### jittered ribbon and OU
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-7'  ### jittered ribbon and OU
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-10'  ### jittered ribbon and OU
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-14'  ### jittered ribbon and OU
 target_file = "exp_matrix.pklz"
 
@@ -70,11 +74,11 @@ for subfolder in subfolders:
             pkl_files.append(full_path)
             print(full_path)
 
-# pkl_files = pkl_files[:25]
-# pkl_files = pkl_files[30:]
+# pkl_files = pkl_files[-20:]
+# pkl_files = pkl_files[24:]
 
-pkl_files = pkl_files[:29]  # OU
-# pkl_files = pkl_files[40:50] + pkl_files[70:80] # jittered
+# pkl_files = pkl_files[:29]  # OU
+pkl_files = pkl_files[40:50] + pkl_files[70:80] # jittered
 # pkl_files = pkl_files[30:40] + pkl_files[50:70] # straight
 print(pkl_files) 
     
@@ -123,7 +127,7 @@ for ff in range(nf):
                     rec_tracks.append(temp_xy)  # get raw tracks
                     # track_id.append(np.array([ff,ii]))  # get track id
                     track_id.append(np.zeros(len(pos))+ii) 
-                    rec_signal.append(data['signal'][pos])
+                    rec_signal.append(data['signal'][pos].squeeze())
                     # rec_signal.append(np.ones((len(pos),1)))   ########################## hacking for now...
                     cond_id += 1
                     masks.append(thetas)
@@ -213,7 +217,7 @@ for kk in range(0,len(sortt_id),1):
 
 # %% analyze speed
 process_post = []
-window = 5*60
+window = 3*60
 for ii in range(len(post_vxy)):
     if len(post_vxy[ii])<window:
         process_post.append(post_vxy[ii])
