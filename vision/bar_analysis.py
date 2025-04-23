@@ -301,7 +301,7 @@ stim_pix = np.linspace(0, 640, num=len(time_stim))
 post_stim_values = np.full(len(time_full)-len(time_stim), np.nan)
 stim_pix_vector = np.concatenate([post_stim_values, stim_pix, post_stim_values])
 time_vec = np.arange(0, pre_stim_duration+stim_duration+post_stim_duration, dt)
-pix2mm = 1.5#1.5
+pix2mm = 1.5 #1.5#1.5
 def map_to_rectangle_path(n_points=641):
     """
     Map indices 0 to n_points-1 along a rectangle path.
@@ -344,6 +344,7 @@ fly_angle = []
 rec_time = []
 fly_response = []
 stim_angle_vector = []
+stim_ang_bar = []
 for ii in range(len(tracks)):
     time_i = times[ii]
     dtheta_i = dthetas[ii]
@@ -357,12 +358,14 @@ for ii in range(len(tracks)):
         pos_stim = pos_stim_[:-delay] ### make delays here
         pos_resp = pos_stim_[delay:]
         stim_angi = np.zeros(len(pos_stim))
+        stim_ang_box = np.zeros(len(pos_stim))
         for tt in range(len(pos_stim)):
-            # stim_angi[tt] = find_stim_angle_at_time_t(time_i[pos_stim[tt]])  ### use angle directly
+            stim_ang_box[tt] = find_stim_angle_at_time_t(time_i[pos_stim[tt]])  ### use angle directly
             
             ### test with bar location to calculate view angle
             stim_xyt = find_stim_location_at_time_t(time_i[pos_stim[tt]])
-            view_angle = angle_between_vectors(  head_i[pos_stim[tt],:] , stim_xyt - pos_i[pos_stim[tt]]) # angle between bar and heading
+            # view_angle = angle_between_vectors(  head_i[pos_stim[tt],:] , stim_xyt - pos_i[pos_stim[tt]]) # angle between bar and heading
+            view_angle = angle_between_vectors(  stim_xyt - pos_i[pos_stim[tt]] , head_i[pos_stim[tt],:]) # angle between bar and heading
             stim_angi[tt] = view_angle
         
         fly_angle.append(theta_i[pos_resp])  # dtheta_i
@@ -371,12 +374,13 @@ for ii in range(len(tracks)):
         stim_angle_vector.append(stim_angi)
         fly_response.append(dtheta_i[pos_stim])  # dtheta_i
         rec_time.append(time_i[pos_stim])
+        stim_ang_bar.append(stim_ang_box)
         
-fly_angle = np.concatenate(fly_angle)
-fly_response = np.concatenate(fly_response)
-stim_angle = np.concatenate(stim_angle)
-rec_time = np.concatenate(rec_time)
-stim_angle_vector = np.concatenate(stim_angle_vector)
+fly_angle_ = np.concatenate(fly_angle)
+fly_response_ = np.concatenate(fly_response)
+stim_angle_ = np.concatenate(stim_angle)
+rec_time_ = np.concatenate(rec_time)
+stim_angle_vector_ = np.concatenate(stim_angle_vector)
 
 ## %% test with simple binning
 def bin_and_average_with_error(x, y, bins):
@@ -418,8 +422,8 @@ def bin_and_average_with_error(x, y, bins):
 
 # Bin and compute averages with error bars
 # delay = 5  ### need to think about how to choose this time lag for response
-# bin_centers, y_means, y_sem = bin_and_average_with_error(stim_angle[:-delay], fly_response[delay:], bins=20) ### through angles
-bin_centers, y_means, y_sem = bin_and_average_with_error(stim_angle_vector[:-delay], fly_response[delay:], bins=20)  ### through vectors
+# bin_centers, y_means, y_sem = bin_and_average_with_error(stim_angle_[:-delay], fly_response_[delay:], bins=20) ### through angles
+bin_centers, y_means, y_sem = bin_and_average_with_error(stim_angle_vector_[:-delay], fly_response_[delay:], bins=20)  ### through vectors
 
 # Plot Results
 plt.figure(figsize=(8, 5))
@@ -427,3 +431,123 @@ plt.errorbar(bin_centers, y_means, yerr=y_sem, fmt='o', capsize=5, label="Binned
 plt.xlabel("stimulus angle to heading (deg)")
 plt.ylabel("fly response angle (deg/s)")
 # plt.ylim([-7,16])
+
+# %% track based analysis
+###############################################################################
+# %% exp track
+trk = 19 #41 #18,19 # 2 not moving 5 for good response... might have error in heading ??
+plt.figure()
+plt.subplot(311); plt.plot(fly_response[trk]); plt.ylabel(r'$d\theta$')
+# plt.subplot(312); plt.plot(np.rad2deg(np.unwrap(np.deg2rad(stim_angle_vector[trk]))),'o')
+plt.subplot(312); plt.plot(stim_angle_vector[trk],'o'); plt.plot([0, len(stim_angle_vector[trk])],[0,0],'k--'); plt.ylabel(r'$\phi$')
+plt.subplot(313); plt.plot(rec_time[trk] - rec_time[trk][0], stim_ang_bar[trk]); plt.ylabel('bar'); plt.xlabel('time (s)')
+
+# %% find front-crossing
+def find_first_pos_to_neg_crossing_circular(x, crossing_ang=0, wrap_limit=180):
+    x = np.asarray(x)
+    dx = np.diff(x)
+    
+    # Detect where the jump is a real sign change, not a wraparound
+    valid_crossings = (x[:-1] <= crossing_ang) & (x[1:] > crossing_ang)
+    
+    # Exclude wraparound boundary jumps (e.g. from ~180 to -179)
+    wrap_jumps = np.abs(dx) > 2 * wrap_limit - 10  # add tolerance if noisy
+
+    # Only keep valid, non-wraparound crossings
+    valid_crossings &= ~wrap_jumps
+
+    indices = np.where(valid_crossings)[0]
+    return indices[0] + 1 if len(indices) > 0 else None
+
+def circular_mean_std_deg(angles_deg):
+    angles_deg = np.asarray(angles_deg)
+    angles_deg = angles_deg[~np.isnan(angles_deg)]  # remove NaNs
+
+    if len(angles_deg) == 0:
+        return np.nan, np.nan  # or raise an error if preferred
+
+    angles_rad = np.deg2rad(angles_deg)
+
+    # Mean of unit vectors
+    sin_sum = np.nanmean(np.sin(angles_rad))
+    cos_sum = np.nanmean(np.cos(angles_rad))
+
+    # Compute circular mean
+    mean_angle_rad = np.arctan2(sin_sum, cos_sum)
+    mean_angle_deg = np.rad2deg(mean_angle_rad)
+
+    # Resultant vector length
+    R = np.sqrt(sin_sum**2 + cos_sum**2)
+
+    # Circular std: handle edge cases where R ~ 0
+    circ_std_rad = np.sqrt(-2 * np.log(R)) if R > 0 else np.pi
+    circ_std_deg = np.rad2deg(circ_std_rad)
+
+    return mean_angle_deg, circ_std_deg
+
+# %% tracks
+kk=0
+offset = 0## 1 or 0
+time_vec = []
+reps_vec = []
+phi_vec = []
+plt.figure()
+for ii in range(len(fly_response)):
+    pos = find_first_pos_to_neg_crossing_circular(stim_angle_vector[ii],crossing_ang=-30)
+    if pos is not None and (stim_angle_vector[ii][0]>-0):# and (stim_angle_vector[ii][0]>-60):
+    # if pos is not None and (stim_angle_vector[ii][0]<-0):
+    # if pos is not None:# and (np.abs(stim_angle_vector[ii][-1])<100):
+        # plt.plot(rec_time[ii][pos:] - rec_time[ii][pos] , fly_response[ii][pos:] - offset*fly_response[ii][pos],'k-', alpha=0.2)
+        plt.plot(rec_time[ii][pos:] - rec_time[ii][pos] , stim_angle_vector[ii][pos:] - offset*stim_angle_vector[ii][pos],'k-', alpha=0.2)
+        kk+=1
+        time_vec.append( rec_time[ii][pos:] - rec_time[ii][pos] )
+        reps_vec.append( fly_response[ii][pos:] - offset*fly_response[ii][pos] )
+        phi_vec.append( stim_angle_vector[ii][pos:] - offset*stim_angle_vector[ii][pos] )
+# plt.ylim([-500, 500])
+
+time_vec = np.concatenate(time_vec)
+reps_vec = np.concatenate(reps_vec)
+phi_vec = np.concatenate(phi_vec)
+
+plt.xlabel('Time (s)')
+plt.ylabel(r'd$\theta$ post crossing threshold')
+
+# %% binning
+nbins = 30
+min_samps = 10
+t_bin = np.linspace(0, stim_duration, nbins)
+response_mean = np.zeros(nbins) + np.nan
+resposne_std = np.zeros(nbins) + np.nan
+n_samps = np.zeros(nbins)
+
+for bb in range(nbins-1):
+    pos = np.where((time_vec>t_bin[bb]) & (time_vec<=t_bin[bb+1]))[0]
+    if len(pos)>min_samps:
+        
+        response_mean[bb] = np.nanmean(reps_vec[pos])
+        resposne_std[bb] = np.nanstd(reps_vec[pos])/np.sqrt(len(pos))
+        
+        # mm,ss = circular_mean_std_deg(phi_vec[pos])
+        # response_mean[bb] = mm
+        # resposne_std[bb] = ss/np.sqrt(len(pos))
+        
+        n_samps[bb] = len(pos)
+    
+plt.figure(figsize=(8, 5))
+plt.plot(t_bin, response_mean, label='Mean', color='blue')
+plt.plot([t_bin[0], 0.65], [0,0], 'k--')
+plt.fill_between(t_bin,
+                 response_mean - resposne_std,
+                 response_mean + resposne_std,
+                 color='blue',
+                 alpha=0.3,
+                 label='±1 SEM')
+
+# Decorations
+plt.xlabel('Time (s)')
+plt.ylabel(r'd$\theta$ post crossing')
+# plt.ylabel(r'$\phi$ post crossing')
+# plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
