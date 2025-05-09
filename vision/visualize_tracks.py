@@ -292,9 +292,9 @@ plt.xlabel('x (mm)'); plt.ylabel('y (mm)'); plt.title(r'example tracks ($\righta
 # plt.xlabel('vx (mm/s)')
 
 # %% showing counts
-plt.figure()
-g = sns.jointplot(x=vec_xy[::30,0], y=vec_xy[::30,1], kind="kde")
-g.set_axis_labels('x (mm)', 'y (mm)')
+# plt.figure()
+# g = sns.jointplot(x=vec_xy[::30,0], y=vec_xy[::30,1], kind="kde")
+# g.set_axis_labels('x (mm)', 'y (mm)')
 
 # %% turning analysis
 ###############################################################################
@@ -369,33 +369,130 @@ plt.xlabel('x (mm)'); plt.ylabel('heading (degrees from wind)')
 # %% time/space aligned tracks
 ###############################################################################
 # %% iterate across tracks
-pre_time = 1
+pre_time = 2
+stop_threshold = 5
+not_stop = 5
+max_jump = 10
+time_all, speed_all, stop_all = [], [], []
 for ii in range(len(tracks)):
     xy_i = tracks[ii]
     time_i = times[ii]
     vxy_i = vxys[ii]
-    pos_time = np.where((time_i>25) & (time_i<30))[0]
-    # pos_time = np.where((time_i>62) & (time_i<68))[0]
-    pos_space = np.where((xy_i[:,0]>50) & (xy_i[:,0]<250) & (xy_i[:,1]>50) & (xy_i[:,1]<150))[0]
-    pos = np.intersect1d(pos_time, pos_space)
-    pos_end = np.where(np.diff(pos)>10)[0]
+    speed_i = speeds[ii]
+    pos_time = np.where((time_i>25) & (time_i<30))[0]  ### condition in time
+    pos_time = np.where((time_i>63-pre_time) & (time_i<68))[0]
+    pos_space = np.where((xy_i[:,0]>50) & (xy_i[:,0]<250) & (xy_i[:,1]>50) & (xy_i[:,1]<150))[0]  ### condition in space
+    
+    pos = pos_time*1 #np.intersect1d(pos_time, pos_space)
+    pos_end = np.where(np.diff(pos)>max_jump)[0]
+    
     if len(pos_end)>0:
         pos = pos[:pos_end[0]]
-    if len(pos)>0:
+    if len(pos)>0 and np.nanmean(speed_i[pos])>not_stop:
+        # print(ii)
         plt.figure(1)
-        plt.plot(np.abs(xy_i[pos,0] - xy_i[pos[0],0]), np.abs(xy_i[pos,1]-184) - xy_i[pos[0],1]*0, 'k', alpha=0.5); 
+        plt.plot(np.abs(xy_i[pos,0] - xy_i[pos[0],0]), np.abs(xy_i[pos,1]-185) - xy_i[pos[0],1]*0, 'k', alpha=0.5); 
         plt.xlim([0,125]); #plt.ylim([-50, 50]); 
         plt.title(' 5s aligned tracks w/o loom'); plt.xlabel('aligned along bar direction, X (mm)'); plt.ylabel('distance to loom side, Y (mm)'); 
         
         plt.figure(2)
         plt.plot(np.arange(0, len(pos))/60 - pre_time, vxy_i[pos,0], 'k', alpha=0.45)
+        # plt.plot(np.arange(0, len(pos))/60 - pre_time, speed_i[pos], 'k', alpha=0.45)
         plt.ylim([-35,35]); plt.ylabel(r'$V_x$ (mm/s)'); plt.xlabel('time since loom (s)')
         x = [0, 0.5,  0.5, 0]  # x-coordinates of corners
         y = [-35, -35, 35, 35]  # y-coordinates of corners
+        
+        time_all.append(time_i[pos])
+        speed_all.append(speed_i[pos])
+        temp_stop = speed_i[pos]*0 + 1
+        temp_stop[speed_i[pos]>stop_threshold] = 0
+        stop_all.append(temp_stop)
 
-        # Plot the gray area
+time_all = np.concatenate(time_all)
+speed_all = np.concatenate(speed_all)
+stop_all = np.concatenate(stop_all)
+
+# Plot the gray area
 plt.figure(1)
 plt.gca().invert_yaxis()
 plt.figure(2)
 plt.fill(x, y, color='gray', alpha=0.5)
 # plt.xlim([0,300]); plt.ylim([0, 180])
+
+# %% average traces
+###############################################################################
+# %% stopping and speed
+nbins = 90*2
+at,bt = np.histogram(time_all, nbins)
+mean_speed = np.zeros(nbins)
+std_speed = np.zeros(nbins)
+for ii in range(1,nbins):
+    pos = np.where((time_all>bt[ii-1]) & (time_all<bt[ii]))[0]
+    if len(pos)>0:
+        # mean_speed[ii-1] = np.mean(stop_all[pos])
+        # std_speed[ii-1] = np.std(stop_all[pos])/len(pos)**0.5
+        mean_speed[ii-1] = np.mean(speed_all[pos])
+        std_speed[ii-1] = np.std(speed_all[pos])/len(pos)**0.5
+
+tt, mean, error = bt[:-2] - bt[0] - pre_time, mean_speed[:-1], std_speed[:-1]
+plt.figure()
+# plt.plot(bt[:-2], mean_speed[:-1], '-o')
+plt.plot(tt, mean)
+plt.fill_between(tt, mean - error, mean + error, color='blue', alpha=0.3, label='± Error')
+plt.fill(x, y, color='gray', alpha=0.5)
+# plt.ylim([0,1]); plt.xlabel('time since loom (s)'); plt.ylabel('P(stop)')
+plt.xlabel('time since loom (s)'); plt.ylabel('speed (mm/s)'); plt.ylim([5,15])
+
+# %% turning rate
+pre_time = 5
+not_stop = 10
+max_jump = 10
+time_all, turn_all = [], []
+
+plt.figure()
+for ii in range(len(tracks)):
+    xy_i = tracks[ii]
+    time_i = times[ii]
+    vxy_i = vxys[ii]
+    speed_i = speeds[ii]
+    theta_i = thetas[ii]
+    # pos_time = np.where((time_i>25) & (time_i<30))[0]  ### condition in time
+    pos_time = np.where((time_i>63-pre_time) & (time_i<69))[0]
+    pos_space = np.where((xy_i[:,0]>50) & (xy_i[:,0]<250) & (xy_i[:,1]>50) & (xy_i[:,1]<150))[0]  ### condition in space
+    
+    pos = pos_time*1 #np.intersect1d(pos_time, pos_space)
+    pos_end = np.where(np.diff(pos)>max_jump)[0]
+    
+    if len(pos_end)>0:
+        pos = pos[:pos_end[0]]
+    if len(pos)>0 and np.mean(vxy_i[pos,0])<0 and np.nanmean(speed_i[pos])>not_stop: #xy_i[pos[0],0] < xy_i[pos[-1],0] 
+            plt.plot(np.arange(0, len(pos))/60 - pre_time, theta_i[pos], 'k', alpha=0.1)
+            # plt.ylim([-35,35]); plt.ylabel(r'$V_x$ (mm/s)'); plt.xlabel('time since loom (s)')
+            
+            time_all.append(time_i[pos])
+            turn_all.append(theta_i[pos])
+
+time_all = np.concatenate(time_all)
+turn_all = np.concatenate(turn_all)
+
+# %%
+nbins = 60
+at,bt = np.histogram(time_all, nbins)
+mean_speed = np.zeros(nbins)
+std_speed = np.zeros(nbins)
+for ii in range(1,nbins):
+    pos = np.where((time_all>bt[ii-1]) & (time_all<bt[ii]))[0]
+    if len(pos)>0:
+        # mean_speed[ii-1] = np.nanmean(np.abs(turn_all[pos]))
+        mean_speed[ii-1] = np.nanmean(turn_all[pos])
+        std_speed[ii-1] = np.nanstd(turn_all[pos])/len(pos)**0.5
+
+tt, mean, error = bt[:-2] - bt[0] - pre_time, mean_speed[:-1], std_speed[:-1]
+plt.figure()
+# plt.plot(bt[:-2], mean_speed[:-1], '-o')
+plt.plot(tt, mean)
+plt.fill_between(tt, mean - error, mean + error, color='blue', alpha=0.3, label='± Error')
+# x = [0, 0.5,  0.5, 0]  # x-coordinates of corners
+# y = [20, 20, 55, 55]  # y-coordinates of corners
+# plt.fill(x, y, color='gray', alpha=0.5); plt.ylim([20,55])
+# plt.xlabel('time since loom (s)'); plt.ylabel('|turning| (|deg|/s)'); #plt.ylim([5,15])
