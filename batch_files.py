@@ -46,12 +46,13 @@ exp_list = [r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_
             r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-4',  ### jittered ribbon and OU
             r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-7',  ### jittered ribbon and OU
             r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-10',  ### jittered ribbon and OU
-            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-14']  ### jittered ribbon and OU
+            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-14',
+            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-17']  ### jittered ribbon and OU
 
 target_file = "exp_matrix.pklz"
-exp_type = 'jitter0p05'
-exp_type = 'jitter0p0_'
-exp_type = '_OU_'
+exp_type = 'jitter0p05'   ### 143
+# exp_type = 'jitter0p0_' ### 92
+# exp_type = '_OU_' ### 126
 
 pkl_files = []
 for ll in range(len(exp_list)):

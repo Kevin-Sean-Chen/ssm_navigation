@@ -35,7 +35,7 @@ matplotlib.rc('ytick', labelsize=20)
 
 # %% for Kiri's data
 ### cutoff for short tracks
-threshold_track_l = 60 * 15  # 20 # look at long-enough tracks
+threshold_track_l = 60 * 10  # 20 # look at long-enough tracks
 
 # # Define the folder path
 # folder_path = 'C:/Users/ksc75/Downloads/ribbon_data_kc/'
@@ -48,19 +48,22 @@ threshold_track_l = 60 * 15  # 20 # look at long-enough tracks
 #     print(file)
 
 # %% for perturbed data
-root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
+# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-5'
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-11-7'  ### for full field and OU
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\100424_new'  ### OU ribbons
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-10-31' ### OU ribbons... need signal!
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-20'  ### jittered ribbon
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-20'  ### jittered ribbon
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-24'  ### jittered ribbon
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-31'  ### jittered ribbon
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-4'  ### jittered ribbon and OU
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-7'  ### jittered ribbon and OU
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-10'  ### jittered ribbon and OU
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-14'  ### jittered ribbon and OU
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-14'  ### jittered ribbon and OU
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-21'  ### jittered ribbon and OU
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-5-1'  ### jittered ribbon and OU
 target_file = "exp_matrix.pklz"
+exp_type = 'jitter0p05' #'jitter0p0_' #'jitter0p05' #'OU_'
 
 # List all subfolders in the root directory
 subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
@@ -69,7 +72,8 @@ pkl_files = []
 # Loop through each subfolder to search for the target file
 for subfolder in subfolders:
     for dirpath, dirnames, filenames in os.walk(subfolder):
-        if target_file in filenames:
+        # if target_file in filenames:
+        if target_file in filenames and exp_type in dirpath:
             full_path = os.path.join(dirpath, target_file)
             pkl_files.append(full_path)
             print(full_path)
@@ -78,7 +82,7 @@ for subfolder in subfolders:
 # pkl_files = pkl_files[24:]
 
 # pkl_files = pkl_files[:29]  # OU
-pkl_files = pkl_files[40:50] + pkl_files[70:80] # jittered
+# pkl_files = pkl_files[40:50] + pkl_files[70:80] # jittered
 # pkl_files = pkl_files[30:40] + pkl_files[50:70] # straight
 print(pkl_files) 
     
@@ -149,11 +153,13 @@ pos=np.where(rec_signal[ii]>10)[0];
 plt.plot(rec_tracks[ii][pos,0], rec_tracks[ii][pos,1],'r.'); plt.plot(rec_tracks[ii][0,0], rec_tracks[ii][0,1],'*')
 
 # %% measuring base on tracks
-pre_t = 30 #45 30
-stim_t = 30
+pre_t = 0 #45 30 0!!!
+stim_t = 30 +45*1
+pre_los = 60* 5
 odor_feature = []
 post_vxy = []
 post_xy = []
+pre_vxy = []
 for nn in range(len(data4fit)):
     time_i = times[nn]
     signal_i = rec_signal[nn]
@@ -161,6 +167,7 @@ for nn in range(len(data4fit)):
     vxy_i = data4fit[nn]
     pos_stim = np.where((time_i>pre_t) & (time_i<pre_t+stim_t))[0]
     if np.nansum(signal_i)>0 and len(pos_stim)>0:  # some odor encounter
+        # print(nn)
         pos = np.where(signal_i>0)[0][-1]  # last encounter
         # pos = pos_stim[-1] # last stim
         # pos = np.random.randint(0,len(vxy_i),1)[0]  # random control
@@ -189,10 +196,14 @@ for nn in range(len(data4fit)):
         # else:
         #     odor_feature.append( pos - pos_stim[0])
         
+        ### collect pre-off velocity
+        if pos>pre_los:
+            pre_vxy.append(vxy_i[pos-pre_los:pos,:])
+        
 # %% sorted plots
 dispy = 3
 offset = 1
-post_window = 20*60
+post_window = 30*60
 
 sortt_id = np.argsort(odor_feature)[::-1]
 import matplotlib.cm as cm
@@ -216,20 +227,28 @@ for kk in range(0,len(sortt_id),1):
     # plt.plot(odor_feature[sortt_id[kk]], post_feature,'o')
 
 # %% analyze speed
+spd_bin = np.linspace(0, 30, 50)
 process_post = []
-window = 3*60
+process_pre = []
+window = 10*60
 for ii in range(len(post_vxy)):
     if len(post_vxy[ii])<window:
         process_post.append(post_vxy[ii])
     else:
         process_post.append(post_vxy[ii][:window, :])
+for ii in range(len(pre_vxy)):
+    process_pre.append(pre_vxy[ii])
+    
 post_action = np.concatenate(process_post)#[:,0]
 post_action = np.sum(post_action**2,1)**0.5
+pre_action = np.concatenate(process_pre)#[:,0]
+pre_action = np.sum(pre_action**2,1)**0.5
 plt.figure()
-plt.hist(post_action, bins=30, density=True, alpha=0.7, color='skyblue', edgecolor='black')
+plt.hist(post_action, bins=spd_bin, density=True, alpha=0.7, color='skyblue', edgecolor='black')
+plt.hist(pre_action, bins=spd_bin, density=True, alpha=0.7, color='r', edgecolor='black')
 
 full_action = np.sum(vec_vxy**2,1)**0.5
-plt.hist(full_action, bins=30, density=True, alpha=0.5, color='k', edgecolor='black')
+# plt.hist(full_action, bins=spd_bin, density=True, alpha=0.5, color='k', edgecolor='black')
 plt.xlim([-.5, 20]); plt.ylim([0,0.9])
 
 # %%
@@ -250,7 +269,7 @@ msd_std = msd*0
 
 # Compute MSD
 for track in track_set:
-    n_points = len(track)
+    n_points = len(track)//1 ### truncation here
     for lag in range(1, n_points):
         displacements = track[lag:,:] - track[:-lag,:]  # Displacements for this lag
         squared_displacement = np.sum(displacements**2)#, axis=1)  # (dx^2 + dy^2)
@@ -284,6 +303,12 @@ plt.xlabel("lag time (s)")
 plt.ylabel(r"MSD (mm$^2$)")
 plt.title("MSD scaling")
 plt.grid(True)
-plt.xlim([0,90]); plt.ylim([0.001, 20000])
+# plt.xlim([0,90]); plt.ylim([0.001, 20000])
 # plt.show()
 plt.legend()
+
+# %% saving off tracks
+# data = {'post_xy': post_xy, 'post_vxy': post_vxy}
+
+# with open('jit_off_tracks.pkl', 'wb') as f:
+#     pickle.dump(data, f)
