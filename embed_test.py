@@ -29,17 +29,18 @@ sns.set_context("talk")
 threshold_track_l = 60 * 20  # 20 # look at long-enough tracks
 
 # Define the folder path
-folder_path = 'C:/Users/ksc75/Downloads/ribbon_data_kc/'
+# folder_path = 'C:/Users/ksc75/Downloads/ribbon_data_kc/'
 
-# Use glob to search for all .pkl files in the folder
-pkl_files = glob.glob(os.path.join(folder_path, '*.pklz'))
+# # Use glob to search for all .pkl files in the folder
+# pkl_files = glob.glob(os.path.join(folder_path, '*.pklz'))
 
-# Print the list of .pkl files
-for file in pkl_files:
-    print(file)
+# # Print the list of .pkl files
+# for file in pkl_files:
+#     print(file)
 
 # %% for perturbed data
-root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'
+# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'
+root_dir = 'C:/Users/kevin/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -281,6 +282,8 @@ plt.ylabel('proejction')
 # plt.ylim([-6,6])
 
 # %% projections conditioned on past odor!
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
 def last_argmin(arr):
     # Find the minimum value
     min_val = np.min(arr)
@@ -298,14 +301,26 @@ for tt in range(len(odor_off)):
     if (vectorized_id[close_time_pos1] == vectorized_id[-1]) or (vectorized_id[close_time_pos2] == vectorized_id[-1]):  # of the same track
         vectorized_signal = feat_odor[:pos,:].reshape(-1)  ### might want to figure out when it ends
         proj_val_off.append(np.dot(data_2d[pos,:]-center, lda_direction.T))
-        prev_odor_off.append(np.mean(vectorized_signal[close_time_pos1:pos*window])/1)# / len(np.where(vectorized_signal[close_time_pos1:pos*window]>0)[0]) )
+        prev_odor_off.append(np.mean(vectorized_signal[close_time_pos1:pos*window])/50)# / len(np.where(vectorized_signal[close_time_pos1:pos*window]>0)[0]) )
         # print(pos)
 
+# %%
+### fitting
+model = LinearRegression()
+x_,y_ = np.array(prev_odor_off), np.array(proj_val_off).squeeze()
+x_[np.isnan(x_)] = 0
+pos = x_ != 0
+x_, y_ = x_[pos], y_[pos]
+x_ = x_.reshape(-1, 1)
+model.fit(x_, y_)
+y_pred = model.predict(x_)
+r2 = r2_score(y_, y_pred)
 ## %%
 plt.figure()
-plt.plot(prev_odor_off, proj_val_off, 'r.')
-plt.xlabel('experienced odor before off')
-plt.ylabel('proejction of off response')
+plt.plot(x_, y_, '.')
+plt.plot(x_, y_pred, color='k', label="Fitted")
+plt.xlabel('odor experience (normalized)', fontsize=20)
+plt.ylabel('projected off response', fontsize=20)
 # plt.ylim([-6,6])
 
 # %% relaxation upon odor-off
