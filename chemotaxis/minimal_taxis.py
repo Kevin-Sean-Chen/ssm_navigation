@@ -451,3 +451,18 @@ for ii in range(6):
     plt.plot(ps, np.mean(infos[:,:,ii],1),'-o', label=labels[ii])
 plt.legend()
 plt.xlabel('P(turn|down)')
+
+# %%
+###############################################################################
+# %% single examples
+s,a,x = binary_chemotaxis(0.05) #0.05
+# s,a,x = nonMarkov_test(ps[pp])
+TE_YX, TE_XY, Hx, Hy, Hxy = transfer_entropy_both(a, s)
+
+idnex = np.array([Hx, Hy, TE_YX, TE_XY]) / Hxy
+
+plt.figure()
+plt.subplot(211)
+plt.plot(x); plt.xticks([])
+plt.subplot(212)
+plt.bar(['a', 's', 's->a', 'a->s' ], idnex); plt.xlabel('contribution')
