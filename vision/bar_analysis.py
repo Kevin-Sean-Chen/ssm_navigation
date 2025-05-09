@@ -332,19 +332,26 @@ x_bar,y_bar = map_to_rectangle_path()  ### get the real-space x,y coordinates
 
 def find_stim_location_at_time_t(time,  time_vec=time_vec, stim_pix_vector=stim_pix_vector, x=x_bar, y=y_bar):
     index = np.argmin(np.abs(time_vec - time)) # fine index with time
+    # if np.isnan(stim_pix_vector[index]) is False:
+        # print(stim_pix_vector[index])
     pixel_location = int(stim_pix_vector[index])  # find pixel index
     stim_location = np.array([x[pixel_location], y[pixel_location]]) # return x,y location
+    # else:
+    #     stim_location = np.ones(2)+np.nan
     return stim_location
 
 # %% rebuild the stim angle
 pre_window = 30  # steps of 1/60 frame-rate
-delay = 1*5  ### test this here
+delay = 1*1  ### test this here
 stim_angle = []
 fly_angle = []
 rec_time = []
 fly_response = []
 stim_angle_vector = []
 stim_ang_bar = []
+valid_tracks = []
+pseudo_lab_ang = []
+
 for ii in range(len(tracks)):
     time_i = times[ii]
     dtheta_i = dthetas[ii]
@@ -352,29 +359,41 @@ for ii in range(len(tracks)):
     speed_i = speeds[ii]
     head_i = heading[ii]
     pos_i = tracks[ii]
+    vxy_i = vxys[ii]
     pos_stim_ = np.where((time_i>pre_stim_duration) & (time_i<pre_stim_duration+stim_duration))[0]
-    if len(pos_stim_)>delay:  # measurement during stim exists
+    if len(pos_stim_)>delay+0:  # measurement during stim exists
     # if len(pos_stim)>0:
+        valid_tracks.append(ii)
         pos_stim = pos_stim_[:-delay] ### make delays here
         pos_resp = pos_stim_[delay:]
         stim_angi = np.zeros(len(pos_stim))
         stim_ang_box = np.zeros(len(pos_stim))
-        for tt in range(len(pos_stim)):
+        lab_fly_ang = np.zeros(len(pos_stim))
+        test_bear = np.zeros(len(pos_stim))
+        # dxy = np.diff(np.concatenate((pos_i,pos_i[0,:][None,:])).T).T
+        dxy = vxy_i*1
+        for tt in range(0,len(pos_stim)):
             stim_ang_box[tt] = find_stim_angle_at_time_t(time_i[pos_stim[tt]])  ### use angle directly
-            
+
             ### test with bar location to calculate view angle
             stim_xyt = find_stim_location_at_time_t(time_i[pos_stim[tt]])
             # view_angle = angle_between_vectors(  head_i[pos_stim[tt],:] , stim_xyt - pos_i[pos_stim[tt]]) # angle between bar and heading
-            view_angle = angle_between_vectors(  stim_xyt - pos_i[pos_stim[tt]] , head_i[pos_stim[tt],:]) # angle between bar and heading
-            stim_angi[tt] = view_angle
+            # view_angle = angle_between_vectors(  stim_xyt - pos_i[pos_stim[tt]] , head_i[pos_stim[tt],:]) # angle between bar and heading, flipped
+            view_angle = angle_between_vectors( np.array([1,0]) , stim_xyt - pos_i[pos_stim[tt]]) # angle between bar vector and reference
+            stim_angi[tt] = view_angle - theta_i[pos_stim[tt]] ### # difference between bar and heading
+            lab_fly_ang[tt] = angle_between_vectors(  np.array([1, 0]) , stim_xyt - pos_i[pos_stim[tt]])
+            test_bear[tt] = angle_between_vectors( dxy[pos_stim[tt],:] , dxy[pos_stim[tt-1],:] )
         
-        fly_angle.append(theta_i[pos_resp])  # dtheta_i
-        stim_angle.append( wrap_heading( stim_angi - theta_i[pos_resp]) )
+        test_bear[np.abs(test_bear)>50] = np.nan
+        fly_angle.append(theta_i[pos_stim])  # dtheta_i
+        stim_angle.append( wrap_heading( stim_angi - theta_i[pos_stim]) )
         # stim_angle_vector.append(angle_between_vector_series(np.array([np.cos(stim_angi), np.sin(stim_angi)]).T, head_i[pos_resp,:]))
-        stim_angle_vector.append(stim_angi)
-        fly_response.append(dtheta_i[pos_stim])  # dtheta_i
+        stim_angle_vector.append( wrap_heading(stim_angi) )
+        fly_response.append(dtheta_i[pos_resp])  # dtheta_i
+        # fly_response.append(test_bear) 
         rec_time.append(time_i[pos_stim])
         stim_ang_bar.append(stim_ang_box)
+        pseudo_lab_ang.append(lab_fly_ang)
         
 fly_angle_ = np.concatenate(fly_angle)
 fly_response_ = np.concatenate(fly_response)
@@ -435,12 +454,32 @@ plt.ylabel("fly response angle (deg/s)")
 # %% track based analysis
 ###############################################################################
 # %% exp track
-trk = 19 #41 #18,19 # 2 not moving 5 for good response... might have error in heading ??
+trk = 97 #41 #18,19 # 2 not moving 5 for good response... might have error in heading ??
 plt.figure()
 plt.subplot(311); plt.plot(fly_response[trk]); plt.ylabel(r'$d\theta$')
 # plt.subplot(312); plt.plot(np.rad2deg(np.unwrap(np.deg2rad(stim_angle_vector[trk]))),'o')
 plt.subplot(312); plt.plot(stim_angle_vector[trk],'o'); plt.plot([0, len(stim_angle_vector[trk])],[0,0],'k--'); plt.ylabel(r'$\phi$')
-plt.subplot(313); plt.plot(rec_time[trk] - rec_time[trk][0], stim_ang_bar[trk]); plt.ylabel('bar'); plt.xlabel('time (s)')
+# plt.subplot(313); plt.plot(rec_time[trk] - rec_time[trk][0], stim_ang_bar[trk]); plt.ylabel('bar'); #plt.xlabel('time (s)')
+plt.subplot(313); plt.plot(rec_time[trk] - rec_time[trk][0], pseudo_lab_ang[trk] , '.'); plt.ylabel('bar'); plt.xlabel('time (s)')
+
+# %% show valid tacks
+trid = valid_tracks[trk]
+pos_stim_ = np.where((times[trid]>pre_stim_duration) & (times[trid]<pre_stim_duration+stim_duration))[0]
+head_i = heading[trid][pos_stim_]; 
+# head_i = vxys[trid][pos_stim_]; 
+pos_i = tracks[trid][pos_stim_]
+step = 1
+x = pos_i[:, 0]
+y = pos_i[:, 1]
+dx = head_i[:, 0]
+dy = head_i[:, 1]
+plt.figure(figsize=(8, 6))
+plt.plot(x, y, '-', label='Trajectory', color='gray')
+plt.plot(x[0], y[0], 'k*')
+plt.quiver(x[::step], y[::step], dx[::step], dy[::step], #scale=10,
+           scale_units='xy', angles='xy',width=0.003, color='red', alpha=0.8, label='Heading')
+plt.xlabel('X')
+plt.ylabel('Y')
 
 # %% find front-crossing
 def find_first_pos_to_neg_crossing_circular(x, crossing_ang=0, wrap_limit=180):
@@ -448,7 +487,7 @@ def find_first_pos_to_neg_crossing_circular(x, crossing_ang=0, wrap_limit=180):
     dx = np.diff(x)
     
     # Detect where the jump is a real sign change, not a wraparound
-    valid_crossings = (x[:-1] <= crossing_ang) & (x[1:] > crossing_ang)
+    valid_crossings = (x[:-1] >= crossing_ang) & (x[1:] < crossing_ang)
     
     # Exclude wraparound boundary jumps (e.g. from ~180 to -179)
     wrap_jumps = np.abs(dx) > 2 * wrap_limit - 10  # add tolerance if noisy
@@ -457,6 +496,7 @@ def find_first_pos_to_neg_crossing_circular(x, crossing_ang=0, wrap_limit=180):
     valid_crossings &= ~wrap_jumps
 
     indices = np.where(valid_crossings)[0]
+    # indices = valid_crossings
     return indices[0] + 1 if len(indices) > 0 else None
 
 def circular_mean_std_deg(angles_deg):
@@ -493,16 +533,17 @@ reps_vec = []
 phi_vec = []
 plt.figure()
 for ii in range(len(fly_response)):
-    pos = find_first_pos_to_neg_crossing_circular(stim_angle_vector[ii],crossing_ang=-30)
-    if pos is not None and (stim_angle_vector[ii][0]>-0):# and (stim_angle_vector[ii][0]>-60):
-    # if pos is not None and (stim_angle_vector[ii][0]<-0):
+    pos = find_first_pos_to_neg_crossing_circular(stim_angle_vector[ii],crossing_ang=0)
+    # print(stim_angle_vector[ii][1])
+    if pos is not None and (stim_angle_vector[ii][0]>-45) and (stim_angle_vector[ii][0]<45):
+    # if pos is not None and (stim_angle_vector[ii][0]>-0):
     # if pos is not None:# and (np.abs(stim_angle_vector[ii][-1])<100):
-        # plt.plot(rec_time[ii][pos:] - rec_time[ii][pos] , fly_response[ii][pos:] - offset*fly_response[ii][pos],'k-', alpha=0.2)
-        plt.plot(rec_time[ii][pos:] - rec_time[ii][pos] , stim_angle_vector[ii][pos:] - offset*stim_angle_vector[ii][pos],'k-', alpha=0.2)
+        plt.plot(rec_time[ii][pos:] - rec_time[ii][pos] , fly_response[ii][pos:] - offset*fly_response[ii][pos],'k-', alpha=0.2)
+        # plt.plot(rec_time[ii][pos:] - rec_time[ii][pos] , stim_angle_vector[ii][pos:] - offset*stim_angle_vector[ii][pos],'k-', alpha=0.2)
         kk+=1
         time_vec.append( rec_time[ii][pos:] - rec_time[ii][pos] )
         reps_vec.append( fly_response[ii][pos:] - offset*fly_response[ii][pos] )
-        phi_vec.append( stim_angle_vector[ii][pos:] - offset*stim_angle_vector[ii][pos] )
+        phi_vec.append( stim_angle_vector[ii][pos-0:] - offset*stim_angle_vector[ii][pos] )
 # plt.ylim([-500, 500])
 
 time_vec = np.concatenate(time_vec)
@@ -514,7 +555,7 @@ plt.ylabel(r'd$\theta$ post crossing threshold')
 
 # %% binning
 nbins = 30
-min_samps = 10
+min_samps = 50
 t_bin = np.linspace(0, stim_duration, nbins)
 response_mean = np.zeros(nbins) + np.nan
 resposne_std = np.zeros(nbins) + np.nan

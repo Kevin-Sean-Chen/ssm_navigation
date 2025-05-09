@@ -29,8 +29,10 @@ from scipy.sparse.linalg import eigs
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-13'  ### V+O exp
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-17'  ### O or empty exp
 root_dir = r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-4-4'  ### O or empty exp
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-17'  ### wider ribbons
  
 target_file = "exp_matrix.pklz"
+exp_type = "gaussianribbon_vial"
 
 # List all subfolders in the root directory
 subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
@@ -39,7 +41,8 @@ pkl_files = []
 # Loop through each subfolder to search for the target file
 for subfolder in subfolders:
     for dirpath, dirnames, filenames in os.walk(subfolder):
-        if target_file in filenames:
+        # if target_file in filenames:
+        if target_file in filenames and exp_type in dirpath:
             full_path = os.path.join(dirpath, target_file)
             pkl_files.append(full_path)
             print(full_path)
@@ -60,6 +63,9 @@ ff = np.arange(20,40) ### ribbon
 ### 4/4
 ff = np.arange(10,20)  ### landscape
 # ff = np.arange(20,30)
+
+### 4/17
+ff = np.arange(0,25)
 
 threshold_track_l = 60 * 2*1 #2 
 times = []
@@ -127,6 +133,8 @@ for ii in range(len(tracks)):
 # %% compute projection
 speed_threshold = 5
 pos_boundary = np.where((vec_xy[:,0]<260) & (vec_xy[:,0]>15) & (vec_xy[:,1]>15) & (vec_xy[:,1]<160))[0]
+pos_boundary = np.where((vec_xy[:,0]<260) & (vec_xy[:,0]>15) & (vec_xy[:,1]>70) & (vec_xy[:,1]<130) & (vec_signal>=0))[0]
+# pos_boundary = np.where((vec_xy[:,0]<260) & (vec_xy[:,0]>15) & (vec_xy[:,1]>15) & (vec_xy[:,1]<80) & (vec_signal>1))[0]
 pos_time = np.where((vec_time<30) & (vec_speed>speed_threshold))[0]
 # pos_time = np.where((vec_time>30) & (vec_speed>speed_threshold))[0]
 pos = np.intersect1d(pos_boundary, pos_time)
@@ -140,7 +148,7 @@ vx_angs = np.abs(compute_angle(vec_vxy[pos,:]))
 
 plt.figure()
 plt.hist(vx_angs,bins=50, density=True)
-plt.xlabel('angle to x axis'); plt.ylim([0,0.013])
+plt.xlabel('angle to x axis'); plt.ylim([0,0.025])
 
 # %% make independent model
 # import numpy as np
@@ -153,31 +161,32 @@ plt.xlabel('angle to x axis'); plt.ylim([0,0.013])
 # data3 = vx_angs_combined
 
 # # Create histograms
-# bins = np.linspace(0, 180, 100)
+# bins = np.linspace(0, 180, 25)
 
 # h1, edges = np.histogram(data1, bins=bins, density=True)
-# h2, _ = np.histogram(data2, bins=bins, density=True)
-# h3, _ = np.histogram(data3, bins=bins, density=True)
+# h2, edges = np.histogram(data2, bins=bins, density=True)
+# # h3, _ = np.histogram(data3, bins=bins, density=True)
 
 # # Combine densities by summing
-# h_combined = h1 + h2
+# # h_combined = h1 + h2
 
 # # Normalize combined histogram to be a valid density
 # bin_width = edges[1] - edges[0]
-# h_combined /= np.sum(h_combined) * bin_width
+# # h_combined /= np.sum(h_combined) * bin_width
 
 # # Plotting
 # bin_centers = (edges[:-1] + edges[1:]) / 2
 
 # plt.figure(figsize=(8,5))
-# plt.plot(bin_centers, h1, label='olfaction data')
-# plt.plot(bin_centers, h2, label='vision data')
+# plt.plot(bin_centers, h1, label='odor')
+# plt.plot(bin_centers, h2, label='vsion')
 # plt.plot(bin_centers, h3, label='V+O data')
-# plt.plot(bin_centers, h_combined, label='V+O sum', linestyle='--', color='k')
+# # plt.plot(bin_centers, h1, label='middle')
+# # plt.plot(bin_centers, h_combined, label='V+O sum', linestyle='--', color='k')
 # plt.xlabel('angle to x axis')
 # plt.ylabel('Density')
 # plt.legend()
-# plt.grid(True)
+# plt.grid(True);  plt.ylim([0,0.027])
 
 # %%
 def linear_regression_two_predictors(a, b, c):
@@ -205,7 +214,7 @@ sigs = np.zeros(len(tracks))
 for ii in range(len(tracks)):
     sigs[ii] = np.nanvar(signals[ii])
 
-interesting_tracks = np.where(sigs>2000)[0] #15000
+interesting_tracks = np.where(sigs>3000)[0] #15000
 
 # %% visualize
 for ii in range(len(interesting_tracks)):

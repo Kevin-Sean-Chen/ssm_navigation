@@ -49,7 +49,7 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_r
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-20'   ### missing dv and dth
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-27'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-6' 
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-3-20'  ### jittered ribbon
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-3-20'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -196,9 +196,9 @@ ff = np.arange(38,48)
 # ff = np.arange(32,40)  ### w/o ATR +BP
 ff = np.arange(40,56) ### w/o ATR
 
-ff = np.arange(0,18)
+ff = np.arange(30,40)
 
-threshold_track_l = 60 * 2*1 #2 
+threshold_track_l = 60 * 5 #2 
 times = []
 tracks = []
 thetas = []
@@ -254,12 +254,21 @@ plt.figure()
 for ii in range(len(tracks)):
     xy_i = tracks[ii]
     time_i = times[ii]
-    # pos = np.where((times[ii]>30) & (times[ii]<90))[0]
+    pos = np.where((times[ii]>30) & (times[ii]<50))[0]
+    # pos = np.where((times[ii]>63) & (times[ii]<63+5))[0]
     # pos = np.where((times[ii]<30))[0]
-    pos = np.where((times[ii]>0))[0]
-    plt.plot(xy_i[pos,0], xy_i[pos,1],'k',alpha=.5)
+    # pos = np.where((times[ii]>0))[0]
+    # plt.plot(xy_i[pos,0], xy_i[pos,1],'k',alpha=.5)
     
-    # plt.plot(xy_i[:,0], xy_i[:,1],'k', alpha=.8)
+    if len(pos)>0:
+        diff_pos = xy_i[pos[0],0] - xy_i[pos[-1],0]
+        if diff_pos>0:
+            plt.plot(xy_i[pos,0], xy_i[pos,1],'r',alpha=.5)
+        else:
+            plt.plot(xy_i[pos,0], xy_i[pos,1],'b',alpha=.5)
+
+plt.xlabel('x (mm)'); plt.ylabel('y (mm)'); plt.title(r'example tracks ($\rightarrow$ in red, $\leftarrow$ in blue)')
+    # # plt.plot(xy_i[:,0], xy_i[:,1],'k', alpha=.8)
     # plt.scatter(xy_i[:,0],xy_i[:,1],c=time_i,cmap='coolwarm',s=.1,vmin=np.min(time_i),vmax=np.max(time_i))
     # plt.scatter(xy_i[:,0],xy_i[:,1],c=time_i,cmap='coolwarm',s=.1,vmin=np.min(vec_time),vmax=np.max(vec_time))
 
@@ -301,7 +310,7 @@ for ii in range(len(tracks)):
     speed_i = speeds[ii]
     vx_i = vxys[ii][:,0]
     # stim_i = signal[ii]
-    pos = np.where(time_i<90)[0]
+    pos = np.where(time_i<120)[0]
     # pos_v = np.where(vx_i>0)[0]
     # pos = np.intersect1d(pos, pos_v)
     # plt.plot(time_i[pos], np.abs(dtheta_i[pos]),'k', alpha=0.2)
@@ -317,7 +326,7 @@ vel_align = np.concatenate(vel_align)
 speed_align = np.concatenate(speed_align)
 
 # %%
-time_stim = np.arange(0,50,.2) ###
+time_stim = np.arange(0,123,.2) ###
 # time_stim = np.arange(0,120*2,.4)
 mean_dtheta = time_stim*0+np.nan
 mean_speed = time_stim*0+np.nan
@@ -356,3 +365,37 @@ for ii in range(len(tracks)):
 # plt.ylim([-30,30])
 # plt.xlabel('x (mm)'); plt.ylabel('vy (mm/s)')
 plt.xlabel('x (mm)'); plt.ylabel('heading (degrees from wind)')
+
+# %% time/space aligned tracks
+###############################################################################
+# %% iterate across tracks
+pre_time = 1
+for ii in range(len(tracks)):
+    xy_i = tracks[ii]
+    time_i = times[ii]
+    vxy_i = vxys[ii]
+    pos_time = np.where((time_i>25) & (time_i<30))[0]
+    # pos_time = np.where((time_i>62) & (time_i<68))[0]
+    pos_space = np.where((xy_i[:,0]>50) & (xy_i[:,0]<250) & (xy_i[:,1]>50) & (xy_i[:,1]<150))[0]
+    pos = np.intersect1d(pos_time, pos_space)
+    pos_end = np.where(np.diff(pos)>10)[0]
+    if len(pos_end)>0:
+        pos = pos[:pos_end[0]]
+    if len(pos)>0:
+        plt.figure(1)
+        plt.plot(np.abs(xy_i[pos,0] - xy_i[pos[0],0]), np.abs(xy_i[pos,1]-184) - xy_i[pos[0],1]*0, 'k', alpha=0.5); 
+        plt.xlim([0,125]); #plt.ylim([-50, 50]); 
+        plt.title(' 5s aligned tracks w/o loom'); plt.xlabel('aligned along bar direction, X (mm)'); plt.ylabel('distance to loom side, Y (mm)'); 
+        
+        plt.figure(2)
+        plt.plot(np.arange(0, len(pos))/60 - pre_time, vxy_i[pos,0], 'k', alpha=0.45)
+        plt.ylim([-35,35]); plt.ylabel(r'$V_x$ (mm/s)'); plt.xlabel('time since loom (s)')
+        x = [0, 0.5,  0.5, 0]  # x-coordinates of corners
+        y = [-35, -35, 35, 35]  # y-coordinates of corners
+
+        # Plot the gray area
+plt.figure(1)
+plt.gca().invert_yaxis()
+plt.figure(2)
+plt.fill(x, y, color='gray', alpha=0.5)
+# plt.xlim([0,300]); plt.ylim([0, 180])

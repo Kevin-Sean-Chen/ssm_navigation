@@ -8,7 +8,7 @@ Created on Fri Apr 11 00:11:24 2025
 import numpy as np
 import matplotlib.pyplot as plt
 
-def simulate_search(T=5, noise_type="none"):
+def simulate_search(T=15, noise_type="none"):
     """
     Simulate Bayesian search in 1D with different noise types.
 
@@ -23,7 +23,7 @@ def simulate_search(T=5, noise_type="none"):
 
     belief = np.ones_like(x_space) / len(x_space)  # uniform prior
 
-    # Define likelihood field
+    # # Define likelihood field
     if noise_type == "none":
         likelihood = np.exp(-(x_space - true_pos)**2 / (2*0.9**2))  # Very sharp Gaussian
     elif noise_type == "spatial":
@@ -41,22 +41,46 @@ def simulate_search(T=5, noise_type="none"):
         # Pick greedy move: go to maximum a posteriori (MAP)
         idx = np.argmax(belief)
         x_curr = x_space[idx]
+        
+        # Define likelihood field
+        if noise_type == "none":
+            sensor_likelihood = np.exp(-(x_space - true_pos)**2 / (2*0.9**2))  # Very sharp Gaussian
+        elif noise_type == "spatial":
+            sensor_likelihood = np.exp(-(x_space - true_pos)**2 / (2*5.0**2))  # Broad Gaussian
+        elif noise_type == "temporal":
+            sensor_likelihood = np.exp(-(x_space - true_pos)**2 / (2*0.9**2))  # Sharp Gaussian
+        else:
+            raise ValueError("noise_type must be 'none', 'spatial', or 'temporal'")
+
+        sensor_likelihood /= np.sum(sensor_likelihood)  # normalize properly over x
+        
 
         # Simulate observation
-        prob_detect = np.interp(x_curr, x_space, likelihood)
+        prob_detect = np.interp(x_curr, x_space, sensor_likelihood)
         
         if noise_type == "temporal":
             # Temporal noise: detection is noisy even when sitting still
-            detection_noise = 20  # not too strong now
+            detection_noise = 50  # not too strong now
             detected = np.random.rand() < (prob_detect * detection_noise)
         else:
             detected = np.random.rand() < prob_detect
 
         # Bayes update
+        # if detected:
+        #     obs_likelihood = 1-likelihood
+        # else:
+        #     obs_likelihood = likelihood
+            
+        # if detected:
+        #     obs_likelihood = likelihood
+        # else:
+        #     obs_likelihood = 1 - likelihood
+        
         if detected:
-            obs_likelihood = 1-likelihood
+            obs_likelihood = 1 - sensor_likelihood
         else:
-            obs_likelihood = likelihood
+            obs_likelihood = sensor_likelihood
+
 
         belief = belief * obs_likelihood
         belief /= np.sum(belief)
@@ -84,14 +108,14 @@ def plot_comparison(x_space, all_beliefs, true_pos, likelihood, title):
         axs[t].set_title(f"Time step {t}")
 
         if t == 0:
-            axs[t].legend(fontsize=15)
+            axs[t].legend(loc='upper left', bbox_to_anchor=(-2, 1.0), fontsize=15) #(fontsize=15)
 
     for ax in axs:
         ax.set_xticks([])
         ax.set_yticks([])
 
     plt.suptitle(title, fontsize=20)
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 0.85, 1])#tight_layout()
     plt.show()
 
 # ----------------------------------------------------------
