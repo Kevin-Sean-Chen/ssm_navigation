@@ -29,18 +29,25 @@ matplotlib.rc('xtick', labelsize=20)
 matplotlib.rc('ytick', labelsize=20)
 
 # %% data files
-files = ['D:/github/ssm_navigation/saved_data/jit_off_tracks.pkl',
-         'D:/github/ssm_navigation/saved_data/str_off_tracks.pkl',
-         'D:/github/ssm_navigation/saved_data/OU_off_tracks.pkl']
+files = ['D:/github/ssm_navigation/saved_data/jit_off_tracks3.pkl',
+         'D:/github/ssm_navigation/saved_data/str_off_tracks3.pkl',
+         'D:/github/ssm_navigation/saved_data/OU_off_tracks3.pkl']
 
+# data = {'post_xy': post_xy, 'post_vxy': post_vxy, 'track_xy': track_xy, 'track_vxy': track_vxy, 'track_signal': track_signal}
 # %% load data
 post_xys = []
 post_vxys = []
+track_vxys = []
+track_xys = []
+track_sigs = []
 for ii in range(3):
     with open(files[ii], 'rb') as f:
         data = pickle.load(f)
     post_xys.append(data['post_xy'])
     post_vxys.append(data['post_vxy'])
+    track_xys.append(data['track_xy'])
+    track_vxys.append(data['track_vxy'])
+    track_sigs.append(data['track_signal'])
 
 # %% functional
 def MSD_scaling(track_set):
@@ -247,8 +254,8 @@ bin_t = np.array([ 0.5, 1, 2, 4, 8, 16, 32])*60
 bin_x = np.arange(-150,150,20)
 density_xt = np.zeros((len(bin_t), len(bin_x)))  # space-time density since off
 
-post_xy = post_xys[1]
-xy = 1 ### x:0, y:1
+post_xy = post_xys[2]
+xy = 0 ### x:0, y:1
 for ii in range(len(post_xy)):
     track_i = post_xy[ii]
     ## exclude boundary touching!!! ####
@@ -298,85 +305,177 @@ plt.xlabel("y")
 plt.ylabel("P(y|t)")
 plt.show()
 
+# %% return analysis
+time_window = 15*60
+time_winds = np.array([1,5,10,15,20,25,30])*60
+space_scale = 25*1.5 
+p_return = np.zeros((3, len(time_winds)))
+
+
+for tt in range(len(time_winds)):
+    time_window = time_winds[tt]
+    for ii in range(3):
+        n_back, n_tracks = 0,0
+        post_xy = post_xys[ii]
+        
+        for jj in range(len(post_xy)):
+            track_i = post_xy[jj]
+            #### exclude boundary touching!!! ####
+            pos_boundary = np.where((track_i[:,0]<260) & (track_i[:,0]>15) & (track_i[:,1]>15) & (track_i[:,1]<160))[0]
+            # track_i = track_i[pos_boundary,:]
+            pos_boundary = np.where((track_i[:,0]<270) & (track_i[:,0]>15) & (track_i[:,1]>10) & (track_i[:,1]<170))[0] 
+            pos_boundary = np.where((track_i[:,0]<275) & (track_i[:,0]>5) & (track_i[:,1]>10) & (track_i[:,1]<175))[0]  #### checking this!!! #####
+            pos_out = np.where((track_i[:,0]>275) | (track_i[:,0]<5) | (track_i[:,1]<10) | (track_i[:,1]>175))[0]  #### checking this!!! #####
+            
+            ### removal
+            if len(pos_out)>0:
+                track_i = track_i[:pos_out[0],:]
+            else:
+                track_i = track_i[pos_boundary,:]
+            
+            
+            if len(track_i)>time_window:
+                xy_final = track_i[time_window,:]
+                dists = np.linalg.norm(track_i - xy_final, axis=1)
+                exit_check = np.where(dists>space_scale)[0]  ### have to exit
+                if True: #len(exit_check)>0:
+                    n_tracks += 1
+                    if np.linalg.norm( track_i[0,:] - xy_final ) < space_scale:
+                        n_back += 1
+        
+        p_return[ii, tt] = n_back/n_tracks
+        # print(n_tracks)
+
+plt.figure()
+plt.plot(time_winds/60, p_return.T)
+plt.xlabel('time since last event (s)'); plt.ylabel('P(remain close)')
+
 
 # %%
 ###############################################################################
-# %% actions
-spd_bin = np.linspace(0, 30, 50)
-process_post = []
-process_pre = []
-window = 10*60
-for ii in range(len(post_vxy)):
-    if len(post_vxy[ii])<window:
-        process_post.append(post_vxy[ii])
-    else:
-        process_post.append(post_vxy[ii][:window, :])
-for ii in range(len(pre_vxy)):
-    process_pre.append(pre_vxy[ii])
+# %% functional
+def mean_dwell_time(binary_vector, value=1):
+    binary_vector = np.asarray(binary_vector)
+    # Find changes
+    changes = np.diff(binary_vector.astype(int))
+    # Start and end indices of dwell periods
+    starts = np.where(changes == 1)[0] + 1 if value == 1 else np.where(changes == -1)[0] + 1
+    ends = np.where(changes == -1)[0] + 1 if value == 1 else np.where(changes == 1)[0] + 1
+
+    # Handle case where it starts with value
+    if len(binary_vector)>2:
+        if binary_vector[0] == value:
+            starts = np.insert(starts, 0, 0)
+        # Handle case where it ends with value
+        if binary_vector[-1] == value:
+            ends = np.append(ends, len(binary_vector))
     
-post_action = np.concatenate(process_post)#[:,0]
-post_action = np.sum(post_action**2,1)**0.5
-pre_action = np.concatenate(process_pre)#[:,0]
-pre_action = np.sum(pre_action**2,1)**0.5
+        dwell_times = ends - starts
+        return np.mean(dwell_times) if len(dwell_times) > 0 else 0
+    else:
+        return np.nan
+
+def x_persistence(track_xy):
+    """
+    Compute a scalar measure of persistence along the x-axis.
+
+    Parameters:
+        track_xy: (T, 2) array of [x, y] positions over time
+
+    Returns:
+        persistence: float — higher means more persistence along x
+    """
+    if len(track_xy)>0:
+        track_xy = np.asarray(track_xy)
+        x = track_xy[:, 0]
+        y = track_xy[:, 1]
+    
+        dx = np.abs(x[-1] - x[0])  # end-to-end distance along x
+        y_var = np.mean((y - np.mean(y))**2)  # mean square y fluctuation
+    
+        if y_var == 0:
+            return np.inf  # perfectly straight
+        else:
+            return dx / np.sqrt(y_var)
+    else:
+        return np.nan
+    
+def tortuosity(track):
+    """
+    Compute tortuosity of a trajectory.
+    
+    Parameters:
+        track: (T, 2) or (T, 3) numpy array of positions over time
+
+    Returns:
+        tortuosity: float (>= 1), higher = more winding path
+    """
+    if len(track)>0:
+        track = np.asarray(track)
+        displacement = np.linalg.norm(track[-1] - track[0])
+        segment_lengths = np.linalg.norm(np.diff(track, axis=0), axis=1)
+        path_length = np.sum(segment_lengths)
+        
+        if displacement == 0:
+            return np.inf  # completely closed or stationary
+        return path_length / displacement
+    else:
+        return np.nan
+    
+# %% relating pre to post
+data_id = 2
+odor_threshold = 50
+window = 10*60
+search, signal = [], []
+
+# plt.figure()
+# for kk in range(3):
+#     data_id = kk*1
+#     plt.subplot([1,3,kk])
+for ii in range(len(post_xys[data_id])):
+    track_i = post_xys[data_id][ii]
+    track_v = post_vxys[data_id][ii]
+    sig_i = track_sigs[data_id][ii]
+    pre_vxy_i = track_vxys[data_id][ii]
+    pre_xy_i = track_xys[data_id][ii]
+    
+    ## exclude boundary touching!!! ####
+    # pos_boundary = np.where((track_i[:,0]<275) & (track_i[:,0]>5) & (track_i[:,1]>10) & (track_i[:,1]<175))[0]  #### checking this!!! #####
+    # pos_out = np.where((track_i[:,0]>275) | (track_i[:,0]<5) | (track_i[:,1]<10) | (track_i[:,1]>175))[0]  #### checking this!!! #####
+    # if len(pos_out)>0:
+    #     track_i = track_i[:pos_out[0],:]
+    # else:
+    #     track_i = track_i[pos_boundary,:]
+        
+    ### process signal
+    sig_ii = np.zeros_like(sig_i)
+    sig_ii[sig_i<odor_threshold] = 0
+    sig_ii[sig_i>0] = 1
+    diff = np.diff(sig_ii)
+    n_events = len(np.where(diff>0)[0]) + 1
+    
+    ### process tracks
+    
+    
+    ### simple measurements
+    # search.append(np.mean(np.sum(track_v[:window, :]**2,1))**0.5)  ### speed
+    # search.append(np.mean(track_v[:window, 0]**2)**.5)  ### along one direction
+    search.append(tortuosity(track_i[:window, :]))
+    
+    # signal.append(mean_dwell_time(sig_ii)/60)  ### dwell time
+    # signal.append(np.sum(sig_i)/1)  ### sum odor
+    # signal.append(np.mean(np.sum(pre_vxy_i[-window:, :]**2,1)**0.5* 1))  ### prior speed
+    # signal.append(np.mean(pre_vxy_i[-window:, 1]**2)**0.5)
+    signal.append(n_events)  ### number of events
+    # signal.append(np.sum(sig_ii)/60)  ### time in odor
+    # signal.append(np.mean(pre_xy_i[:,1]))  ### prior location
+    # signal.append(tortuosity(pre_xy_i))
+    
+    
 plt.figure()
-plt.hist(post_action, bins=spd_bin, density=True, alpha=0.7, color='skyblue', edgecolor='black')
-plt.hist(pre_action, bins=spd_bin, density=True, alpha=0.7, color='r', edgecolor='black')
-
-full_action = np.sum(vec_vxy**2,1)**0.5
-# plt.hist(full_action, bins=spd_bin, density=True, alpha=0.5, color='k', edgecolor='black')
-plt.xlim([-.5, 20]); plt.ylim([0,0.9])
-
-# %% MSD analysis!
-
-# sortt_id = np.array(sortt_id, dtype=int)
-# track_set = post_xy[sortt_id[:len(sortt_id)//2]]  ## compare sorted
-# track_set = [post_xy[i] for i in sortt_id[:len(sortt_id)//1]]
-track_set = post_xys[2]
-# track_set = [post_xy[i] for i in sortt_id[len(sortt_id)//3:-len(sortt_id)//3]]
-# track_set = [post_xy[i] for i in sortt_id[-len(sortt_id)//3:]]
-max_lag = max(len(track) for track in track_set)
-# max_lag = int(10*1/(1/60))
-# Initialize arrays for MSD and counts
-msd = np.zeros(max_lag)
-counts = np.zeros(max_lag)
-msd_std = msd*0
-
-# Compute MSD
-for track in track_set:
-    n_points = len(track)//2 ### truncation here
-    for lag in range(1, n_points):
-        displacements = track[lag:,:] - track[:-lag,:]  # Displacements for this lag
-        squared_displacement = np.sum(displacements**2)#, axis=1)  # (dx^2 + dy^2)
-        ##############################################################3 TRY <X^2> vs. <R^2>!!!
-        msd[lag] += np.sum(squared_displacement)  # Sum displacements
-        counts[lag] += len(displacements)  # Count valid pairs
-        msd_std[lag] += np.sum(squared_displacement**2)
-# Normalize to get the average MSD for each lag
-
-# %%
-msd_mean = msd / counts
-variance_msd = (msd_std / counts) - (msd_mean**2)
-sem_msd = np.sqrt(variance_msd) / counts**0.5 * 1
-lag_times = np.arange(max_lag)*1/60  # Lag times
-
-# %%
-# Plot MSD
-plt.figure(figsize=(8, 6))
-plt.plot(lag_times, msd_mean, marker='o', linestyle='-', color='r', label='fluc')
-# plt.loglog(lag_times_mid, msd_mean_mid, marker='o', linestyle='-.', color='r', label='middle')
-# plt.loglog(lag_times_last, msd_mean_last, marker='o', linestyle='--', color='b', label='short')
-# plt.loglog(lag_times, lag_times**2 + msd_mean[1], marker='o', linestyle='-', color='g')
-# plt.fill_between(
-#     lag_times,
-#     msd_mean - sem_msd,  # Lower bound of shaded region
-#     msd_mean + sem_msd,  # Upper bound of shaded region
-#     color='red',
-#     alpha=0.5,)
-#     # label='1 Std Dev')
-plt.xlabel("lag time (s)")
-plt.ylabel(r"MSD (mm$^2$)")
-plt.title("MSD scaling")
-plt.grid(True)
-# plt.xlim([0,90]); plt.ylim([0.001, 20000])
-# plt.show()
-plt.legend()
+plt.plot(signal, search, '.')
+# plt.xlabel('pre mean speed'); plt.ylabel('post mean speed')
+# plt.xlabel('total time in odor (s)'); plt.ylabel('post mean speed')
+# plt.xlabel('mean location in y during tracking (mm)'); plt.ylabel('post mean speed')
+# plt.xlabel('mean location in y during tracking (mm)'); plt.ylabel('post mean speed'); 
+plt.xlabel('odor encount'); plt.ylabel('tortuosity'); plt.yscale('log'); #plt.xscale('log'); 

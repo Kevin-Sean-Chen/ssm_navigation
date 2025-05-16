@@ -160,6 +160,9 @@ odor_feature = []
 post_vxy = []
 post_xy = []
 pre_vxy = []
+
+track_xy, track_vxy, track_signal = [], [], []
+
 for nn in range(len(data4fit)):
     time_i = times[nn]
     signal_i = rec_signal[nn]
@@ -199,25 +202,36 @@ for nn in range(len(data4fit)):
         ### collect pre-off velocity
         if pos>pre_los:
             pre_vxy.append(vxy_i[pos-pre_los:pos,:])
+            
+        ### recording what happens DURING stimulus encounter
+        pos = np.where(signal_i>0)[0]
+        track_xy.append(xy_i[pos[0]:pos[-1],:])
+        track_vxy.append(vxy_i[pos[0]:pos[-1],:])
+        track_signal.append(signal_i[pos[0]:pos[-1]])
         
 # %% sorted plots
 dispy = 3
 offset = 1
+disp_every = 1
 post_window = 30*60
 
 sortt_id = np.argsort(odor_feature)[::-1]
+sortt_id = np.where(np.array(odor_feature)>3)[0] #### tracking condition ####
+
 import matplotlib.cm as cm
 colors = cm.viridis(np.linspace(0, 1, len(sortt_id)))
 
 plt.figure()
-for kk in range(0,len(sortt_id),1):
+cc = 0
+for kk in range(0,len(sortt_id),disp_every):
     ### plot tracks
     traji = post_xy[sortt_id[kk]]
     if len(traji)<post_window:
-        plt.plot(traji[:,0] - traji[0,0]*offset, kk*dispy + traji[0:,1]-traji[0,1]*offset, color=colors[kk])
+        plt.plot(traji[:,0] - traji[0,0]*offset, cc*dispy + traji[0:,1]-traji[0,1]*offset, color=colors[kk])
     else:
-        plt.plot(traji[:post_window,0] - traji[0,0]*offset, kk*dispy + traji[:post_window,1]-traji[0,1]*offset, color=colors[kk])
-    plt.plot(traji[0,0]  - traji[0,0]*offset, kk*dispy +traji[0,1]-traji[0,1]*offset,'r.', markersize=2)
+        plt.plot(traji[:post_window,0] - traji[0,0]*offset, cc*dispy + traji[:post_window,1]-traji[0,1]*offset, color=colors[kk])
+    plt.plot(traji[0,0]  - traji[0,0]*offset, cc*dispy +traji[0,1]-traji[0,1]*offset,'r.', markersize=2)
+    cc += 1
     
     ### plot dots
     # traji = post_xy[sortt_id[kk]][:post_window,:]
@@ -308,7 +322,7 @@ plt.grid(True)
 plt.legend()
 
 # %% saving off tracks
-# data = {'post_xy': post_xy, 'post_vxy': post_vxy}
+# data = {'post_xy': post_xy, 'post_vxy': post_vxy, 'track_xy': track_xy, 'track_vxy': track_vxy, 'track_signal': track_signal}
 
-# with open('jit_off_tracks.pkl', 'wb') as f:
+# with open('OU_off_tracks3.pkl', 'wb') as f:
 #     pickle.dump(data, f)
