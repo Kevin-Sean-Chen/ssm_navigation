@@ -50,6 +50,10 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_r
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-27'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-6' 
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-3-20'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-5-5' ### loom + ribbon
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-4-11'  ### visual loom
+
+exp_type = 'screen_blue'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -59,7 +63,8 @@ pkl_files = []
 # Loop through each subfolder to search for the target file
 for subfolder in subfolders:
     for dirpath, dirnames, filenames in os.walk(subfolder):
-        if target_file in filenames:
+        # if target_file in filenames:
+        if target_file in filenames and exp_type in dirpath:
             full_path = os.path.join(dirpath, target_file)
             pkl_files.append(full_path)
             print(full_path)
@@ -196,9 +201,13 @@ ff = np.arange(38,48)
 # ff = np.arange(32,40)  ### w/o ATR +BP
 ff = np.arange(40,56) ### w/o ATR
 
-ff = np.arange(30,40)
+ff = np.arange(30,40)  ### loom with bars
+ff = np.arange(20,30) ### fast looms
 
-threshold_track_l = 60 * 5 #2 
+ff = np.arange(0, len(pkl_files))  ### if all
+ff= np.arange(0,17)
+
+threshold_track_l = 60 * 5#5 #2 
 times = []
 tracks = []
 thetas = []
@@ -254,20 +263,20 @@ plt.figure()
 for ii in range(len(tracks)):
     xy_i = tracks[ii]
     time_i = times[ii]
-    pos = np.where((times[ii]>30) & (times[ii]<50))[0]
+    # pos = np.where((times[ii]>30) & (times[ii]<50))[0]
     # pos = np.where((times[ii]>63) & (times[ii]<63+5))[0]
-    # pos = np.where((times[ii]<30))[0]
+    pos = np.where((times[ii]<15))[0]
     # pos = np.where((times[ii]>0))[0]
-    # plt.plot(xy_i[pos,0], xy_i[pos,1],'k',alpha=.5)
+    plt.plot(xy_i[pos,0], xy_i[pos,1],'k',alpha=.5)
     
-    if len(pos)>0:
-        diff_pos = xy_i[pos[0],0] - xy_i[pos[-1],0]
-        if diff_pos>0:
-            plt.plot(xy_i[pos,0], xy_i[pos,1],'r',alpha=.5)
-        else:
-            plt.plot(xy_i[pos,0], xy_i[pos,1],'b',alpha=.5)
+#     if len(pos)>0:
+#         diff_pos = xy_i[pos[0],0] - xy_i[pos[-1],0]
+#         if diff_pos>0:
+#             plt.plot(xy_i[pos,0], xy_i[pos,1],'r',alpha=.5)
+#         else:
+#             plt.plot(xy_i[pos,0], xy_i[pos,1],'b',alpha=.5)
 
-plt.xlabel('x (mm)'); plt.ylabel('y (mm)'); plt.title(r'example tracks ($\rightarrow$ in red, $\leftarrow$ in blue)')
+# plt.xlabel('x (mm)'); plt.ylabel('y (mm)'); plt.title(r'example tracks ($\rightarrow$ in red, $\leftarrow$ in blue)')
     # # plt.plot(xy_i[:,0], xy_i[:,1],'k', alpha=.8)
     # plt.scatter(xy_i[:,0],xy_i[:,1],c=time_i,cmap='coolwarm',s=.1,vmin=np.min(time_i),vmax=np.max(time_i))
     # plt.scatter(xy_i[:,0],xy_i[:,1],c=time_i,cmap='coolwarm',s=.1,vmin=np.min(vec_time),vmax=np.max(vec_time))
@@ -310,7 +319,7 @@ for ii in range(len(tracks)):
     speed_i = speeds[ii]
     vx_i = vxys[ii][:,0]
     # stim_i = signal[ii]
-    pos = np.where(time_i<120)[0]
+    pos = np.where(time_i<30)[0]
     # pos_v = np.where(vx_i>0)[0]
     # pos = np.intersect1d(pos, pos_v)
     # plt.plot(time_i[pos], np.abs(dtheta_i[pos]),'k', alpha=0.2)
@@ -327,6 +336,7 @@ speed_align = np.concatenate(speed_align)
 
 # %%
 time_stim = np.arange(0,123,.2) ###
+time_stim = np.arange(0,30,.2) ###
 # time_stim = np.arange(0,120*2,.4)
 mean_dtheta = time_stim*0+np.nan
 mean_speed = time_stim*0+np.nan
@@ -369,7 +379,7 @@ plt.xlabel('x (mm)'); plt.ylabel('heading (degrees from wind)')
 # %% time/space aligned tracks
 ###############################################################################
 # %% iterate across tracks
-pre_time = 2
+pre_time = 10 ### 3,2
 stop_threshold = 5
 not_stop = 5
 max_jump = 10
@@ -381,6 +391,8 @@ for ii in range(len(tracks)):
     speed_i = speeds[ii]
     pos_time = np.where((time_i>25) & (time_i<30))[0]  ### condition in time
     pos_time = np.where((time_i>63-pre_time) & (time_i<68))[0]
+    pos_time = np.where((time_i>16-pre_time) & (time_i<28))[0]
+    # pos_time = np.where((time_i>0))[0]   ### for just loom
     pos_space = np.where((xy_i[:,0]>50) & (xy_i[:,0]<250) & (xy_i[:,1]>50) & (xy_i[:,1]<150))[0]  ### condition in space
     
     pos = pos_time*1 #np.intersect1d(pos_time, pos_space)
@@ -398,7 +410,7 @@ for ii in range(len(tracks)):
         plt.figure(2)
         plt.plot(np.arange(0, len(pos))/60 - pre_time, vxy_i[pos,0], 'k', alpha=0.45)
         # plt.plot(np.arange(0, len(pos))/60 - pre_time, speed_i[pos], 'k', alpha=0.45)
-        plt.ylim([-35,35]); plt.ylabel(r'$V_x$ (mm/s)'); plt.xlabel('time since loom (s)')
+        plt.ylim([-50,50]); plt.ylabel(r'$V_x$ (mm/s)'); plt.xlabel('time since loom (s)')
         x = [0, 0.5,  0.5, 0]  # x-coordinates of corners
         y = [-35, -35, 35, 35]  # y-coordinates of corners
         
@@ -429,8 +441,8 @@ std_speed = np.zeros(nbins)
 for ii in range(1,nbins):
     pos = np.where((time_all>bt[ii-1]) & (time_all<bt[ii]))[0]
     if len(pos)>0:
-        # mean_speed[ii-1] = np.mean(stop_all[pos])
-        # std_speed[ii-1] = np.std(stop_all[pos])/len(pos)**0.5
+        mean_speed[ii-1] = np.mean(stop_all[pos])
+        std_speed[ii-1] = np.std(stop_all[pos])/len(pos)**0.5
         mean_speed[ii-1] = np.mean(speed_all[pos])
         std_speed[ii-1] = np.std(speed_all[pos])/len(pos)**0.5
 
@@ -440,12 +452,12 @@ plt.figure()
 plt.plot(tt, mean)
 plt.fill_between(tt, mean - error, mean + error, color='blue', alpha=0.3, label='± Error')
 plt.fill(x, y, color='gray', alpha=0.5)
-# plt.ylim([0,1]); plt.xlabel('time since loom (s)'); plt.ylabel('P(stop)')
-plt.xlabel('time since loom (s)'); plt.ylabel('speed (mm/s)'); plt.ylim([5,15])
+plt.ylim([0,1]); plt.xlabel('time since loom (s)'); plt.ylabel('P(stop)')
+plt.xlabel('time since loom (s)'); plt.ylabel('speed (mm/s)'); plt.ylim([2, 18])
 
 # %% turning rate
-pre_time = 5
-not_stop = 10
+pre_time = 10 ## 5,3
+not_stop = 4 #10
 max_jump = 10
 time_all, turn_all = [], []
 
@@ -458,6 +470,8 @@ for ii in range(len(tracks)):
     theta_i = thetas[ii]
     # pos_time = np.where((time_i>25) & (time_i<30))[0]  ### condition in time
     pos_time = np.where((time_i>63-pre_time) & (time_i<69))[0]
+    pos_time = np.where((time_i>16.-pre_time) & (time_i<28))[0]
+    # pos_time = np.where((time_i>0))[0]   ### for just loom
     pos_space = np.where((xy_i[:,0]>50) & (xy_i[:,0]<250) & (xy_i[:,1]>50) & (xy_i[:,1]<150))[0]  ### condition in space
     
     pos = pos_time*1 #np.intersect1d(pos_time, pos_space)
@@ -476,23 +490,23 @@ time_all = np.concatenate(time_all)
 turn_all = np.concatenate(turn_all)
 
 # %%
-nbins = 60
+nbins = 90
 at,bt = np.histogram(time_all, nbins)
 mean_speed = np.zeros(nbins)
 std_speed = np.zeros(nbins)
 for ii in range(1,nbins):
     pos = np.where((time_all>bt[ii-1]) & (time_all<bt[ii]))[0]
     if len(pos)>0:
-        # mean_speed[ii-1] = np.nanmean(np.abs(turn_all[pos]))
-        mean_speed[ii-1] = np.nanmean(turn_all[pos])
+        mean_speed[ii-1] = np.nanmean(np.abs(turn_all[pos]))
+        # mean_speed[ii-1] = np.nanmean(turn_all[pos])
         std_speed[ii-1] = np.nanstd(turn_all[pos])/len(pos)**0.5
 
-tt, mean, error = bt[:-2] - bt[0] - pre_time, mean_speed[:-1], std_speed[:-1]
+tt, mean, error = bt[:-2] - bt[0] - pre_time*1, mean_speed[:-1], std_speed[:-1]
 plt.figure()
 # plt.plot(bt[:-2], mean_speed[:-1], '-o')
 plt.plot(tt, mean)
 plt.fill_between(tt, mean - error, mean + error, color='blue', alpha=0.3, label='± Error')
-# x = [0, 0.5,  0.5, 0]  # x-coordinates of corners
-# y = [20, 20, 55, 55]  # y-coordinates of corners
-# plt.fill(x, y, color='gray', alpha=0.5); plt.ylim([20,55])
-# plt.xlabel('time since loom (s)'); plt.ylabel('|turning| (|deg|/s)'); #plt.ylim([5,15])
+x = [0, 0.5,  0.5, 0]  # x-coordinates of corners
+y = [20, 20, 90, 90]  # y-coordinates of corners
+plt.fill(x, y, color='gray', alpha=0.5); #plt.ylim([20,70])
+plt.xlabel('time since loom (s)'); plt.ylabel('|turning| (|deg|/s)'); #plt.ylim([5,15])
