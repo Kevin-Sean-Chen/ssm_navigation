@@ -39,8 +39,8 @@ threshold_track_l = 60 * 20  # 20 # look at long-enough tracks
 #     print(file)
 
 # %% for perturbed data
-# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'
-root_dir = 'C:/Users/kevin/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'
+root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'
+# root_dir = 'C:/Users/kevin/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory

@@ -29,7 +29,8 @@ def load_avi_as_array(filepath):
 
 avi_file = r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/vidual_stim/2025-5-13/screen_projector_calibration 10mm 60s LED255 screen_blue4_0/frames.avi'
 avi_file = r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/vidual_stim/2025-5-13/screen_projector_calibration full_field_flash_5 _15s_proj_15s_screen/frames.avi'
-
+avi_file = r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/vidual_stim/screen_projector_calibration full_screen_flash_15/frames.avi'
+avi_file = r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/vidual_stim/screen_projector_calibration full_screen_flash_16/frames.avi'
 v_array = load_avi_as_array(avi_file)
 # video = iio.imread(avi_file)  # shape: (T, H, W) or (T, H, W, C)
 
