@@ -50,10 +50,11 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_r
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-27'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-6' 
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-3-20'
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-5-5' ### loom + ribbon
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-4-11'  ### visual loom
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-5-5' ### loom + ribbon
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-4-11'  ### visual loom + bar
 
-exp_type = 'screen_blue'
+exp_type = ['05s']
+exclude_keywords = ['bars']
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -64,7 +65,11 @@ pkl_files = []
 for subfolder in subfolders:
     for dirpath, dirnames, filenames in os.walk(subfolder):
         # if target_file in filenames:
-        if target_file in filenames and exp_type in dirpath:
+        # if target_file in filenames and exp_type in dirpath:
+        if (target_file in filenames and
+            any(kw in dirpath for kw in exp_type) and
+            not any(kw in dirpath for kw in exclude_keywords)):
+            
             full_path = os.path.join(dirpath, target_file)
             pkl_files.append(full_path)
             print(full_path)
@@ -205,9 +210,9 @@ ff = np.arange(30,40)  ### loom with bars
 ff = np.arange(20,30) ### fast looms
 
 ff = np.arange(0, len(pkl_files))  ### if all
-ff= np.arange(0,17)
+# ff= np.arange(0,17)
 
-threshold_track_l = 60 * 5#5 #2 
+threshold_track_l = 60 * 1#5 #2 
 times = []
 tracks = []
 thetas = []
@@ -233,7 +238,7 @@ for ii in range(len(ff)):
                 
                 ### make per track data
                 theta = data['dtheta_smooth'][pos]
-                # theta = data['theta'][pos]
+                theta = data['theta_smooth'][pos]
                 temp_v = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]))
                 temp_x = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
                 times.append(data['t'][pos])
@@ -257,6 +262,7 @@ vec_ids = np.concatenate(track_id)  # track ID
 vec_theta = np.concatenate(thetas)  # theta
 # vec_signal = np.concatenate(signal)  # odor signal
 vec_msd_x = np.concatenate(msd_x)
+vec_speed = np.concatenate(speeds)
 
 # %% plot tracks
 plt.figure()
@@ -265,7 +271,7 @@ for ii in range(len(tracks)):
     time_i = times[ii]
     # pos = np.where((times[ii]>30) & (times[ii]<50))[0]
     # pos = np.where((times[ii]>63) & (times[ii]<63+5))[0]
-    pos = np.where((times[ii]<15))[0]
+    pos = np.where((times[ii]<126))[0]
     # pos = np.where((times[ii]>0))[0]
     plt.plot(xy_i[pos,0], xy_i[pos,1],'k',alpha=.5)
     
@@ -319,7 +325,7 @@ for ii in range(len(tracks)):
     speed_i = speeds[ii]
     vx_i = vxys[ii][:,0]
     # stim_i = signal[ii]
-    pos = np.where(time_i<30)[0]
+    pos = np.where(time_i>0)[0]
     # pos_v = np.where(vx_i>0)[0]
     # pos = np.intersect1d(pos, pos_v)
     # plt.plot(time_i[pos], np.abs(dtheta_i[pos]),'k', alpha=0.2)
@@ -336,7 +342,7 @@ speed_align = np.concatenate(speed_align)
 
 # %%
 time_stim = np.arange(0,123,.2) ###
-time_stim = np.arange(0,30,.2) ###
+# time_stim = np.arange(0,30,.2) ###
 # time_stim = np.arange(0,120*2,.4)
 mean_dtheta = time_stim*0+np.nan
 mean_speed = time_stim*0+np.nan
@@ -348,11 +354,11 @@ for tt in range(len(time_stim)-1):
 plt.figure()
 plt.plot(time_stim, mean_dtheta)
 plt.xlabel('time (s)'); plt.ylabel('|degree|/s'); 
-plt.ylim([25, 90])
+# plt.ylim([25, 90])
 plt.figure()
 plt.plot(time_stim, mean_speed)
 plt.xlabel('time (s)'); plt.ylabel('speed (mm/s)'); 
-plt.ylim([3, 11])
+# plt.ylim([3, 11])
 
 # %%
 ###############################################################################
@@ -390,12 +396,12 @@ for ii in range(len(tracks)):
     vxy_i = vxys[ii]
     speed_i = speeds[ii]
     pos_time = np.where((time_i>25) & (time_i<30))[0]  ### condition in time
-    pos_time = np.where((time_i>63-pre_time) & (time_i<68))[0]
-    pos_time = np.where((time_i>16-pre_time) & (time_i<28))[0]
+    pos_time = np.where((time_i>63-pre_time) & (time_i<73))[0]
+    pos_time = np.where((time_i>13-pre_time) & (time_i<28))[0]
     # pos_time = np.where((time_i>0))[0]   ### for just loom
     pos_space = np.where((xy_i[:,0]>50) & (xy_i[:,0]<250) & (xy_i[:,1]>50) & (xy_i[:,1]<150))[0]  ### condition in space
     
-    pos = pos_time*1 #np.intersect1d(pos_time, pos_space)
+    pos = np.intersect1d(pos_time, pos_space)
     pos_end = np.where(np.diff(pos)>max_jump)[0]
     
     if len(pos_end)>0:
@@ -455,12 +461,51 @@ plt.fill(x, y, color='gray', alpha=0.5)
 plt.ylim([0,1]); plt.xlabel('time since loom (s)'); plt.ylabel('P(stop)')
 plt.xlabel('time since loom (s)'); plt.ylabel('speed (mm/s)'); plt.ylim([2, 18])
 
+# %% angular functions
+def circular_mean_deg(angles_deg):
+    # angles_rad = np.deg2rad(angles_deg)
+    # mean_angle_rad = np.arctan2(np.nanmean(np.sin(angles_rad)), np.nanmean(np.cos(angles_rad)))
+    # mean_angle_deg = np.rad2deg(mean_angle_rad - 0) % 360
+    # return mean_angle_deg
+    angles_deg = np.asarray(angles_deg)
+    angles_rad = np.deg2rad(angles_deg)
+
+    sin_mean = np.nanmean(np.sin(angles_rad))
+    cos_mean = np.nanmean(np.cos(angles_rad))
+
+    mean_angle_rad = np.arctan2(sin_mean, cos_mean)
+    mean_angle_deg = np.rad2deg(mean_angle_rad) % 360
+
+    R = np.hypot(sin_mean, cos_mean)  # mean resultant length (vector strength)
+    std_angle_rad = np.sqrt(-2 * np.log(R)) if R > 0 else np.nan
+    std_angle_deg = np.rad2deg(std_angle_rad)
+
+    return mean_angle_deg, std_angle_deg
+
+def circular_mean_deg_complex(angles_deg):
+    angles_rad = np.deg2rad(angles_deg)
+    vectors = np.exp(1j * angles_rad)
+    mean_vector = np.nanmean(vectors)
+    mean_angle_rad = np.angle(mean_vector)
+    mean_angle_deg = np.rad2deg(mean_angle_rad - 0) % 360
+    return mean_angle_deg
+
+def unwrap_angles_deg(angles_deg):
+    angles_rad = np.deg2rad(angles_deg)
+    unwrapped_rad = np.unwrap(angles_rad)
+    unwrapped_deg = np.rad2deg(unwrapped_rad)
+    return unwrapped_deg
+
 # %% turning rate
-pre_time = 10 ## 5,3
-not_stop = 4 #10
+pre_time = 5 ## 5,3
+post_time = 10
+not_stop = 0 #5
 max_jump = 10
 time_all, turn_all = [], []
+hist_window = 5
+time_time_point = 63
 
+cnt = 0
 plt.figure()
 for ii in range(len(tracks)):
     xy_i = tracks[ii]
@@ -469,44 +514,68 @@ for ii in range(len(tracks)):
     speed_i = speeds[ii]
     theta_i = thetas[ii]
     # pos_time = np.where((time_i>25) & (time_i<30))[0]  ### condition in time
-    pos_time = np.where((time_i>63-pre_time) & (time_i<69))[0]
-    pos_time = np.where((time_i>16.-pre_time) & (time_i<28))[0]
+    pos_time = np.where((time_i>time_time_point - pre_time) & (time_i<time_time_point+post_time))[0]
+    pos_time = np.where((time_i>13.-pre_time) & (time_i<26))[0]
     # pos_time = np.where((time_i>0))[0]   ### for just loom
     pos_space = np.where((xy_i[:,0]>50) & (xy_i[:,0]<250) & (xy_i[:,1]>50) & (xy_i[:,1]<150))[0]  ### condition in space
+    # pos_space = np.where((xy_i[:,0]>70) & (xy_i[:,0]<230) & (xy_i[:,1]>70) & (xy_i[:,1]<130))[0]  ### condition in space
     
-    pos = pos_time*1 #np.intersect1d(pos_time, pos_space)
+    pos = np.intersect1d(pos_time, pos_space)
     pos_end = np.where(np.diff(pos)>max_jump)[0]
+    pos_pre = np.where((time_i>time_time_point-hist_window) & (time_i<time_time_point))[0]
     
     if len(pos_end)>0:
         pos = pos[:pos_end[0]]
-    if len(pos)>0 and np.mean(vxy_i[pos,0])<0 and np.nanmean(speed_i[pos])>not_stop: #xy_i[pos[0],0] < xy_i[pos[-1],0] 
-            plt.plot(np.arange(0, len(pos))/60 - pre_time, theta_i[pos], 'k', alpha=0.1)
-            # plt.ylim([-35,35]); plt.ylabel(r'$V_x$ (mm/s)'); plt.xlabel('time since loom (s)')
-            
-            time_all.append(time_i[pos])
-            turn_all.append(theta_i[pos])
+    if len(pos)>0 and np.nanmean(speed_i[pos])>not_stop:# and len(pos_pre)>0: #xy_i[pos[0],0] < xy_i[pos[-1],0] 
+        direction = xy_i[pos[0],0] - xy_i[pos[-1],0] #np.mean(vxy_i[pos,0])
+        if direction > 0:
+                time_vec = np.arange(0, len(pos))/60 - pre_time
+                theta_vec = (theta_i[pos])
+                plt.plot(time_vec, theta_vec, 'k', alpha=0.1)
+                # plt.ylim([-35,35]); plt.ylabel(r'$V_x$ (mm/s)'); plt.xlabel('time since loom (s)')
+                
+                time_all.append(time_i[pos])
+                turn_all.append(theta_i[pos] - 180 - 0)#*circular_mean_deg_complex(theta_i[pos_pre])) #0*np.nanmean(theta_i[pos]))
+                cnt += 1
+        
+        ### flipping to align
+        if direction < 0:
+                time_vec = np.arange(0, len(pos))/60 - pre_time
+                theta_vec = (-theta_i[pos] - 0)
+                plt.plot(time_vec, theta_vec, 'k', alpha=0.1)
+                time_all.append(time_i[pos])
+                turn_all.append( (theta_vec - 0))#*circular_mean_deg_complex(-theta_i[pos_pre]-180)) )
+                
+                cnt+=1
 
 time_all = np.concatenate(time_all)
 turn_all = np.concatenate(turn_all)
+print(cnt)
 
 # %%
-nbins = 90
+nbins = 70#60*2
 at,bt = np.histogram(time_all, nbins)
 mean_speed = np.zeros(nbins)
 std_speed = np.zeros(nbins)
 for ii in range(1,nbins):
     pos = np.where((time_all>bt[ii-1]) & (time_all<bt[ii]))[0]
     if len(pos)>0:
-        mean_speed[ii-1] = np.nanmean(np.abs(turn_all[pos]))
-        # mean_speed[ii-1] = np.nanmean(turn_all[pos])
-        std_speed[ii-1] = np.nanstd(turn_all[pos])/len(pos)**0.5
+        # mean_speed[ii-1] = np.nanmean((turn_all[pos]))
+        # std_speed[ii-1] = np.nanstd((turn_all[pos]))/len(pos)**0.5
+        
+        aa,bb = circular_mean_deg(turn_all[pos])
+        mean_speed[ii-1] = aa  #np.nanmean(turn_all[pos])
+        std_speed[ii-1] = bb/len(pos)**0.5
 
-tt, mean, error = bt[:-2] - bt[0] - pre_time*1, mean_speed[:-1], std_speed[:-1]
+tt, mean, error = bt[:-2] - bt[0] - pre_time*1, unwrap_angles_deg(mean_speed[:-1]-360), std_speed[:-1]
 plt.figure()
 # plt.plot(bt[:-2], mean_speed[:-1], '-o')
 plt.plot(tt, mean)
 plt.fill_between(tt, mean - error, mean + error, color='blue', alpha=0.3, label='± Error')
-x = [0, 0.5,  0.5, 0]  # x-coordinates of corners
-y = [20, 20, 90, 90]  # y-coordinates of corners
-plt.fill(x, y, color='gray', alpha=0.5); #plt.ylim([20,70])
-plt.xlabel('time since loom (s)'); plt.ylabel('|turning| (|deg|/s)'); #plt.ylim([5,15])
+# x = [0, 0.5,  0.5, 0]  # x-coordinates of corners
+# y = [-5, -5, 17, 17]  # y-coordinates of corners
+# plt.fill(x, y, color='gray', alpha=0.5); plt.ylim([-5,17])
+plt.xlabel('time since loom (s)'); plt.ylabel('heading (degrees)'); #plt.ylim([5,15])
+plt.title('aligned tracks with loom on the right')
+
+# plt.savefig("heading.pdf", bbox_inches='tight')
