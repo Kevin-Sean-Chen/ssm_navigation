@@ -135,3 +135,60 @@ plot_comparison(x_space, beliefs_spatial, true_pos, likelihood_spatial,
 
 plot_comparison(x_space, beliefs_temporal, true_pos, likelihood_temporal,
                 title="Temporal Noise: Sharp Likelihood, Noisy Detection")
+
+# %%
+###############################################################################
+# %% simpler demo
+from scipy.stats import norm
+
+# Define the 1D domain
+x = np.linspace(-10, 10, 500)
+
+# True value (delta function center, hidden from the model)
+true_value = 2.0
+
+# Flat prior (uniform distribution over the domain)
+prior = np.ones_like(x)
+prior /= np.trapz(prior, x)  # Normalize
+
+# Function to compute likelihood for a given observation
+def compute_likelihood(x, observation, noise_std):
+    return norm.pdf(x, loc=observation, scale=noise_std)
+
+# Bayesian update
+def bayesian_update(prior, likelihood, x):
+    posterior_unnorm = prior * likelihood
+    posterior = posterior_unnorm / np.trapz(posterior_unnorm, x)
+    return posterior
+
+# Simulate observations around true value
+np.random.seed(42)
+noise_std = 1.0
+num_observations = 5
+observations = np.random.normal(loc=true_value, scale=noise_std, size=num_observations)
+
+# Initialize plot
+plt.figure(figsize=(10, 6))
+posterior = prior.copy()
+
+for i, obs in enumerate(observations):
+    obs = true_value*1
+    likelihood = compute_likelihood(x, obs, noise_std)
+    posterior = bayesian_update(posterior, likelihood, x)
+    
+    # Plot each update
+    plt.clf()
+    plt.plot(x, prior, label='Prior', linestyle='--', alpha=0.5)
+    plt.plot(x, likelihood, label=f'Likelihood (obs {i+1})', linestyle=':', alpha=0.7)
+    plt.plot(x, posterior, label='Posterior', linewidth=2)
+    plt.axvline(true_value, color='k', linestyle='--', label='True Value')
+    plt.title(f'Bayesian Update - Step {i+1}')
+    plt.xlabel('x')
+    plt.ylabel('Probability Density')
+    plt.legend()
+    plt.pause(0.8)
+    
+    # Update prior for next round
+    prior = posterior
+
+plt.show()

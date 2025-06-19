@@ -92,3 +92,7 @@ plt.ylabel('acf')
 plt.xlabel('lag (s)')
 plt.legend()
 
+# %%
+plt.figure()
+plt.plot(binned_int[:1300], label='binned')
+plt.savefig("bin_stim.pdf", bbox_inches='tight')
