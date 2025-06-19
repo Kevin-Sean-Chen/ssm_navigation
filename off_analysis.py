@@ -30,8 +30,10 @@ matplotlib.rc('ytick', labelsize=20)
 
 # %% data files
 files = ['D:/github/ssm_navigation/saved_data/jit_off_tracks3.pkl',
-         'D:/github/ssm_navigation/saved_data/str_off_tracks3.pkl',
-         'D:/github/ssm_navigation/saved_data/OU_off_tracks3.pkl']
+         'D:/github/ssm_navigation/saved_data/space_jitter_2_ribbons2.pkl',
+         'D:/github/ssm_navigation/saved_data/time_flicker_2_ribbons2.pkl']
+         # 'D:/github/ssm_navigation/saved_data/str_off_tracks3.pkl',
+         # 'D:/github/ssm_navigation/saved_data/OU_off_tracks3.pkl']
 
 # data = {'post_xy': post_xy, 'post_vxy': post_vxy, 'track_xy': track_xy, 'track_vxy': track_vxy, 'track_signal': track_signal}
 # %% load data
@@ -60,15 +62,15 @@ def MSD_scaling(track_set):
     valid_track = 0
     for track in track_set:
         pos_boundary = np.where((track[:,0]<270) & (track[:,0]>15) & (track[:,1]>10) & (track[:,1]<170))[0] 
-        pos_boundary = np.where((track[:,0]<275) & (track[:,0]>5) & (track[:,1]>10) & (track[:,1]<175))[0]  #### checking this!!! #####
-        pos_out = np.where((track[:,0]>275) | (track[:,0]<5) | (track[:,1]<10) | (track[:,1]>175))[0]  #### checking this!!! #####
-        ### removal
+        pos_boundary = np.where((track[:,0]<275) & (track[:,0]>15) & (track[:,1]>15) & (track[:,1]<175))[0]  #### checking this!!! #####
+        pos_out = np.where((track[:,0]>275) | (track[:,0]<15) | (track[:,1]<15) | (track[:,1]>175))[0]  #### checking this!!! #####
+        ## removal
         # if len(pos_out)>0:
         #     track = track[:pos_out[0],:]
         # else:
         #     track = track[pos_boundary,:]
         
-        ### track-based
+        # ## track-based
         # if len(pos_boundary)==len(track):  #### only use tracks within
         #     valid_track += 1
         
@@ -86,7 +88,7 @@ def MSD_scaling(track_set):
     variance_msd = (msd_std / counts) - (msd_mean**2)
     sem_msd = np.sqrt(variance_msd) / counts**0.5 * 1
     lag_times = np.arange(max_lag)*1/60  # Lag times
-    return lag_times, msd_mean, counts #sem_msd
+    return lag_times, msd_mean, counts, sem_msd
 
 def MSD_compute(track_set, tau):
     msd = 0
@@ -111,14 +113,32 @@ def MSD_compute(track_set, tau):
 # %% sample MSD
 pert_types = ['space', 'static', 'time']
 cols = ['k','r', 'b']
+lls, mms, ccs, sss = [], [], [], []
 plt.figure(figsize=(8,6))
 for ii in range(3):
-    ll,mm,cc = MSD_scaling(post_xys[ii])
+    ll,mm,cc,ss = MSD_scaling(post_xys[ii])
+    lls.append(ll)
+    mms.append(mm)
+    ccs.append(cc)
+    sss.append(ss)
     # plt.plot(cc)
-    plt.plot(ll, mm, 'o', color=cols[ii], label=pert_types[ii])
+    plt.plot(ll, mm, '-', color=cols[ii], label=pert_types[ii])
 plt.ylabel(r'MSD (mm$^2$)'); plt.xlabel('lag time (s)'); plt.legend(); plt.grid(True)
+plt.xlim([0,50]); plt.ylim([0,14000])
 
-# %% sampling
+# %% plotting
+plt.figure()
+for ii in range(3):
+    plt.plot(lls[ii], mms[ii], '-', color=cols[ii], label=pert_types[ii])
+    std_vals = sss[ii] / 1 #np.sqrt(10) #(ccs[ii])
+    plt.fill_between(lls[ii], mms[ii] - std_vals, mms[ii] + std_vals, alpha=0.3)
+    
+plt.ylabel(r'MSD (mm$^2$)'); plt.xlabel('lag time (s)'); plt.legend(); plt.grid(True)
+plt.xlim([1,50]); plt.ylim([0,14000]); 
+# plt.yscale('log')
+# plt.savefig("MSD2.pdf", bbox_inches='tight')
+
+# %% sampling for error bars
 reps = 50
 n_samps = 100
 msds = np.zeros((reps, 3))
@@ -259,12 +279,12 @@ xy = 0 ### x:0, y:1
 for ii in range(len(post_xy)):
     track_i = post_xy[ii]
     ## exclude boundary touching!!! ####
-    # pos_boundary = np.where((track_i[:,0]<275) & (track_i[:,0]>5) & (track_i[:,1]>10) & (track_i[:,1]<175))[0]  #### checking this!!! #####
-    # pos_out = np.where((track_i[:,0]>275) | (track_i[:,0]<5) | (track_i[:,1]<10) | (track_i[:,1]>175))[0]  #### checking this!!! #####
-    # if len(pos_out)>0:
-    #     track_i = track_i[:pos_out[0],:]
-    # else:
-    #     track_i = track_i[pos_boundary,:]
+    pos_boundary = np.where((track_i[:,0]<275) & (track_i[:,0]>5) & (track_i[:,1]>10) & (track_i[:,1]<175))[0]  #### checking this!!! #####
+    pos_out = np.where((track_i[:,0]>275) | (track_i[:,0]<5) | (track_i[:,1]<10) | (track_i[:,1]>175))[0]  #### checking this!!! #####
+    if len(pos_out)>0:
+        track_i = track_i[:pos_out[0],:]
+    else:
+        track_i = track_i[pos_boundary,:]
         
     ### space-time condition
     for tt in range(len(bin_t)):
@@ -306,15 +326,15 @@ plt.ylabel("P(y|t)")
 plt.show()
 
 # %% return analysis
-time_window = 15*60
+time_window = 10*60
 time_winds = np.array([1,5,10,15,20,25,30])*60
-space_scale = 25*1.5 
+space_scale = 30 #25*1.5 
 p_return = np.zeros((3, len(time_winds)))
 
 
 for tt in range(len(time_winds)):
     time_window = time_winds[tt]
-    for ii in range(3):
+    for ii in range(1,3):
         n_back, n_tracks = 0,0
         post_xy = post_xys[ii]
         
@@ -324,7 +344,7 @@ for tt in range(len(time_winds)):
             pos_boundary = np.where((track_i[:,0]<260) & (track_i[:,0]>15) & (track_i[:,1]>15) & (track_i[:,1]<160))[0]
             # track_i = track_i[pos_boundary,:]
             pos_boundary = np.where((track_i[:,0]<270) & (track_i[:,0]>15) & (track_i[:,1]>10) & (track_i[:,1]<170))[0] 
-            pos_boundary = np.where((track_i[:,0]<275) & (track_i[:,0]>5) & (track_i[:,1]>10) & (track_i[:,1]<175))[0]  #### checking this!!! #####
+            # pos_boundary = np.where((track_i[:,0]<275) & (track_i[:,0]>5) & (track_i[:,1]>10) & (track_i[:,1]<175))[0]  #### checking this!!! #####
             pos_out = np.where((track_i[:,0]>275) | (track_i[:,0]<5) | (track_i[:,1]<10) | (track_i[:,1]>175))[0]  #### checking this!!! #####
             
             ### removal
@@ -338,7 +358,8 @@ for tt in range(len(time_winds)):
                 xy_final = track_i[time_window,:]
                 dists = np.linalg.norm(track_i - xy_final, axis=1)
                 exit_check = np.where(dists>space_scale)[0]  ### have to exit
-                if True: #len(exit_check)>0:
+                if len(exit_check)>0:  ### exit or not
+                # if True:
                     n_tracks += 1
                     if np.linalg.norm( track_i[0,:] - xy_final ) < space_scale:
                         n_back += 1
@@ -350,6 +371,75 @@ plt.figure()
 plt.plot(time_winds/60, p_return.T)
 plt.xlabel('time since last event (s)'); plt.ylabel('P(remain close)')
 
+# plt.savefig("p_return.pdf", bbox_inches='tight')
+
+# %% return analysis, with sampling!
+reps = 20
+n_samps = 400
+time_window = 10*60
+time_winds = np.array([1,5,10,15,20,25,30])*60
+space_scale = 20 #25*1.5 
+p_return = np.zeros((3, len(time_winds), reps))
+
+
+for rr in range(reps):
+    for tt in range(len(time_winds)):
+        time_window = time_winds[tt]
+        for ii in range(3):
+            n_back, n_tracks = 0,0
+            post_xy = post_xys[ii]
+            
+            ### sub-sample
+            samp_id = np.random.randint(0,len(post_xy), n_samps)
+            post_xy_ = [post_xy[kk] for kk in samp_id]
+            
+            for jj in range(n_samps):
+                track_i = post_xy_[jj]
+                #### exclude boundary touching!!! ####
+                pos_boundary = np.where((track_i[:,0]<260) & (track_i[:,0]>15) & (track_i[:,1]>15) & (track_i[:,1]<160))[0]
+                # track_i = track_i[pos_boundary,:]
+                pos_boundary = np.where((track_i[:,0]<250) & (track_i[:,0]>50) & (track_i[:,1]>50) & (track_i[:,1]<150))[0] 
+                pos_boundary = np.where((track_i[:,0]<275) & (track_i[:,0]>15) & (track_i[:,1]>15) & (track_i[:,1]<175))[0]  #### checking this!!! #####
+                pos_out = np.where((track_i[:,0]>275) | (track_i[:,0]<15) | (track_i[:,1]<15) | (track_i[:,1]>175))[0]  #### checking this!!! #####
+                
+                ### removal
+                if len(pos_out)>0:
+                    track_i = track_i[:pos_out[0],:]
+                else:
+                    track_i = track_i[pos_boundary,:]
+                
+                
+                if len(track_i)>time_window:
+                    xy_final = track_i[time_window,:]
+                    dists = np.linalg.norm(track_i - xy_final, axis=1)
+                    exit_check = np.where(dists>space_scale)[0]  ### have to exit
+                    if len(exit_check)>0:  ### exit or not
+                    # if True:
+                        n_tracks += 1
+                        if np.linalg.norm( track_i[0,:] - xy_final ) < space_scale:
+                            n_back += 1
+            
+            p_return[ii, tt, rr] = n_back/n_tracks
+            # print(n_tracks)
+
+# %%
+# plt.figure()
+# for ii in range(3):
+#     temp = p_return[ii,:,:]
+#     plt.errorbar(time_winds/60, np.mean(temp,1), np.std(temp,1))
+plt.figure()
+for ii in range(1,3):
+    temp = p_return[ii, :, :]
+    mean_vals = np.mean(temp, axis=1)
+    std_vals = np.std(temp, axis=1)/1 #np.sqrt(n_samps)
+
+    plt.plot(time_winds / 60, mean_vals, label=f'Condition {ii+1}')
+    plt.fill_between(time_winds / 60, mean_vals - std_vals, mean_vals + std_vals, alpha=0.3)
+
+plt.legend()
+plt.xlabel('time since last event (s)'); plt.ylabel('P(remain close)')
+
+# plt.savefig("p_return2.pdf", bbox_inches='tight')
 
 # %%
 ###############################################################################
@@ -423,7 +513,7 @@ def tortuosity(track):
         return np.nan
     
 # %% relating pre to post
-data_id = 2
+data_id = 0
 odor_threshold = 50
 window = 10*60
 search, signal = [], []
@@ -458,24 +548,52 @@ for ii in range(len(post_xys[data_id])):
     
     
     ### simple measurements
-    # search.append(np.mean(np.sum(track_v[:window, :]**2,1))**0.5)  ### speed
-    # search.append(np.mean(track_v[:window, 0]**2)**.5)  ### along one direction
-    search.append(tortuosity(track_i[:window, :]))
+    search.append(np.mean(np.sum(track_v[:window, :]**2,1))**0.5)  ### speed
+    # search.append(np.mean(track_v[:window, 1]**2)**.5)  ### along one direction
+    # search.append(tortuosity(track_i[:window, :]))
     
     # signal.append(mean_dwell_time(sig_ii)/60)  ### dwell time
     # signal.append(np.sum(sig_i)/1)  ### sum odor
     # signal.append(np.mean(np.sum(pre_vxy_i[-window:, :]**2,1)**0.5* 1))  ### prior speed
     # signal.append(np.mean(pre_vxy_i[-window:, 1]**2)**0.5)
-    signal.append(n_events)  ### number of events
+    # signal.append(n_events)  ### number of events
     # signal.append(np.sum(sig_ii)/60)  ### time in odor
-    # signal.append(np.mean(pre_xy_i[:,1]))  ### prior location
+    signal.append(np.mean(pre_xy_i[:,1]))  ### prior location
     # signal.append(tortuosity(pre_xy_i))
     
     
 plt.figure()
-plt.plot(signal, search, '.')
+plt.plot(signal, search, '.', alpha=0.9);# plt.ylim([0,15])
 # plt.xlabel('pre mean speed'); plt.ylabel('post mean speed')
 # plt.xlabel('total time in odor (s)'); plt.ylabel('post mean speed')
 # plt.xlabel('mean location in y during tracking (mm)'); plt.ylabel('post mean speed')
 # plt.xlabel('mean location in y during tracking (mm)'); plt.ylabel('post mean speed'); 
-plt.xlabel('odor encount'); plt.ylabel('tortuosity'); plt.yscale('log'); #plt.xscale('log'); 
+# plt.xlabel('odor encount'); plt.ylabel('tortuosity'); plt.yscale('log'); #plt.xscale('log'); 
+
+
+# %% raw off-tracks
+min_t = 30*60
+
+# for ii in range(3):
+ii = 2
+plt.figure(ii)
+post_xy = post_xys[ii]
+for jj in range(0,500,1): #range(len(post_xy)):
+    track_i = post_xy[jj]
+    #### exclude boundary touching!!! ####
+    pos_boundary = np.where((track_i[:,0]<260) & (track_i[:,0]>15) & (track_i[:,1]>15) & (track_i[:,1]<160))[0]
+    pos_out = np.where((track_i[:,0]>275) | (track_i[:,0]<5) | (track_i[:,1]<10) | (track_i[:,1]>175))[0]  #### checking this!!! #####
+    
+    ### removal
+    if len(pos_out)>0:
+        track_i = track_i[:pos_out[0],:]
+    else:
+        track_i = track_i[pos_boundary,:]
+    if len(track_i)>min_t:   
+        track_i = track_i - track_i[0,:][None,:]
+        plt.plot(track_i[:,0], track_i[:,1],'k', alpha=0.5)
+        plt.plot(track_i[-1,0], track_i[-1,1],'ro', markersize=5)
+        plt.xlim([-210,210]); plt.ylim([-140, 140])
+        
+# plt.savefig("track_time.pdf", bbox_inches='tight')
+
