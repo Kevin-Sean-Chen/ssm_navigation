@@ -52,16 +52,23 @@ exp_list = [r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_
             r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-5-1']  ### jittered ribbon and OU
 
 ### testing for two-ribbon environments (for spatial or temporal jitter)
-exp_list = [r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-5-12',
-            r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-5-15',
-            r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-5-19',
-            r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-5-31',
-            r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-6-5']
+# exp_list = [r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-5-12',
+#             r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-5-15',
+#             r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-5-19',
+#             r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-5-31',
+#             r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-6-5']
+
+### EPG preliminaryt
+# exp_list = [r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\periodic_ribbon\2025-6-27',
+#             r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\periodic_ribbon\2025-6-30',
+#             r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\periodic_ribbon\2025-7-3']
+exp_list = [r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\periodic_ribbon\2025-7-3']
 
 target_file = "exp_matrix.pklz"
 exp_type = 'jitter0p05'   ### 183
-# exp_type = 'jitter0p0_' ### 142
+exp_type = 'jitter0p0_' ### 142
 exp_type = '_OU_' ### 176
+# exp_type = 'gaussianribbon_vial'
 
 pkl_files = []
 for ll in range(len(exp_list)):

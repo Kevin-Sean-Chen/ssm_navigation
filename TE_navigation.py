@@ -250,7 +250,6 @@ fig.colorbar(cax3, ax=axs, orientation='horizontal', fraction=0.02, pad=0.1)
 
 
 # %% quick test for mode-TE calculation
-
 TEs = np.zeros(20)
 TE2 = TEs*1
 for ii in range(20):

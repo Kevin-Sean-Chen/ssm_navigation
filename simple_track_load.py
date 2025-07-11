@@ -27,9 +27,11 @@ sns.set_context("talk")
 # %% load data
 # folder root-directory
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-5-1'  ### straight, jittered ribbon and OU data
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\periodic_ribbon\2025-7-3'
 
 # extract through exp names
-exp_type = 'jitter0p0_'
+exp_type = 'jitter0p05_'
+exp_type = 'gaussianribbon_OU_vial1'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -115,9 +117,19 @@ plt.plot(tracks[track_id][pos,0], tracks[track_id][pos,1],'r.')
 plt.plot(tracks[track_id][0,0], tracks[track_id][0,1],'*')
 
 ### plot ensemble
+x_samp = []
 plt.figure()
-for ii in range(500):
+for ii in range(1,600):
     xy_i = tracks[ii]
-    plt.plot(xy_i[:,0], xy_i[:,1],'k',alpha=.5)
+    od_i = signals[ii]
+    if np.nansum(od_i)>-0:
+        plt.plot(xy_i[:,0], xy_i[:,1],'k',alpha=.3)
+        x_samp.append(xy_i[:,1])
 plt.xlabel('x (mm)')
 plt.ylabel('y (mm)')
+
+### odor-angle plot
+pos = np.where(vec_signal>0)[0]
+plt.figure()
+plt.hist(np.abs(vec_theta[pos]-180), 30)
+plt.xlabel('heading in odor')

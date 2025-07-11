@@ -298,7 +298,7 @@ plt.show()
 import umap
 
 sub_samp = np.random.choice(X_traj.shape[0], 10000, replace=False)
-reducer = umap.UMAP(n_components=3, random_state=37)
+reducer = umap.UMAP(n_components=3, random_state=1)
 data_2d = reducer.fit_transform(X_traj[sub_samp,:])
 
 # %% show in 3D
@@ -324,14 +324,17 @@ plt.xlabel('eigenvalue index')
 # plt.ylim([0.001, 20])
 
 # %% color code tracks]
-imode = 3
+imode = 1
 phi2 = eigvecs[labels,imode].real
-window_show = np.arange(1,100000,3) ###1,50000,3
+window_show = np.arange(1,100000,2) ###1,50000,3
 color_abs = np.max(np.abs(phi2[window_show]))
 X_xy, track_id = build_X(rec_tracks, return_id=True)
 xy_back = X_xy[:, [0,int(K_star)]]
 plt.figure()
 plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5, vmin=-color_abs*1, vmax=color_abs/1)
+# pos = np.where(phi2[window_show]<0)[0]
+# plt.scatter(xy_back[window_show, 0][pos],xy_back[window_show, 1][pos],c=-phi2[window_show][pos],cmap='coolwarm',s=.5, vmin=-color_abs*1, vmax=color_abs/1)
+
 plt.title(f'mode#{imode}')
 
 # %% modes back to velocity

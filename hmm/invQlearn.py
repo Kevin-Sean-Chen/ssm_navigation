@@ -136,7 +136,7 @@ for tr in range(n_tracks):
 
 # %% tabular inverse Q-learning!
 nS, nA = 4,4
-epochs = 100`
+epochs = 100
 n_tracks = len(states)
 n_samples = 30
 ### learning and discount parameters
