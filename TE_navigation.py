@@ -45,6 +45,15 @@ y_smooth = expmat[32,:][::down_samp][:chop]
 speed_smooth = expmat[30,:][::down_samp][:chop]  #11 31
 dtheta_smooth = expmat[34,:][::down_samp][:chop]  #14 35
 
+# %% plot track
+trk = 11
+pos = np.where(trjNum==trk)[0][10:-10]
+pos_stop = np.where((stops==1) | (turns>0))[0]
+pos_stop = np.intersect1d(pos, pos_stop)
+plt.figure()
+plt.plot(x_smooth[pos], y_smooth[pos],'k')
+plt.plot(x_smooth[pos_stop], y_smooth[pos_stop],'r.')
+
 # %% some pre-processing
 v_threshold = 30
 vx_smooth[np.abs(vx_smooth)>v_threshold] = v_threshold
