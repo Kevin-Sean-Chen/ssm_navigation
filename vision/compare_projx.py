@@ -133,8 +133,9 @@ for ii in range(len(tracks)):
 # %% compute projection
 speed_threshold = 5
 pos_boundary = np.where((vec_xy[:,0]<260) & (vec_xy[:,0]>15) & (vec_xy[:,1]>15) & (vec_xy[:,1]<160))[0]
-pos_boundary = np.where((vec_xy[:,0]<260) & (vec_xy[:,0]>15) & (vec_xy[:,1]>70) & (vec_xy[:,1]<130) & (vec_signal>=0))[0]
+pos_boundary = np.where((vec_xy[:,0]<260) & (vec_xy[:,0]>15) & (vec_xy[:,1]>70) & (vec_xy[:,1]<130) & (vec_signal>1))[0]
 # pos_boundary = np.where((vec_xy[:,0]<260) & (vec_xy[:,0]>15) & (vec_xy[:,1]>15) & (vec_xy[:,1]<80) & (vec_signal>1))[0]
+pos_boundary = np.where((vec_xy[:,0]<260) & (vec_xy[:,0]>15) & (vec_xy[:,1]>130) & (vec_xy[:,1]<160) & (vec_signal>1))[0]
 pos_time = np.where((vec_time<30) & (vec_speed>speed_threshold))[0]
 # pos_time = np.where((vec_time>30) & (vec_speed>speed_threshold))[0]
 pos = np.intersect1d(pos_boundary, pos_time)
@@ -237,13 +238,16 @@ for ii in range(len(tracks)):
     time_i = times[ii]
     stim_i = signals[ii]
     pos_time = np.where((time_i<30))[0]
-    pos_time = np.where((time_i>30))[0]
+    # pos_time = np.where((time_i>30))[0]
     pos_signal = np.where(stim_i>1)[0]
     pos_boundary = np.where((xy_i[:,0]<260) & (xy_i[:,0]>15) & (xy_i[:,1]>15) & (xy_i[:,1]<160))[0]
+    pos_boundary = np.where((xy_i[:,0]<260) & (xy_i[:,0]>15) & (xy_i[:,1]>70) & (xy_i[:,1]<130) & (stim_i>1))[0]
+    # pos_boundary = np.where((xy_i[:,0]<260) & (xy_i[:,0]>15) & (xy_i[:,1]>15) & (xy_i[:,1]<80) & (stim_i>1))[0]
+    pos_boundary = np.where((xy_i[:,0]<260) & (xy_i[:,0]>15) & (xy_i[:,1]>130) & (xy_i[:,1]<160) & (stim_i>1))[0]
     pos = np.intersect1d(pos_boundary, pos_signal)
-    pos = np.intersect1d(pos_boundary, pos_time)
-    # if len(pos)>0 and len(pos_signal)>0 and np.mean(speeds[ii])>1:
-    if len(pos)>0 and np.mean(speeds[ii])>1:
+    # pos = np.intersect1d(pos_boundary, pos_time)
+    if len(pos)>0 and len(pos_signal)>0 and np.mean(speeds[ii])>1:
+    # if len(pos)>0 and np.mean(speeds[ii])>1:
         vyi = vxy_i[pos,1]  ### velocity along y
         
         dx = xy_i[pos_time[0],0] - xy_i[pos_time[-1],0]
@@ -288,10 +292,38 @@ ax.set_ylabel('displacement (mm/s)^2')
 ax.grid(True, axis='y')
 
 plt.tight_layout()
+plt.ylim([0,100])
+
+# %% tortuosity of tracks
+def compute_tortuosity(xy):
+    """
+    Compute tortuosity of a 2D trajectory.
+    
+    Parameters:
+        xy: T x 2 array of (x, y) positions over time
+    
+    Returns:
+        tortuosity: float
+    """
+    xy = np.asarray(xy)
+
+    # Total path length (sum of distances between consecutive points)
+    deltas = np.diff(xy, axis=0)
+    segment_lengths = np.linalg.norm(deltas, axis=1)
+    path_length = np.sum(segment_lengths)
+
+    # Euclidean distance from start to end
+    euclidean_distance = np.linalg.norm(xy[-1] - xy[0])
+
+    if euclidean_distance == 0:
+        return 1 #np.inf  # Avoid division by zero if start == end
+
+    return path_length / euclidean_distance
 
 # %% compute velocity distribution
 speed_up = []
 speed_down = []
+tort = []
 
 for ii in range(len(tracks)):
     xy_i = tracks[ii]
@@ -301,12 +333,16 @@ for ii in range(len(tracks)):
     pos_time = np.where((time_i<30))[0]
     # pos_time = np.where((time_i>30))[0]
     pos_signal = np.where(stim_i>1)[0]
-    pos_boundary = np.where((xy_i[:,0]<260) & (xy_i[:,0]>15) & (xy_i[:,1]>15) & (xy_i[:,1]<160))[0]
+    # pos_boundary = np.where((xy_i[:,0]<260) & (xy_i[:,0]>15) & (xy_i[:,1]>15) & (xy_i[:,1]<160))[0]
+    pos_boundary = np.where((xy_i[:,0]<260) & (xy_i[:,0]>15) & (xy_i[:,1]>70) & (xy_i[:,1]<130) & (stim_i>1))[0]
+    # pos_boundary = np.where((xy_i[:,0]<260) & (xy_i[:,0]>15) & (xy_i[:,1]>15) & (xy_i[:,1]<80) & (stim_i>1))[0]
+    # pos_boundary = np.where((xy_i[:,0]<260) & (xy_i[:,0]>15) & (xy_i[:,1]>130) & (xy_i[:,1]<160) & (stim_i>1))[0]
     pos = np.intersect1d(pos_boundary, pos_signal)
     # pos = np.intersect1d(pos_boundary, pos_time)
-    if len(pos)>0 and len(pos_signal)>0 and np.mean(speeds[ii])>1:
+    if len(pos)>1 and len(pos_signal)>0 and np.mean(speeds[ii])>1:
     # if len(pos)>0 and np.mean(speeds[ii])>1:
-        speed_i = np.sum(vxy_i[pos,:]**2,1)**0.5
+        # speed_i = np.sum(vxy_i[pos,:]**2,1)**0.5
+        speed_i = (vxy_i[pos,1]**2)**0.5
         
         ### track based
         # dx = xy_i[pos_time[0],0] - xy_i[pos_time[-1],0] 
@@ -316,13 +352,23 @@ for ii in range(len(tracks)):
         #     speed_down.append(speed_i)
             
         ### vector based
-        pos_up = np.where(vxy_i[pos,0]<0)[0]
-        pos_down = np.where(vxy_i[pos,0]>0)[0]
+        pos_up = np.where(vxy_i[pos,1]<0)[0]
+        pos_down = np.where(vxy_i[pos,1]>0)[0]
         speed_up.append(speed_i[pos_up])
         speed_down.append(speed_i[pos_down])
+        
+        tort.append(compute_tortuosity(xy_i[pos,:]))
+        
 # %%
 bins = np.linspace(0,30,30)
+# bins = 50
 plt.figure()
 plt.hist(np.concatenate(speed_up), bins=bins, density=True, alpha=0.7, color='skyblue', edgecolor='black', label='up')
-plt.hist(np.concatenate(speed_down), bins=bins, density=True, alpha=0.5, color='k', edgecolor='black', label='down')
-plt.xlim([-.5, 35]); plt.ylim([0,0.6]); plt.legend()
+# plt.hist(np.concatenate(speed_down), bins=bins, density=True, alpha=0.5, color='k', edgecolor='black', label='down')
+# plt.xlim([-.5, 20]); plt.ylim([0,0.5]); plt.legend(); 
+plt.xlabel('speed in y'); plt.yscale('log')
+
+# %%
+plt.figure()
+pos = np.where(np.array(tort)<10)[0]
+plt.plot(np.array(tort)[pos]); plt.ylim([0,5])

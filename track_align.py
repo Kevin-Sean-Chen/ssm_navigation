@@ -63,7 +63,7 @@ threshold_track_l = 60 * 10  # 20 # look at long-enough tracks
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-21'  ### jittered ribbon and OU
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-5-1'  ### jittered ribbon and OU
 target_file = "exp_matrix.pklz"
-exp_type = 'jitter0p05' #'jitter0p0_' #'jitter0p05' #'OU_'
+exp_type = 'jitter0p0' #'jitter0p0_' #'jitter0p05' #'OU_'
 
 # List all subfolders in the root directory
 subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
@@ -94,6 +94,7 @@ track_id = []  # record track id (file and track)
 rec_tracks = []  # record the full track x,y
 rec_signal = []  # record opto signal
 times = []   # record time in epoch
+thetas = []
 cond_id = 0
 
 for ff in range(nf):
@@ -113,7 +114,7 @@ for ff in range(nf):
                 ### make per track data
                 # temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos] , \
                                         # data['theta_smooth'][pos] , data['signal'][pos]))
-                thetas = data['theta'][pos]
+                theta = data['theta'][pos]
                 # temp = np.column_stack((data['headx'][pos] , data['heady'][pos]))
                 temp = np.stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]),1)#######
                 
@@ -122,11 +123,11 @@ for ff in range(nf):
                                 
                 ### criteria
                 mask_i = np.where(np.isnan(temp), 0, 1)
-                mask_j = np.where(np.isnan(thetas), 0, 1)
+                mask_j = np.where(np.isnan(theta), 0, 1)
                 mean_v = np.nanmean(np.sum(temp**2,1)**0.5)
                 max_v = np.max(np.sum(temp**2,1)**0.5)
                 # print(mean_v)
-                if np.prod(mask_i)==1 and np.prod(mask_j)==1 and mean_v>.1 and max_v<20:  ###################################### removing nan for now
+                if np.prod(mask_i)==1 and np.prod(mask_j)==1 and mean_v>.1 and max_v<30: #max_v<20:  ###################################### removing nan for now
                     data4fit.append(temp)  # get data for ssm fit
                     rec_tracks.append(temp_xy)  # get raw tracks
                     # track_id.append(np.array([ff,ii]))  # get track id
@@ -134,8 +135,9 @@ for ff in range(nf):
                     rec_signal.append(data['signal'][pos].squeeze())
                     # rec_signal.append(np.ones((len(pos),1)))   ########################## hacking for now...
                     cond_id += 1
-                    masks.append(thetas)
+                    # masks.append(thetas)
                     times.append(data['t'][pos])
+                    thetas.append(theta)
                 # masks.append(mask_i)
 
 # %% vectorize for simpliciy
@@ -154,12 +156,15 @@ plt.plot(rec_tracks[ii][pos,0], rec_tracks[ii][pos,1],'r.'); plt.plot(rec_tracks
 
 # %% measuring base on tracks
 pre_t = 0 #45 30 0!!!
-stim_t = 30 +45*1
+stim_t = 30 +45*0
 pre_los = 60* 5
 odor_feature = []
 post_vxy = []
 post_xy = []
 pre_vxy = []
+
+track_xy, track_vxy, track_signal = [], [], []
+
 for nn in range(len(data4fit)):
     time_i = times[nn]
     signal_i = rec_signal[nn]
@@ -199,25 +204,36 @@ for nn in range(len(data4fit)):
         ### collect pre-off velocity
         if pos>pre_los:
             pre_vxy.append(vxy_i[pos-pre_los:pos,:])
+            
+        ### recording what happens DURING stimulus encounter
+        pos = np.where(signal_i>0)[0]
+        track_xy.append(xy_i[pos[0]:pos[-1],:])
+        track_vxy.append(vxy_i[pos[0]:pos[-1],:])
+        track_signal.append(signal_i[pos[0]:pos[-1]])
         
 # %% sorted plots
 dispy = 3
 offset = 1
+disp_every = 3
 post_window = 30*60
 
 sortt_id = np.argsort(odor_feature)[::-1]
+sortt_id = np.where(np.array(odor_feature)>3)[0] #### tracking condition ####
+
 import matplotlib.cm as cm
 colors = cm.viridis(np.linspace(0, 1, len(sortt_id)))
 
 plt.figure()
-for kk in range(0,len(sortt_id),1):
+cc = 0
+for kk in range(0,len(sortt_id),disp_every):
     ### plot tracks
     traji = post_xy[sortt_id[kk]]
     if len(traji)<post_window:
-        plt.plot(traji[:,0] - traji[0,0]*offset, kk*dispy + traji[0:,1]-traji[0,1]*offset, color=colors[kk])
+        plt.plot(traji[:,0] - traji[0,0]*offset, cc*dispy + traji[0:,1]-traji[0,1]*offset, color=colors[kk])
     else:
-        plt.plot(traji[:post_window,0] - traji[0,0]*offset, kk*dispy + traji[:post_window,1]-traji[0,1]*offset, color=colors[kk])
-    plt.plot(traji[0,0]  - traji[0,0]*offset, kk*dispy +traji[0,1]-traji[0,1]*offset,'r.', markersize=2)
+        plt.plot(traji[:post_window,0] - traji[0,0]*offset, cc*dispy + traji[:post_window,1]-traji[0,1]*offset, color=colors[kk])
+    plt.plot(traji[0,0]  - traji[0,0]*offset, cc*dispy +traji[0,1]-traji[0,1]*offset,'r.', markersize=2)
+    cc += 1
     
     ### plot dots
     # traji = post_xy[sortt_id[kk]][:post_window,:]
@@ -308,7 +324,8 @@ plt.grid(True)
 plt.legend()
 
 # %% saving off tracks
-# data = {'post_xy': post_xy, 'post_vxy': post_vxy}
+# data = {'post_xy': post_xy, 'post_vxy': post_vxy, 'track_xy': track_xy, 'track_vxy': track_vxy, 'track_signal': track_signal, \
+#           'rec_signal': rec_signal, 'times': times, 'data4fit':data4fit, 'thetas': thetas, 'rec_tracks': rec_tracks}
 
-# with open('jit_off_tracks.pkl', 'wb') as f:
+# with open('time_flicker_2_ribbons.pkl', 'wb') as f:
 #     pickle.dump(data, f)

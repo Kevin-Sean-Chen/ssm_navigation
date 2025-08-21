@@ -298,7 +298,7 @@ plt.show()
 import umap
 
 sub_samp = np.random.choice(X_traj.shape[0], 10000, replace=False)
-reducer = umap.UMAP(n_components=3, random_state=42)
+reducer = umap.UMAP(n_components=3, random_state=1)
 data_2d = reducer.fit_transform(X_traj[sub_samp,:])
 
 # %% show in 3D
@@ -307,7 +307,7 @@ fig=plt.figure(figsize=(10,7))
 ax = fig.add_subplot(111, projection='3d')
 color_abs = np.max(np.abs(phi2[sub_samp]))
 # sc = plt.scatter(data_2d[:,0], data_2d[:,1], c=phi2[sub_samp], cmap='coolwarm', s=.1, vmin=-color_abs, vmax=color_abs)
-sc = ax.scatter(data_2d[:,0], data_2d[:,1],data_2d[:,2], c=phi2[sub_samp], cmap='coolwarm', s=.2, vmin=-color_abs, vmax=color_abs)
+sc = ax.scatter(data_2d[:,0], data_2d[:,1],data_2d[:,2], c=phi2[sub_samp], cmap='coolwarm', s=.5, vmin=-color_abs, vmax=color_abs)
 plt.colorbar(sc)
 
 # %% spectral analysis
@@ -326,11 +326,15 @@ plt.xlabel('eigenvalue index')
 # %% color code tracks]
 imode = 1
 phi2 = eigvecs[labels,imode].real
-window_show = np.arange(1,50000,3)
+window_show = np.arange(1,100000,2) ###1,50000,3
+color_abs = np.max(np.abs(phi2[window_show]))
 X_xy, track_id = build_X(rec_tracks, return_id=True)
 xy_back = X_xy[:, [0,int(K_star)]]
 plt.figure()
-plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
+plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5, vmin=-color_abs*1, vmax=color_abs/1)
+# pos = np.where(phi2[window_show]<0)[0]
+# plt.scatter(xy_back[window_show, 0][pos],xy_back[window_show, 1][pos],c=-phi2[window_show][pos],cmap='coolwarm',s=.5, vmin=-color_abs*1, vmax=color_abs/1)
+
 plt.title(f'mode#{imode}')
 
 # %% modes back to velocity
@@ -459,9 +463,9 @@ print(score_control)
 # %% study driven-modes
 ###############################################################################
 # %% y=beta X
-lags = 401
-n_top_modes = 7
-threshold = 2.
+lags = 101
+n_top_modes = 2
+threshold = 5.
 phi_top = eigvecs[labels,1:n_top_modes].real
 X_odor = build_signal(rec_signal, K_star)
 X_odor = X_odor[:, 0]
@@ -478,7 +482,7 @@ time_vec = np.arange(lags)*0.011*down_samp
 plt.figure()
 for ii in range(n_top_modes-1):
     # y = phi_top[lags-1:,ii]*1  ### future
-    y = phi_top[:-lags+1,ii]*1  ### past
+    y = phi_top[1:-lags+2,ii]*1  ### past
     
     xxt = X.T @ X #+ lamb*D.T @ D + theta*np.eye(D.shape[1])
     invxx = np.linalg.inv(xxt)
@@ -488,7 +492,7 @@ for ii in range(n_top_modes-1):
 
 plt.legend()
 plt.xlabel('time (s)'); plt.ylabel('weights')
-plt.xlim([-0.051,4])
+plt.xlim([-0.051,2])
 
 # %% information rank
 ### make the full dist vector
@@ -510,9 +514,9 @@ def compute_mutual_information(x, y, bins=10):
     y_binned = np.digitize(y, bins=np.histogram_bin_edges(y, bins=bins))
     mi = mutual_info_score(x_binned, y_binned)
     return mi
-n_top_modes = 25
-reps = 10
-segment = 60000
+n_top_modes = 20
+reps = 30
+segment = 70000
 nbins = 5
 modes_k = eigvecs[labels,1:n_top_modes].real
 MIs = np.zeros((n_top_modes, reps))
@@ -529,13 +533,13 @@ for nn in range(n_top_modes):
     # MIs[nn] = compute_mutual_information(phi_samp, signal, bins=10)
     for rr in range(reps):
         rand_int = np.random.randint(0, len(dists)- segment)
-        MIs[nn, rr] = compute_mutual_information(phi_samp[rand_int:rand_int+segment], signal[rand_int:rand_int+segment], bins=nbins)
+        MIs[nn, rr] = compute_mutual_information(phi_samp[rand_int:rand_int+segment], signal[rand_int:rand_int+segment], bins=nbins)/(1/60*down_samp)
 
 plt.figure()
 # plt.plot(MIs,'-o')
-plt.errorbar(np.arange(n_top_modes), np.mean(MIs,1), np.std(MIs,1))#/reps**0.5)
+plt.errorbar(np.arange(n_top_modes)+1, np.mean(MIs,1), np.std(MIs,1))#/reps**0.5)
 plt.xlabel('ranked modes')
-plt.ylabel('I(odor; mode)')
+plt.ylabel('I(odor; mode) bit/s')
 
 # %% start with simple regression
 # X_odor = build_signal(rec_signal, K_star)

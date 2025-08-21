@@ -254,7 +254,7 @@ plt.plot(n_reduced, errs[:, 3], '-o')
 plt.xlabel('reduced states'); plt.ylabel('density error')
 
 # %% test with simulated performances
-def sim_performance(red_P, sim_len=1500, reps=100,  x_range=(-300, -200), y_range=(-50, 50)):
+def sim_performance(red_P, sim_len=1500, reps=50,  x_range=(-300, -200), y_range=(-50, 50)):
     n_success = 0
     for rr in range(reps):
         _, sim_xy = gen_data_from_redused_states(reduced_P, sim_len)
@@ -263,16 +263,20 @@ def sim_performance(red_P, sim_len=1500, reps=100,  x_range=(-300, -200), y_rang
             n_success+=1
     return n_success/reps
 
-hit_rate = np.zeros(len(n_reduced))  ### n-states by the metrics
+rep_sim = 5
+hit_rate = np.zeros((len(n_reduced), rep_sim))  ### n-states by the metrics
 
-for ns in range(len(n_reduced)):
-    print('n-states=', n_reduced[ns])
-    reduced_P, state_sequence, cluster_labels, mapping_matrix = reduce_and_sample_markov(P, num_clusters=n_reduced[ns], num_steps=1000)
-    hit_rate[ns] = sim_performance(reduced_P)
+for rr in range(rep_sim):
+    print(rr)
+    for ns in range(len(n_reduced)):
+        print('n-states=', n_reduced[ns])
+        reduced_P, state_sequence, cluster_labels, mapping_matrix = reduce_and_sample_markov(P, num_clusters=n_reduced[ns], num_steps=1000)
+        hit_rate[ns,rr] = sim_performance(reduced_P)
 
 # %%
 plt.figure()
-plt.plot(n_reduced, hit_rate, '-o')
+# plt.plot(n_reduced, hit_rate, '-o')
+plt.errorbar(n_reduced, np.mean(hit_rate,1), yerr=np.std(hit_rate,1),color='k')
 plt.xlabel('reduced states'); plt.ylabel('navigation hit rate')
 
 # %% visualize states

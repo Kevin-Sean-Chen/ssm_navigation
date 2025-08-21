@@ -192,7 +192,7 @@ plt.xlabel('time (s)'); plt.ylabel('speed (mm/s)');
 # %% conditional analysis
 stim_len = 1  # 1,2,5 for 360,180,72 deg/s
 pre_stime = 3  # time before stimuli
-pre_window = 30  # steps of 1/60 frame-rate
+pre_window = int(1* 60)  # steps of 1/60 frame-rate
 pre_angle = []
 post_dtheta = []
 post_time = []
@@ -212,11 +212,11 @@ pre_angle = np.array(pre_angle)
 min_pos_wind = min([len(post_dtheta[ii]) for ii in range(len(post_dtheta))])
 
 # %% conditional plot
-conds = [[30, 330],
+conds = [[45, 315],
          [135, 45],
          [225, 135],
          [315, 225]] ### conditional angle bins
-time_stim = np.arange(0,6,.1)+3
+time_stim = np.arange(0,6,.1)+0
 cols = ['r','g','b','k']
 plt.figure()
 for cc in range(0,len(conds)):
@@ -256,7 +256,7 @@ dt = 1/60  # in seconds
 # stim_duration = 1  ### 1, 2, 5, 20 for 360, 180, 72, 18 deg/s
 post_stim_duration = 3
 pre_stim_duration = 3
-time_full = np.arange(0,stim_duration + post_stim_duration,dt) + pre_stim_duration
+time_full = np.arange(0, stim_duration + post_stim_duration,dt) + pre_stim_duration
 time_stim = np.arange(0, stim_duration, dt)
 stim_values = np.linspace(0, 360, num=len(time_stim))
 post_stim_values = np.full(len(time_full)-len(time_stim), np.nan)
@@ -300,7 +300,7 @@ def angle_between_vector_series(U, V):
 stim_pix = np.linspace(0, 640, num=len(time_stim))
 post_stim_values = np.full(len(time_full)-len(time_stim), np.nan)
 stim_pix_vector = np.concatenate([post_stim_values, stim_pix, post_stim_values])
-time_vec = np.arange(0, pre_stim_duration+stim_duration+post_stim_duration, dt)
+time_vec_trial = np.arange(0, pre_stim_duration+stim_duration+post_stim_duration, dt)
 pix2mm = 1.5 #1.5#1.5
 def map_to_rectangle_path(n_points=641):
     """
@@ -330,11 +330,11 @@ def map_to_rectangle_path(n_points=641):
 
 x_bar,y_bar = map_to_rectangle_path()  ### get the real-space x,y coordinates
 
-def find_stim_location_at_time_t(time,  time_vec=time_vec, stim_pix_vector=stim_pix_vector, x=x_bar, y=y_bar):
+def find_stim_location_at_time_t(time,  time_vec=time_vec_trial, stim_pix_vector=stim_pix_vector, x=x_bar, y=y_bar):
     index = np.argmin(np.abs(time_vec - time)) # fine index with time
     # if np.isnan(stim_pix_vector[index]) is False:
         # print(stim_pix_vector[index])
-    pixel_location = int(stim_pix_vector[index])  # find pixel index
+    pixel_location = int(stim_pix_vector[index])-1  # find pixel index
     stim_location = np.array([x[pixel_location], y[pixel_location]]) # return x,y location
     # else:
     #     stim_location = np.ones(2)+np.nan
@@ -379,7 +379,7 @@ for ii in range(len(tracks)):
             stim_xyt = find_stim_location_at_time_t(time_i[pos_stim[tt]])
             # view_angle = angle_between_vectors(  head_i[pos_stim[tt],:] , stim_xyt - pos_i[pos_stim[tt]]) # angle between bar and heading
             # view_angle = angle_between_vectors(  stim_xyt - pos_i[pos_stim[tt]] , head_i[pos_stim[tt],:]) # angle between bar and heading, flipped
-            view_angle = angle_between_vectors( np.array([1,0]) , stim_xyt - pos_i[pos_stim[tt]]) # angle between bar vector and reference
+            view_angle = angle_between_vectors( np.array([1, 0]) , stim_xyt - pos_i[pos_stim[tt]]) # angle between bar vector and reference
             stim_angi[tt] = view_angle - theta_i[pos_stim[tt]] ### # difference between bar and heading
             lab_fly_ang[tt] = angle_between_vectors(  np.array([1, 0]) , stim_xyt - pos_i[pos_stim[tt]])
             test_bear[tt] = angle_between_vectors( dxy[pos_stim[tt],:] , dxy[pos_stim[tt-1],:] )
@@ -481,6 +481,32 @@ plt.quiver(x[::step], y[::step], dx[::step], dy[::step], #scale=10,
 plt.xlabel('X')
 plt.ylabel('Y')
 
+# %% testing the angle code
+###############################################################################
+# fact vectors
+time_fake = np.arange(3, 4, 1/60)[:-1]
+pos_fake = np.array([100, 100])
+theta_fake = np.zeros(len(time_fake))-90
+theta_fake[10:20] = 90
+dtheta_fake = np.diff(theta_fake)
+response_vec = np.zeros(len(time_fake))
+view_vec = np.zeros(len(time_fake))
+bar_vec = np.zeros(len(time_fake))
+for tt in range(0,len(time_fake)):
+    ### test with bar location to calculate view angle
+    stim_xyt = find_stim_location_at_time_t(time_fake[tt])
+    # view_angle = angle_between_vectors(  head_i[pos_stim[tt],:] , stim_xyt - pos_i[pos_stim[tt]]) # angle between bar and heading
+    # view_angle = angle_between_vectors(  stim_xyt - pos_i[pos_stim[tt]] , head_i[pos_stim[tt],:]) # angle between bar and heading, flipped
+    view_angle = angle_between_vectors( np.array([1, 0]) , stim_xyt - pos_fake) # angle between bar vector and reference
+    view_vec[tt] = view_angle - theta_fake[tt] ### # difference between bar and heading
+    bar_vec[tt] = angle_between_vectors(  np.array([1, 0]) , stim_xyt - pos_fake)
+
+plt.figure()
+plt.subplot(311); plt.plot(dtheta_fake); plt.ylabel(r'$d\theta$')
+plt.subplot(312); plt.plot(view_vec,'o'); plt.plot([0, len(bar_vec)],[0,0],'k--'); plt.ylabel(r'$\phi$')
+plt.subplot(313); plt.plot(bar_vec , '.'); plt.ylabel('bar'); plt.xlabel('time (s)')
+
+# %% ##########################################################################
 # %% find front-crossing
 def find_first_pos_to_neg_crossing_circular(x, crossing_ang=0, wrap_limit=180):
     x = np.asarray(x)
@@ -498,6 +524,22 @@ def find_first_pos_to_neg_crossing_circular(x, crossing_ang=0, wrap_limit=180):
     indices = np.where(valid_crossings)[0]
     # indices = valid_crossings
     return indices[0] + 1 if len(indices) > 0 else None
+
+# def find_first_pos_to_neg_crossing_circular(x, crossing_ang=0):
+#     x = np.asarray(x)
+
+#     # Unwrap angles so we handle circular jumps properly
+#     x_unwrapped = np.unwrap(np.deg2rad(x))  # Convert to radians and unwrap
+#     x_unwrapped_deg = np.rad2deg(x_unwrapped)  # Back to degrees for comparison
+
+#     # Detect positive-to-negative crossing (relative to crossing_ang)
+#     x0 = x_unwrapped_deg[:-1]
+#     x1 = x_unwrapped_deg[1:]
+    
+#     crossings = (x0 >= crossing_ang) & (x1 < crossing_ang)
+
+#     indices = np.where(crossings)[0]
+#     return indices[0] + 1 if len(indices) > 0 else None
 
 def circular_mean_std_deg(angles_deg):
     angles_deg = np.asarray(angles_deg)
@@ -591,4 +633,119 @@ plt.ylabel(r'd$\theta$ post crossing')
 # plt.legend()
 plt.grid(True)
 plt.tight_layout()
+plt.show()
+
+# %% NEW attempt for bar crossing mid-line
+###############################################################################
+def signed_angle(v1, theta):
+    theta_ref_rad = theta/180*np.pi
+    # Normalize v1
+    v1 = np.asarray(v1)
+    v1 = v1 / np.linalg.norm(v1)
+
+    # Construct reference vector from angle
+    v2 = np.array([np.cos(theta_ref_rad), np.sin(theta_ref_rad)])
+
+    # Compute angles of each vector
+    angle1 = np.arctan2(v1[1], v1[0])
+    angle2 = np.arctan2(v2[1], v2[0])
+
+    # Difference
+    angle_diff = np.rad2deg(angle1 - angle2)
+
+    # Wrap to [-180, 180]
+    angle_diff = (angle_diff + 180) % 360 - 180
+    return angle_diff
+
+# %% making the lists
+valid_tracks = []  ### list of tracks that have stimuli and crossing the fly's eye
+loc_crossing = []  ### location of the crossing along the time axis
+temp_debug = []  ### a list of signal for debugging
+
+### loop across tracks
+for ii in range(len(tracks)):
+    ### load measurements
+    time_i = times[ii]
+    dtheta_i = dthetas[ii]
+    theta_i = thetas[ii]
+    speed_i = speeds[ii]
+    head_i = heading[ii]
+    pos_i = tracks[ii]
+    ### analyze the stimulated tracks
+    was_stimed = np.where((time_i>pre_stim_duration) & (time_i<pre_stim_duration+stim_duration))[0]
+    if len(was_stimed)>0:  # measurement during stim exists
+        pos_stim = was_stimed*1
+        stim_angi = np.zeros(len(pos_stim))  ### view angle (from fly heading)
+        for tt in range(0,len(pos_stim)):
+            ### test with bar location to calculate view angle
+            stim_xyt = find_stim_location_at_time_t(time_i[pos_stim[tt]])  ### stimulus location
+
+            ### using two angles with respect to 1,0 vector
+            view_angle = angle_between_vectors( np.array([1, 0]) , stim_xyt - pos_i[pos_stim[tt]]) # angle between bar vector and reference
+            stim_angi[tt] = wrap_heading(view_angle - theta_i[pos_stim[tt]]) ### # difference between bar and heading
+            
+            ### directly using two vectors (stim and heading)
+            stim_vector = stim_xyt - pos_i[pos_stim[tt]]
+            head_vector = head_i[pos_stim[tt],:]
+            stim_angi[tt] = angle_between_vectors(head_vector, stim_vector)
+            
+            ### using a function to compute angle between angle and vector
+            # stim_angi[tt] = signed_angle(stim_xyt, theta_i[pos_stim[tt]])  ### biased??
+            
+        ### record crossing
+        pos = find_first_pos_to_neg_crossing_circular((stim_angi), crossing_ang=50) ## wrap_heading
+        # print(stim_angle_vector[ii][1])
+        if pos is not None:
+            valid_tracks.append(ii)
+            loc_crossing.append(pos + 1*was_stimed[0])
+            temp_debug.append(stim_angi)
+            
+# %% plotting
+aligned_dtheta = []
+aligned_time = []
+plt.figure()
+for ii in range(len(valid_tracks)):
+    vid = valid_tracks[ii]
+    dthetai = dthetas[vid]
+    time_aligned = times[vid] - times[vid][loc_crossing[ii]]
+    # plt.plot(time_aligned, dthetai)
+    plt.plot(temp_debug[ii],'ko', alpha=0.1)
+    aligned_dtheta.append(dthetai)
+    aligned_time.append(time_aligned)
+plt.xlabel('time since crossing (s)')
+plt.ylabel(r'd$\theta$')
+
+# %%
+x = np.concatenate(aligned_time)
+y = np.concatenate(aligned_dtheta)
+# Define bin edges (e.g. 3 bins between min and max of x)
+num_bins = 60*4*2
+bins = np.linspace(np.min(x), np.max(x), num_bins + 1)
+
+# Digitize x values into bins (bin index ranges from 1 to len(bins)-1)
+bin_indices = np.digitize(x, bins) - 1  # shift to 0-based index
+
+# Initialize arrays to store statistics
+bin_centers = (bins[:-1] + bins[1:]) / 2
+mean_y = np.zeros(num_bins)
+std_y = np.zeros(num_bins)
+
+# Compute mean and std for y in each bin
+for i in range(num_bins):
+    mask = bin_indices == i
+    values = y[mask]
+    n = len(values)
+    if np.any(mask):  # check if there are any values in the bin
+        mean_y[i] = np.nanmean(y[mask])
+        std_y[i] = np.nanstd(y[mask])/(n**0.5)
+    else:
+        mean_y[i] = np.nan
+        std_y[i] = np.nan
+
+# Plotting
+plt.errorbar(bin_centers, mean_y, yerr=std_y, fmt='.-', capsize=5)
+plt.xlabel('time since crossing (s)')
+plt.ylabel(r'd$\theta$')
+plt.grid(True)
+plt.xlim([-3, 3]); plt.ylim([-70,70])
 plt.show()
