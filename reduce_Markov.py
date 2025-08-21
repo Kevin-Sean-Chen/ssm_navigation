@@ -31,7 +31,7 @@ vx_smooth, vy_smooth, acf_data = vx_smooth, vy_smooth*1, acf_data*1
 K_star = centrals.shape[1]//2
 tau_star = 3
 down_samp = 3
-kmean_seed = 37 #42
+kmean_seed = 37 #37 #42
 
 # %% reduced model exploration... ############################################
 from scipy.linalg import eig
@@ -98,7 +98,7 @@ def reduce_and_sample_markov(P, num_clusters=10, num_steps=1000):
 
 # Reduce to 10 states and simulate 1000 time steps
 num_clusters = 5
-reduced_P, state_sequence, cluster_labels, mapping_matrix = reduce_and_sample_markov(P, num_clusters=num_clusters, num_steps=1000)
+reduced_P, state_sequence, cluster_labels, mapping_matrix = reduce_and_sample_markov(R, num_clusters=num_clusters, num_steps=1000)
 
 # Plot the sampled time series
 plt.figure(figsize=(10, 4))
@@ -278,6 +278,8 @@ plt.figure()
 # plt.plot(n_reduced, hit_rate, '-o')
 plt.errorbar(n_reduced, np.mean(hit_rate,1), yerr=np.std(hit_rate,1),color='k')
 plt.xlabel('reduced states'); plt.ylabel('navigation hit rate')
+
+# plt.savefig("state_navigation.pdf", format="pdf", bbox_inches='tight')
 
 # %% visualize states
 for st in range(mapping_matrix.shape[0]):
