@@ -88,7 +88,7 @@ class LogLinearMarkovWithBaseline(nn.Module):
 
         if mask_seq is not None:
             mask_seq = torch.tensor(mask_seq, dtype=torch.float32)
-            mask_curr = mask_seq #[:-1]  # Mask for transitions
+            mask_curr = mask_seq[:-1]  # Mask for transitions
             selected_log_probs = selected_log_probs * mask_curr  # Only include masked-in terms
             nll = -selected_log_probs.sum() #/ (mask_curr.sum() + 1e-8)  # Normalize by number of valid points
         else:

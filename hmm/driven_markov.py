@@ -155,6 +155,7 @@ plt.figure()
 plt.plot(Pij_true.flatten(), model.P0.flatten(),'o'); plt.xlabel('true P0'); plt.ylabel('inferred P0')
 plt.figure()
 plt.plot(w_true.flatten(), model.ws.flatten(),'o'); plt.xlabel('true w'); plt.ylabel('inferred w')
+plt.show()
 
 # %% simulate
 def compute_markov_transition_matrix(states):
@@ -178,3 +179,4 @@ Peff_sim,_ = compute_markov_transition_matrix(states_sim)
 plt.figure()
 plt.subplot(121); plt.imshow(Peff_true); plt.title('emperical')
 plt.subplot(122); plt.imshow(Peff_sim); plt.title('simulated')
+plt.show()
