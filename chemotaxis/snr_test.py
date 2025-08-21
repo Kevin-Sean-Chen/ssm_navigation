@@ -99,6 +99,8 @@ def sim_RT(alpha, h=1, tau=1):
     tracks = np.zeros((N, T))
     for nn in range(N):
         track = np.zeros(T)
+        at = np.zeros(T)
+        st = np.zeros(T)
         track[:h] = np.random.randn()
         dx_prev = 0
         for tt in range(h, T-1):
@@ -124,23 +126,47 @@ def sim_RT(alpha, h=1, tau=1):
             dx = dx_prev + -dx_prev/tau + dx
             dx_prev = dx*1
             track[tt+1] = track[tt] + dx
+            
+            ### measure binary states
+            if dc>0:
+                st[tt] = 1
+            else:
+                st[tt] = 0
+            if dx>0:
+                at[tt] = 1
+            else:
+                at[tt] = 0
         tracks[nn,:] = track
-    return tracks
+    return tracks, st, at
 
 # %% scanning
 alphas = np.array([0.01, 0.1, 0.5, 1., 5, 10, 50, 100])
 cis = np.zeros((len(alphas), 2))
 
+infos_w = np.zeros((len(alphas), 6))
+infos_wo = infos_w*1 
+dey = 1
+
 for ii in range(len(cis)):
     print(ii)
-    tracks_wo = sim_RT(alphas[ii], h=1, tau=1)
+    tracks_wo, s_wo, a_wo = sim_RT(alphas[ii], h=1, tau=1)
     pos_wo = np.where(tracks_wo[:,-1]>0)[0]
     cis[ii,0] = len(pos_wo)/N
-    tracks_w = sim_RT(alphas[ii], h=1, tau=5)
+    tracks_w, s_w, a_w = sim_RT(alphas[ii], h=1, tau=5)
     pos_w = np.where(tracks_w[:,-1]>0)[0]
     cis[ii,1] = len(pos_w)/N
 
-# %%
+###############################################################################
+    ### if compute TE ###
+    # TE_YX, TE_XY, Hx, Hy, Hxy = transfer_entropy_both(a_wo, s_wo, delay=dey)  ### X,Y
+    # estimate = Hxy - Hx - Hy + TE_XY + TE_YX
+    # infos_wo[ii, :] = np.array([ TE_YX, TE_XY, Hx, Hy, Hxy, estimate])
+    # TE_YX, TE_XY, Hx, Hy, Hxy = transfer_entropy_both(a_w, s_w, delay=dey)  ### X,Y
+    # estimate = Hxy - Hx - Hy + TE_XY + TE_YX
+    # infos_w[ii, :] = np.array([ TE_YX, TE_XY, Hx, Hy, Hxy, estimate])
+###############################################################################
+
+# %% plot 
 plt.figure()
 plt.semilogx(alphas, cis[:,0], '-o', label='w/o')
 plt.semilogx(alphas, cis[:,1], '-o', label='memory')
@@ -151,3 +177,13 @@ plt.xlabel('SNR of gradient'); plt.ylabel('chemotaxis index'); plt.legend()
 plt.figure()
 plt.semilogx(alphas, cis[:,1] - cis[:,0], '-o', label='benifit')
 plt.xlabel('SNR of gradient'); plt.ylabel('benefit');
+
+# %% plot information
+# # [Hx, Hy, TE_YX, TE_XY]
+# labs = ['s->a', 'a->s', 'a', 's' ]
+# plt.figure()
+# # plt.plot(infos_wo[:,:4] / infos_wo[:,4][:,None])
+# for ii in range(4):
+#     plt.semilogx(alphas, infos_w[:,ii] / infos_w[:,4], label=labs[ii])
+# plt.legend()
+# plt.xlabel('SNR of gradient'); plt.ylabel('chemotaxis index'); plt.legend()

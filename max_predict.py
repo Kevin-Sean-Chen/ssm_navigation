@@ -33,18 +33,19 @@ from scipy.sparse.linalg import eigs
 threshold_track_l = 60 * 30  # 20 # look at long-enough tracks
 
 # Define the folder path
-folder_path = 'C:/Users/ksc75/Downloads/ribbon_data_kc/'
+# folder_path = 'C:/Users/ksc75/Downloads/ribbon_data_kc/'
 
-# Use glob to search for all .pkl files in the folder
-pkl_files = glob.glob(os.path.join(folder_path, '*.pklz'))
+# # Use glob to search for all .pkl files in the folder
+# pkl_files = glob.glob(os.path.join(folder_path, '*.pklz'))
 
-# Print the list of .pkl files
-for file in pkl_files:
-    print(file)
+# # Print the list of .pkl files
+# for file in pkl_files:
+#     print(file)
 
 # %% for perturbed data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'  ### for OU-ribbons
-root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
+# root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
+root_dir = 'C:/Users/kevin/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-5'
 target_file = "exp_matrix.pklz"
 

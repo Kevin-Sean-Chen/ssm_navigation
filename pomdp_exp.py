@@ -320,7 +320,7 @@ def transition_model(state, action):
     return (x_new, y_new)
 
 # Observation model P(o | s)
-def observation_model(state, goal=GOAL, lambda_factor=0.03):
+def observation_model(state, goal=GOAL, lambda_factor=0.05):
     """Returns the probability of detecting the goal based on distance."""
     distance = np.linalg.norm(np.array(state) - np.array(goal))
     return np.exp(-lambda_factor * distance)  # Corrected probability model
@@ -474,6 +474,24 @@ train_q_learning(episodes=500, steps=20)
 # Run the simulation using the learned policy
 simulate_pomdp_with_q_policy(steps=10)
 
+# show observation field
+plt.figure()
+obs_prob_grid = np.zeros((GRID_SIZE, GRID_SIZE))
+for x in range(GRID_SIZE):
+    for y in range(GRID_SIZE):
+        obs_prob_grid[x, y] = observation_model((x, y))
+
+# Plot observation probability heatmap
+plt.figure(figsize=(6, 5))
+plt.imshow(obs_prob_grid, origin="lower", cmap="Blues")
+plt.colorbar(label="Observation Probability")
+plt.scatter(GOAL[1], GOAL[0], color="red", marker="*", s=100, label="Goal")
+plt.title("Observation Probability Across Grid")
+plt.xlabel("X Position")
+plt.ylabel("Y Position")
+plt.xticks(range(GRID_SIZE))
+plt.yticks(range(GRID_SIZE))
+plt.legend()
 
 # %% NEXT ###
 # check binary encounter
