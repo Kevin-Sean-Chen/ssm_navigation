@@ -160,7 +160,7 @@ def reconstruct_full_W(model):
 # Simulate Markov chain
 def simulate_markov_chain(N, u_dim, T, true_logP0, true_W):
     x_seq = np.zeros(T, dtype=int)
-    u_seq = np.random.randn(T, u_dim)
+    u_seq = np.random.randn(T, u_dim)*10
 
     for t in range(T-1):
         x_curr = x_seq[t]
@@ -182,9 +182,9 @@ def simulate_markov_chain(N, u_dim, T, true_logP0, true_W):
 # Main
 
 # Set parameters
-N = 5
+N = 3
 u_dim = 1
-T = 10000
+T = 50000
 
 # Ground-truth model
 P0 = np.random.rand(N, N)
@@ -194,10 +194,10 @@ true_W = np.random.randn(N, N-1, u_dim) * 0.5
 
 # Simulate dataset
 x_seq, u_seq = simulate_markov_chain(N, u_dim, T, logP0, true_W)
-mask_seq = (np.random.rand(len(x_seq)) > 0.9).astype(int)
+mask_seq = (np.random.rand(len(x_seq)) < 0.9999).astype(int)
 
 # Fit model
-model = LogLinearMarkovWithBaseline(N=N, u_dim=u_dim, w_regu=0.01)
+model = LogLinearMarkovWithBaseline(N=N, u_dim=u_dim, w_regu=0.0)
 losses = model.fit(x_seq, u_seq, mask_seq=mask_seq, n_epochs=1000, lr=1e-2)
 
 # %%
@@ -259,17 +259,17 @@ plt.tight_layout()
 plt.show()
 
 # %% load reduced model and stim valuse from the dceomposed/reduced Markov script!
-u_dim = 150
-stim_matrix = np.zeros((u_dim, len(stim_bin)))
-stim_matrix[0,:] = stim_bin
-for ii in range(1,u_dim):
-    stim_matrix[ii,:] = np.concatenate((stim_bin[ii:] , np.zeros(ii)))
+# u_dim = 150
+# stim_matrix = np.zeros((u_dim, len(stim_bin)))
+# stim_matrix[0,:] = stim_bin
+# for ii in range(1,u_dim):
+#     stim_matrix[ii,:] = np.concatenate((stim_bin[ii:] , np.zeros(ii)))
     
-# %% test fitting
-# Create model
-# model = LogLinearMarkovTorch(N=5, u_dim=1, w_regu=0.01)
-model = LogLinearMarkovWithBaseline(N=5, u_dim=u_dim, w_regu=0.01)
-mask_tracks = idsi[:-1] == idsi[1:]
+# # %% test fitting
+# # Create model
+# # model = LogLinearMarkovTorch(N=5, u_dim=1, w_regu=0.01)
+# model = LogLinearMarkovWithBaseline(N=5, u_dim=u_dim, w_regu=0.01)
+# mask_tracks = idsi[:-1] == idsi[1:]
 
-# Fit the model
-losses = model.fit(reduced_behavior, stim_matrix.T, mask_seq=mask_tracks, lag=0, n_epochs=1000, lr=1e-2) #### NEED mask for tracks here !! ######
+# # Fit the model
+# losses = model.fit(reduced_behavior, stim_matrix.T, mask_seq=mask_tracks, lag=0, n_epochs=1000, lr=1e-2) #### NEED mask for tracks here !! ######

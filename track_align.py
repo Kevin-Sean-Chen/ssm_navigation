@@ -184,7 +184,9 @@ for nn in range(len(data4fit)):
         signal_vec = np.zeros_like(signal_i[pos_stim]) #,0]
         signal_vec[signal_i[pos_stim]>0] = 1  #,0]
         temp = (np.diff(signal_vec))
-        # odor_feature.append(np.nanmean(signal_i))  # mean encounter
+        # odor_feature.append(np.nansum(signal_i))  # mean encounter
+        odor_feature.append(np.nanmean(signal_i))  # mean encounter
+        # odor_feature.append(np.nanmean(signal_vec*vxy_i[pos_stim,1]**2))
         
         ### pre-off behavior
         # xy_during = xy_i[pos_stim[0]:pos,:]
@@ -192,7 +194,7 @@ for nn in range(len(data4fit)):
         # odor_feature.append(np.nanmean(dxdy2))
         
         ### number of encounter
-        odor_feature.append( len(np.where(temp>0)[0]) )  # number of encounters
+        # odor_feature.append( len(np.where(temp>0)[0]) )  # number of encounters
         # odor_feature.append(np.nanmean(vxy_i[pos_stim[0]:pos,0]**2))  # past behavior
         
         ### encounter time since last one
@@ -218,7 +220,7 @@ disp_every = 3
 post_window = 30*60
 
 sortt_id = np.argsort(odor_feature)[::-1]
-sortt_id = np.where(np.array(odor_feature)>3)[0] #### tracking condition ####
+# sortt_id = np.where(np.array(odor_feature)>3)[0] #### tracking condition ####
 
 import matplotlib.cm as cm
 colors = cm.viridis(np.linspace(0, 1, len(sortt_id)))
@@ -234,13 +236,26 @@ for kk in range(0,len(sortt_id),disp_every):
         plt.plot(traji[:post_window,0] - traji[0,0]*offset, cc*dispy + traji[:post_window,1]-traji[0,1]*offset, color=colors[kk])
     plt.plot(traji[0,0]  - traji[0,0]*offset, cc*dispy +traji[0,1]-traji[0,1]*offset,'r.', markersize=2)
     cc += 1
-    
+    print(odor_feature[sortt_id[kk]])
     ### plot dots
     # traji = post_xy[sortt_id[kk]][:post_window,:]
     # post_feature = np.sum(traji[:,0]**2)**.5
     # post_feature = np.sum((traji[0,0] - traji[-1,0])**2)**.5
     # post_feature = ((traji[0,1] - traji[-1,1]))
     # plt.plot(odor_feature[sortt_id[kk]], post_feature,'o')
+
+# %% sorting upwind
+plt.figure()
+cc = 0
+for kk in range(0,len(sortt_id),disp_every):
+    ### plot tracks
+    traji = post_xy[sortt_id[kk]]
+    pos_max = np.argmin(traji[:,0])
+    plt.plot(cc*dispy + traji[0:pos_max,1]-traji[0,1]*offset,  -(traji[:pos_max,0] - traji[0,0]*offset), color=colors[kk])
+    plt.plot( cc*dispy +traji[0,1]-traji[0,1]*offset, -(traji[0,0]  - traji[0,0]*offset),'r.', markersize=2)
+    cc += 1
+plt.xlabel('upwind displacement')
+plt.ylabel('sorted by past mean signal')
 
 # %% analyze speed
 spd_bin = np.linspace(0, 30, 50)
