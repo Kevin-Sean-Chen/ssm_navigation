@@ -197,7 +197,7 @@ x_seq, u_seq = simulate_markov_chain(N, u_dim, T, logP0, true_W)
 mask_seq = (np.random.rand(len(x_seq)) < 0.9999).astype(int)
 
 # Fit model
-model = LogLinearMarkovWithBaseline(N=N, u_dim=u_dim, w_regu=0.0)
+model = LogLinearMarkovWithBaseline(N=N, u_dim=u_dim, w_regu=0.2)
 losses = model.fit(x_seq, u_seq, mask_seq=mask_seq, n_epochs=1000, lr=1e-2)
 
 # %%
@@ -246,10 +246,10 @@ plt.show()
 # %%
 plt.figure(figsize=(15, 15))
 
-for i in range(5):
-    for j in range(5):
+for i in range(N):
+    for j in range(N):
         # Subplot index needs to be (i * 5 + j + 1)
-        plt.subplot(5, 5, i * 5 + j + 1)
+        plt.subplot(N, N, i * N + j + 1)
         plt.plot(learned_W[i, j, :])
         plt.title(f'({i},{j})', fontsize=8)
         plt.xticks([])  # remove x ticks

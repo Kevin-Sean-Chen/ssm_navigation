@@ -62,12 +62,12 @@ exp_list = [r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_
 # exp_list = [r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\periodic_ribbon\2025-6-27',
 #             r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\periodic_ribbon\2025-6-30',
 #             r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\periodic_ribbon\2025-7-3']
-exp_list = [r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\periodic_ribbon\2025-7-3']
+# exp_list = [r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\periodic_ribbon\2025-7-3']
 
 target_file = "exp_matrix.pklz"
 exp_type = 'jitter0p05'   ### 183
-exp_type = 'jitter0p0_' ### 142
-exp_type = '_OU_' ### 176
+# exp_type = 'jitter0p0_' ### 142
+# exp_type = '_OU_' ### 176
 # exp_type = 'gaussianribbon_vial'
 
 pkl_files = []
