@@ -260,7 +260,7 @@ entropy_components = [] #np.zeros((5, n_tracks))
 v_drift = [] #np.zeros(n_tracks)
 tumb_bias = []
 down_samp= 2
-delay = 10
+delay = 20
 
 for ii in range(n_tracks):
     si,bi = track2states(ii)
@@ -281,7 +281,7 @@ for ii in range(n_tracks):
 entropy_components_ = np.array(entropy_components).T
 plt.figure()
 # plt.hist(entropy_components[0,:] / entropy_components[4,:], 50)
-plt.plot(entropy_components_[0,:] / entropy_components_[4,:], v_drift, 'k.', alpha=0.5); plt.xlim([0,0.07]); plt.ylim([-.0,1.5])
+plt.plot(entropy_components_[0,:] / entropy_components_[4,:], v_drift, 'k.', alpha=0.5);# plt.xlim([0,0.07]); plt.ylim([-.0,1.5])
 # plt.plot(entropy_components_[0,:] / entropy_components_[4,:], entropy_components_[3,:] / entropy_components_[4,:], 'k.', alpha=0.5);
 # plt.xlim([0.,0.1]);plt.ylim([0.,0.1])
 
