@@ -65,7 +65,7 @@ dtheta_smooth[np.abs(dtheta_smooth)>dtheta_threshold] = dtheta_threshold
 dtheta_smooth[np.isnan(dtheta_smooth)] = 0
 
 # %% discretization for now
-thre = 5
+thre = 3
 bin_signal = signal*1
 bin_signal[signal<thre] = 0
 bin_signal[signal>=thre] = 1
@@ -259,22 +259,22 @@ fig.colorbar(cax3, ax=axs, orientation='horizontal', fraction=0.02, pad=0.1)
 
 
 # %% quick test for mode-TE calculation
-TEs = np.zeros(20)
-TE2 = TEs*1
-for ii in range(20):
-    imode = ii+1
-    phi2 = eigvecs[labels,imode].real
-    phi_samp = -phi2[window_show]
-    t = np.arange(1,50000,3)*1/60  ### time vector
-    pos = np.where(np.abs(dists)<50)[0]
-    x,y = phi_samp[pos], dists[pos]
-    yy_,_ = discretize_vector(y[:], n_bins=5)
-    xx_,_ = discretize_vector(x[:], n_bins=5)
-    TEs[ii] = transfer_entropy(yy_,xx_,delay=20) / (3/60)
-    TE2[ii] = transfer_entropy(xx_,yy_,delay=20) / (3/60)
+# TEs = np.zeros(20)
+# TE2 = TEs*1
+# for ii in range(20):
+#     imode = ii+1
+#     phi2 = eigvecs[labels,imode].real
+#     phi_samp = -phi2[window_show]
+#     t = np.arange(1,50000,3)*1/60  ### time vector
+#     pos = np.where(np.abs(dists)<50)[0]
+#     x,y = phi_samp[pos], dists[pos]
+#     yy_,_ = discretize_vector(y[:], n_bins=5)
+#     xx_,_ = discretize_vector(x[:], n_bins=5)
+#     TEs[ii] = transfer_entropy(yy_,xx_,delay=20) / (3/60)
+#     TE2[ii] = transfer_entropy(xx_,yy_,delay=20) / (3/60)
 
-plt.figure()
-plt.plot(TEs,'-o', label='proj->mode')
-plt.plot(TE2,'-o', label='mode->proj')
-plt.xlabel('modes')
-plt.ylabel('TE'); plt.legend()
+# plt.figure()
+# plt.plot(TEs,'-o', label='proj->mode')
+# plt.plot(TE2,'-o', label='mode->proj')
+# plt.xlabel('modes')
+# plt.ylabel('TE'); plt.legend()

@@ -32,7 +32,7 @@ matplotlib.rc('ytick', labelsize=20)
 ### to pull out all folders from a list of experiment dates
 ### find the subfolders that have the right name
 
-# %% for perturbed data
+# %% Specifiy batch of exp folders
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-5'
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2024-11-7'  ### for full field and OU
@@ -64,12 +64,39 @@ exp_list = [r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_
 #             r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\periodic_ribbon\2025-7-3']
 # exp_list = [r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\periodic_ribbon\2025-7-3']
 
+### gap crossing and perturbation data
+exp_list = [r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-09-06\kevin', ### gap crossing data, 117
+            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-09-11\kevin', ### Kir, TNT
+            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-09-12\kevin', ### TNT
+            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-09-19\kevin', ### Kir, TNT, 117
+            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-09-23\kevin', ### Kir, TNT, 117
+            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-09-25\kevin', ### Kir, TNT
+            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-09-30\kevin', ### Kir
+            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-02\kevin', ### TNT and Kir
+            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-07\kevin', ### good 117
+            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-09\kevin', ### good 117
+            r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-16\kevin', ### good 117
+            ]
+
+# %% define conditions
+### old pipeline with perturbed ribbons ###
 target_file = "exp_matrix.pklz"
 exp_type = 'jitter0p05'   ### 183
 # exp_type = 'jitter0p0_' ### 142
 # exp_type = '_OU_' ### 176
 # exp_type = 'gaussianribbon_vial'
+forbidden_subs = []
+###########################################
 
+### perturbation and gap crossing data ###
+target_file = "exp_matrix.joblib"
+exp_type = 'decreasing gap 60s'
+# exp_type = 'increasing gap 60s'
+forbidden_subs = ['Kir', 'TNT', 'OCL']
+# forbidden_subs = ['OCL']
+##########################################
+
+# %% finding in all subfolders
 pkl_files = []
 for ll in range(len(exp_list)):
     root_dir = exp_list[ll]
@@ -78,7 +105,9 @@ for ll in range(len(exp_list)):
     # Loop through each subfolder to search for the target file
     for subfolder in subfolders:
         for dirpath, dirnames, filenames in os.walk(subfolder):
-            if target_file in filenames and exp_type in dirpath:
+            # if target_file in filenames and exp_type in dirpath:
+            if target_file in filenames and exp_type in subfolder and not any(bad in subfolder for bad in forbidden_subs):
                 full_path = os.path.join(dirpath, target_file)
                 pkl_files.append(full_path)
                 print(full_path)
+                

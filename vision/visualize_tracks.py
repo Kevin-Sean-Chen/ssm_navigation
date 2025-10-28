@@ -53,9 +53,9 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_r
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-5-5' ### loom + ribbon
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-4-11'  ### visual loom + bar
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-5-19' ###
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-6-5'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-6-5'
 
-exp_type = ['center']#['05s']
+exp_type = ['05s'] #['center']#
 exclude_keywords = ['bars']
 target_file = "exp_matrix.pklz"
 
@@ -358,7 +358,10 @@ plt.plot(time_stim, mean_dtheta)
 plt.xlabel('time (s)'); plt.ylabel('|degree|/s'); 
 # plt.ylim([25, 90])
 plt.figure()
-plt.plot(time_stim, mean_speed)
+plt.plot(time_stim - 13, mean_speed)
+x = [0, 0.5,  0.5, 0]  # x-coordinates of corners
+y = [-20, -20, 30, 30]  # y-coordinates of corners
+plt.fill(x, y, color='gray', alpha=0.5); #plt.ylim([-5,17])
 plt.xlabel('time (s)'); plt.ylabel('speed (mm/s)'); 
 # plt.ylim([3, 11])
 
@@ -387,8 +390,8 @@ plt.xlabel('x (mm)'); plt.ylabel('heading (degrees from wind)')
 # %% time/space aligned tracks
 ###############################################################################
 # %% iterate across tracks
-pre_time = 10 ### 3,2
-stop_threshold = 5
+pre_time = 5 ### 10,3,2
+stop_threshold = 6
 not_stop = 5
 max_jump = 10
 time_all, speed_all, stop_all = [], [], []
@@ -399,7 +402,7 @@ for ii in range(len(tracks)):
     speed_i = speeds[ii]
     pos_time = np.where((time_i>25) & (time_i<30))[0]  ### condition in time
     pos_time = np.where((time_i>63-pre_time) & (time_i<73))[0]
-    pos_time = np.where((time_i>13-pre_time) & (time_i<28))[0]
+    pos_time = np.where((time_i>13-pre_time) & (time_i<18.5))[0] #28
     # pos_time = np.where((time_i>15+1-pre_time) & (time_i<30))[0]
     # pos_time = np.where((time_i>0))[0]   ### for just loom
     pos_space = np.where((xy_i[:,0]>50) & (xy_i[:,0]<250) & (xy_i[:,1]>50) & (xy_i[:,1]<150))[0]  ### condition in space
@@ -429,6 +432,7 @@ for ii in range(len(tracks)):
         temp_stop[speed_i[pos]>stop_threshold] = 0
         stop_all.append(temp_stop)
 
+print(len(time_all))
 time_all = np.concatenate(time_all)
 speed_all = np.concatenate(speed_all)
 stop_all = np.concatenate(stop_all)
@@ -443,7 +447,7 @@ plt.fill(x, y, color='gray', alpha=0.5)
 # %% average traces
 ###############################################################################
 # %% stopping and speed
-nbins = 90*2
+nbins = 150 #90*2
 at,bt = np.histogram(time_all, nbins)
 mean_speed = np.zeros(nbins)
 std_speed = np.zeros(nbins)
@@ -455,14 +459,22 @@ for ii in range(1,nbins):
         mean_speed[ii-1] = np.mean(speed_all[pos])
         std_speed[ii-1] = np.std(speed_all[pos])/len(pos)**0.5
 
-tt, mean, error = bt[:-2] - bt[0] - pre_time, mean_speed[:-1], std_speed[:-1]
+tt, mean, error = bt[:-2] - bt[0] - pre_time, mean_speed[:-1] , std_speed[:-1]
+# mean = mean - np.mean(mean[:len(mean)//2])
 plt.figure()
 # plt.plot(bt[:-2], mean_speed[:-1], '-o')
 plt.plot(tt, mean)
 plt.fill_between(tt, mean - error, mean + error, color='blue', alpha=0.3, label='± Error')
 plt.fill(x, y, color='gray', alpha=0.5)
-plt.ylim([0,1]); plt.xlabel('time since loom (s)'); plt.ylabel('P(stop)')
-plt.xlabel('time since loom (s)'); plt.ylabel('speed (mm/s)'); plt.ylim([2, 18])
+# plt.ylim([0,1]); plt.xlabel('time since loom (s)'); plt.ylabel('P(stop)')
+plt.xlabel('time since loom (s)'); plt.ylabel('speed (mm/s)'); plt.ylim([0, 16])
+
+plt.minorticks_on()                               # auto minor ticks
+plt.tick_params(axis='both', which='major', length=6, width=1,
+                bottom=True, top=False, left=True, right=False, direction='in')
+# plt.grid()
+
+# plt.savefig("speed_new.pdf", bbox_inches='tight')
 
 # %% angular functions
 def circular_mean_deg(angles_deg):
