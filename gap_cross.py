@@ -28,11 +28,13 @@ matplotlib.rc('ytick', labelsize=15)
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-09-06\kevin' ### gap crossing data
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-09-09\kevin' ### gap crossing data
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-11\kevin' ### gap crossing data
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-30\kevin' ### gap crossing data
+
 target_file = "exp_matrix.joblib"
-exp_type = 'increasing gap 60s TNT'
-# exp_type = 'increasing gap 60s'
+exp_type = 'increasing gap 60s Kir_EPG'
+# exp_type = 'short to gap 60s wind15'
 # forbidden_subs = ['Kir', 'TNT']
-forbidden_subs = ['isod1']
+forbidden_subs = []
 
 subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
 target_files = []
@@ -46,7 +48,7 @@ for subfolder in subfolders:
         print(full_path)
         
 # %% load data
-target_files = pkl_files*1   ### from batch ###################################
+# target_files = pkl_files*1   ### from batch ###################################
 
 target_files_sorted = natsorted(target_files)
 data4fit = []  # list of tracks with its vx,vy,theta signal recorded;  conditioned on behavior and long-tracks
@@ -309,6 +311,7 @@ for ii in range(len(lossx)):
         # Color each line based on its history signal value
         color = plt.cm.viridis(norm(history_vals[jj]))
         plt.plot(trackj[:,0]-trackj[0,0], trackj[:,1]-trackj[0,1], '-', color=color, alpha=0.5)
+        # plt.plot(trackj[:,0]-trackj[0,0], trackj[:,1]-trackj[0,1], 'k-', alpha=0.5)
         displaceix[jj] = np.nanmean((trackj[:,0]-trackj[0,0])**2)
         displaceiy[jj] = np.nanmean((trackj[:,1]-trackj[0,1])**2)
     
