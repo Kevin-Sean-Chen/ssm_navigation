@@ -215,8 +215,8 @@ plt.plot(lags[lag_range], cross_corr[lag_range])
 plt.xlabel("Lag"); plt.ylabel("Cross-Correlation"); plt.grid(True)
 
 # sample for location
-xy_grid = (17,9)
-delay = 20  ### 10,20,30
+xy_grid = (19,9)#(17,9)
+delay = 40  ### 10,20,30
 grid_xy = coarse_grain_2d_scatter_indices(x_smooth, y_smooth, xy_grid)
 
 # %%
@@ -226,20 +226,21 @@ grid_xy = coarse_grain_2d_scatter_indices(x_smooth, y_smooth, xy_grid)
 TE_s2b = np.zeros(xy_grid)
 TE_b2s = np.zeros(xy_grid)
 obs_num = np.zeros(xy_grid)
-for xx in range(xy_grid[0]):
+for xx in range(2,xy_grid[0]):
     print(xx)
     for yy in range(xy_grid[1]):
         pos = grid_xy[xx][yy]
         xi = bin_signal[pos]  ### sensory drive
         yi = bin_vi[pos]   ### behavior output
-        TE_s2b[xx,yy] = transfer_entropy(xi,yi,delay)
-        TE_b2s[xx,yy] = transfer_entropy(yi,xi,delay)
-        obs_num[xx,yy] = len(pos)
+        if len(pos)>1000:
+            TE_s2b[xx,yy] = transfer_entropy(xi,yi,delay) / (1/60*down_samp)
+            TE_b2s[xx,yy] = transfer_entropy(yi,xi,delay) / (1/60*down_samp)
+            obs_num[xx,yy] = len(pos)
 TE_s2b = TE_s2b.T
 TE_b2s = TE_b2s.T
 
 # %% plotting
-data1, data2, data3 = TE_s2b, TE_b2s, (TE_s2b - TE_b2s)
+data1, data2, data3 = TE_s2b, TE_b2s, (TE_s2b - TE_b2s)  * 1
 vmin = min(data1.min(), data2.min(), data3.min())
 vmax = max(data1.max(), data2.max(), data3.max())
 
@@ -248,10 +249,10 @@ for ax in axs:
     ax.set_xticks([])  # Remove x-axis ticks
     ax.set_yticks([]) 
 cax1 = axs[0].imshow(data1, cmap='viridis',vmin=vmin, vmax=vmax)
-axs[0].set_title("S -> B")
+axs[0].set_title(r"TE(s $\rightarrow$ a)")
 # axs[0].set_title("MI(S',S)")
 cax2 = axs[1].imshow(data2, cmap='viridis',vmin=vmin, vmax=vmax)
-axs[1].set_title("B -> S")
+axs[1].set_title(r"TE(a $\rightarrow$ s)")
 cax3 = axs[2].imshow(data3, cmap='viridis',vmin=vmin, vmax=vmax)
 axs[2].set_title("difference")
 fig.colorbar(cax3, ax=axs, orientation='horizontal', fraction=0.02, pad=0.1)
