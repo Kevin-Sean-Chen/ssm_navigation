@@ -1,0 +1,41 @@
+# Byte-code files
+__pycache__/
+*.pyc
+*.pyd
+*.egg-info/
+
+# Virtual environment
+venv/
+env/
+*.venv/
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*~
+#*#
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Sensitive/configuration files
+.env
+config.ini
+local_settings.py
+*.log
+
+# Build artifacts
+dist/
+build/
+
+# MATLAB files
+*.asv
+*.mex*
+
+# data files
+*.pdf
+*.pkl
+*.gif
+*.csv

@@ -48,7 +48,7 @@ for subfolder in subfolders:
         print(full_path)
         
 # %% load data
-# target_files = pkl_files*1   ### from batch ###################################
+target_files = pkl_files*1   ### from batch ###################################
 
 target_files_sorted = natsorted(target_files)
 data4fit = []  # list of tracks with its vx,vy,theta signal recorded;  conditioned on behavior and long-tracks
@@ -227,7 +227,7 @@ plt.tight_layout(); plt.show()
 ###############################################################################
 # %% measure pre, post
 window = 60*2  # window size in frames
-wind_past = 60*10 # window prior to loss
+wind_past = 60*6 # window prior to loss
 min_spd = 0
 # lossx = np.array([75, 131, 183, 233])  ### for increasing
 # lossx = np.array([45, 105, 167, 232])-1   ### for decreasing
@@ -237,6 +237,7 @@ history_signal = {i: [] for i in range(len(lossx))} # Dictionary to store past h
 cross_events = {i: [] for i in range(len(lossx))}  # Dictionary to store crossing events
 cross_action = {i: [] for i in range(len(lossx))}  ### record the action for clustering
 raw_hist_sig = {i: [] for i in range(len(lossx))} ### measure raw history trace for classification
+hist_features = {i: [] for i in range(len(lossx))}  ### place some a priori chosen factors to make crossing prediction later
 
 for ii in range(ntracks):  ### loop for tracks
     ### load track
@@ -290,8 +291,112 @@ for ii in range(ntracks):  ### loop for tracks
                                 cross_events[ll].append(1)  # mark as crossing event
                             else:
                                 cross_events[ll].append(0)  # mark as non-crossing event
+                                
+                            ### build features ###
+                            mean_sig = np.nanmean(hist_signal)
+                            std_sig = np.nanstd(hist_signal)
+                            freq_sig = len(np.where(np.diff(temp)>0)[0]) / (pre_wind/60)  # encounters per second
+                            ### compute past speed
+                            past_speed = np.nanmean(meani[idx-pre_wind:idx]**0.5)
+                            past_spd_std = np.nanstd(meani[idx-pre_wind:idx]**0.5)
+                            # Temporal features
+                            duration_in_signal = np.nansum(temp) * (1/60)  # seconds in signal
+                            # Path features
+                            path_positions = tracki[idx-pre_wind:idx, :]
+                            path_length = np.nansum(np.sqrt(np.sum(np.diff(path_positions, axis=0)**2, axis=1)))
+                            net_displacement = np.sqrt(np.nansum((path_positions[-1] - path_positions[0])**2))
+                            path_tortuosity = path_length / (net_displacement + 1e-6)  # add small value to avoid division by zero
+                            hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal])
 
+# %% simple logistic prediction
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 
+# Concatenate features and events across all loss points
+X_all = np.concatenate([np.array(hist_features[ll]) for ll in range(1,len(lossx))])
+y_all = np.concatenate([np.array(cross_events[ll]) for ll in range(1,len(lossx))])
+
+# Feature names for plotting
+feature_names = ['Mean Signal', 'Std Signal', 'Encounter Freq', 
+                'Past Speed', 'Speed Std', 'Path Tortuosity', 
+                'Duration in Signal']
+
+# K-fold sampling and training
+K = 30
+accuracies = []
+all_weights = []
+all_confusion = []
+all_probas = []
+
+# Standardize features
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X_all)
+
+for k in range(K):
+    # Split and train
+    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_all, test_size=0.2, stratify=y_all)
+    model = LogisticRegression(penalty='l1', C=1.0, solver='saga', max_iter=5000)
+    model.fit(X_train, y_train)
+    
+    # Record metrics
+    accuracies.append(model.score(X_test, y_test))
+    all_weights.append(model.coef_[0])
+    
+    # Get confusion matrix
+    y_pred = model.predict(X_test)
+    all_confusion.append(confusion_matrix(y_test, y_pred))
+    
+    # Get probabilities
+    all_probas.append((model.predict_proba(X_test), y_test))
+
+# Convert to numpy arrays
+accuracies = np.array(accuracies)
+all_weights = np.array(all_weights)
+mean_confusion = np.mean(np.array(all_confusion), axis=0)
+
+# Plot results
+fig = plt.figure(figsize=(15, 5))
+
+# 1. Feature importance
+plt.subplot(131)
+mean_weights = np.mean(all_weights, axis=0)
+std_weights = np.std(all_weights, axis=0)
+plt.errorbar(range(len(feature_names)), mean_weights, yerr=std_weights, fmt='o')
+plt.xticks(range(len(feature_names)), feature_names, rotation=45, ha='right')
+plt.axhline(0, color='gray', linestyle='--')
+plt.ylabel('Weight')
+plt.title(f'Feature Importance\nAccuracy: {np.mean(accuracies):.2f} ± {np.std(accuracies):.2f}')
+
+# 2. Confusion matrix
+plt.subplot(132)
+disp = ConfusionMatrixDisplay(mean_confusion)
+disp.plot(ax=plt.gca(), cmap='Blues', colorbar=False)
+plt.title("Mean Confusion Matrix")
+
+# 3. Probability validation
+plt.subplot(133)
+# Aggregate probabilities from all folds
+all_proba_true = []
+all_proba_false = []
+for proba, y_true in all_probas:
+    p_c = proba[:, 1]  # probability of crossing
+    mask_true = (y_true == 1)
+    all_proba_true.extend(p_c[mask_true])
+    all_proba_false.extend(p_c[~mask_true])
+
+plt.hist(all_proba_true, bins=20, alpha=0.7, label="true crossing", density=True)
+plt.hist(all_proba_false, bins=20, alpha=0.4, label="no crossing", density=True)
+plt.xlabel("P(crossing)")
+plt.ylabel("density")
+plt.legend(fontsize=8)
+plt.title("Prediction Confidence")
+
+plt.tight_layout()
+plt.show()
+    
 # %% sorted by history
 plt.figure(figsize=(15,5))
 mean_dx, std_dx = [],[]
