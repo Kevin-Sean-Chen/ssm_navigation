@@ -362,3 +362,4 @@ plt.figure()
 plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
 plt.title(f'mode#{imode}')
 
+# %% attempt to sample and reconstruct statistics

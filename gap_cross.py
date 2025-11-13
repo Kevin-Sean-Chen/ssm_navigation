@@ -226,8 +226,8 @@ plt.tight_layout(); plt.show()
 # %% visualization
 ###############################################################################
 # %% measure pre, post
-window = 60*2  # window size in frames
-wind_past = 60*6 # window prior to loss
+window = 60*5  # window size in frames
+wind_past = int(60*10) # window prior to loss
 min_spd = 0
 # lossx = np.array([75, 131, 183, 233])  ### for increasing
 # lossx = np.array([45, 105, 167, 232])-1   ### for decreasing
@@ -337,7 +337,7 @@ X_scaled = scaler.fit_transform(X_all)
 
 for k in range(K):
     # Split and train
-    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_all, test_size=0.2, stratify=y_all)
+    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_all, test_size=0.3, stratify=y_all)
     model = LogisticRegression(penalty='l1', C=1.0, solver='saga', max_iter=5000)
     model.fit(X_train, y_train)
     
