@@ -22,7 +22,7 @@ sns.set_style("white")
 sns.set_context("talk")
 
 # %% model setup
-lt = 7000
+lt = 1000
 N = 5
 u_dim = 2
 Pij_true = np.random.rand(N,N) + np.eye(N)*1   # baseline transition
@@ -35,8 +35,8 @@ stim = np.random.randn(lt)*2
 stim = np.convolve(stim, np.ones(smooth_lt), mode='same')  # smooth external input
 
 stim = np.random.randn(lt,u_dim)
-stim[:,0] = np.sin(np.arange(lt)/50)*2
-stim[:,1] = np.cos(np.arange(lt)/40)*2
+stim[:,0] = np.sin(np.arange(lt)/50)*.2
+stim[:,1] = np.cos(np.arange(lt)/40)*.2
 
 # stim[stim>2] = 2
 # stim[stim<2] = 0

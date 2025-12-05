@@ -331,11 +331,12 @@ color_abs = np.max(np.abs(phi2[window_show]))
 X_xy, track_id = build_X(rec_tracks, return_id=True)
 xy_back = X_xy[:, [0,int(K_star)]]
 plt.figure()
-plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5, vmin=-color_abs*1, vmax=color_abs/1)
+plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5, vmin=-color_abs*1.1, vmax=color_abs/2)
 # pos = np.where(phi2[window_show]<0)[0]
 # plt.scatter(xy_back[window_show, 0][pos],xy_back[window_show, 1][pos],c=-phi2[window_show][pos],cmap='coolwarm',s=.5, vmin=-color_abs*1, vmax=color_abs/1)
 
 plt.title(f'mode#{imode}')
+# plt.savefig("mode1.pdf", format="pdf", bbox_inches='tight')
 
 # %% modes back to velocity
 X_speed = build_signal(speeds, K_star)

@@ -15,6 +15,9 @@ import glob
 import os
 import re
 
+from matplotlib.cm import get_cmap
+from matplotlib.ticker import AutoMinorLocator
+
 import seaborn as sns
 sns.set_style("white")
 sns.set_context("talk")
@@ -64,8 +67,8 @@ def filter_files_by_number(file_list, target_number):
 bar_speed = 360 ### 18, 72, 180, 360
 stim_duration = 1  ### 1, 2, 5, 20 for 360, 180, 72, 18 deg/s
 ff = filter_files_by_number(pkl_files, bar_speed)
-threshold_track_l = 60 * 3 #2   #### set lenght criteria (in seconds)
-min_mean_speed = 1
+threshold_track_l = 60 * 1 #2   #### set lenght criteria (in seconds)
+min_mean_speed = 5
 # ff = np.arange(30,40)
 
 ### sort the lists
@@ -96,6 +99,7 @@ for ii in range(len(ff)):
                 
                 ### make per track data
                 dtheta = data['dtheta_smooth'][pos]
+                # _,dtheta,_ = turn_rate_from_v(data['vx_smooth'][pos] , data['vy_smooth'][pos])
                 theta = data['theta'][pos]
                 temp_v = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]))
                 temp_x = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
@@ -342,7 +346,7 @@ def find_stim_location_at_time_t(time,  time_vec=time_vec_trial, stim_pix_vector
 
 # %% rebuild the stim angle
 pre_window = 30  # steps of 1/60 frame-rate
-delay = 1*1  ### test this here
+delay = 1*30  # 10,20,30 ### test this here
 stim_angle = []
 fly_angle = []
 rec_time = []
@@ -383,6 +387,11 @@ for ii in range(len(tracks)):
             stim_angi[tt] = view_angle - theta_i[pos_stim[tt]] ### # difference between bar and heading
             lab_fly_ang[tt] = angle_between_vectors(  np.array([1, 0]) , stim_xyt - pos_i[pos_stim[tt]])
             test_bear[tt] = angle_between_vectors( dxy[pos_stim[tt],:] , dxy[pos_stim[tt-1],:] )
+            
+            # ### directly using two vectors (stim and heading)
+            stim_vector = stim_xyt - pos_i[pos_stim[tt]]
+            head_vector = head_i[pos_stim[tt],:]
+            stim_angi[tt] = angle_between_vectors(head_vector, stim_vector)
         
         test_bear[np.abs(test_bear)>50] = np.nan
         fly_angle.append(theta_i[pos_stim])  # dtheta_i
@@ -442,25 +451,85 @@ def bin_and_average_with_error(x, y, bins):
 # Bin and compute averages with error bars
 # delay = 5  ### need to think about how to choose this time lag for response
 # bin_centers, y_means, y_sem = bin_and_average_with_error(stim_angle_[:-delay], fly_response_[delay:], bins=20) ### through angles
-bin_centers, y_means, y_sem = bin_and_average_with_error(stim_angle_vector_[:-delay], fly_response_[delay:], bins=20)  ### through vectors
+bin_centers, y_means, y_sem = bin_and_average_with_error(stim_angle_vector_[:], fly_response_[:], bins=20)  ### through vectors
 
 # Plot Results
 plt.figure(figsize=(8, 5))
-plt.errorbar(bin_centers, y_means, yerr=y_sem, fmt='o', capsize=5, label="Binned Averages")
-plt.xlabel("stimulus angle to heading (deg)")
-plt.ylabel("fly response angle (deg/s)")
-# plt.ylim([-7,16])
+
+# mean line + shaded SEM band
+(line,) = plt.plot(bin_centers, y_means, '-', label="Binned Averages")
+c = line.get_color()
+ylo, yhi = y_means - y_sem, y_means + y_sem
+plt.fill_between(bin_centers, ylo, yhi, color=c, alpha=0.25, linewidth=0)
+
+ax = plt.gca()
+xmin, xmax = ax.get_xlim()
+ymin, ymax = ax.get_ylim()
+
+# crosshair through (0,0)
+ax.plot([xmin, xmax], [0, 0], linestyle='--', linewidth=1, color='k', alpha=0.6)
+ax.plot([0, 0], [ymin, ymax], linestyle='--', linewidth=1, color='k', alpha=0.6)
+
+# labels/title
+ax.set_xlabel("stimulus angle to heading (deg)")
+ax.set_ylabel("fly response angle (deg/s)")
+ax.set_title(f"delay = {delay/60:.2f} s")
+
+# keep original bounds
+ax.set_xlim(xmin, xmax)
+ax.set_ylim(ymin, ymax)
+
+# ---- Inward/outward tick marks + minors ----
+ax.xaxis.set_minor_locator(AutoMinorLocator())
+ax.yaxis.set_minor_locator(AutoMinorLocator())
+
+# inward ticks on bottom/left only (set top/right=True to show on all four sides)
+ax.tick_params(axis='both', which='major', direction='in', length=6, width=1, top=False, right=False)
+ax.tick_params(axis='both', which='minor', direction='in', length=3, width=0.8, top=False, right=False)
+ax.tick_params(left=True, bottom=True)  
+
+plt.tight_layout()
+# plt.show()
+# plt.savefig("stim_response_plot3.pdf", bbox_inches="tight")
 
 # %% track based analysis
 ###############################################################################
 # %% exp track
-trk = 97 #41 #18,19 # 2 not moving 5 for good response... might have error in heading ??
+trk = 90 #41 #18,19 # 2 not moving 5 for good response... might have error in heading ??
+# for tt in range(50):
+#     trk = tt*1
 plt.figure()
+plt.title(str(trk))
 plt.subplot(311); plt.plot(fly_response[trk]); plt.ylabel(r'$d\theta$')
 # plt.subplot(312); plt.plot(np.rad2deg(np.unwrap(np.deg2rad(stim_angle_vector[trk]))),'o')
 plt.subplot(312); plt.plot(stim_angle_vector[trk],'o'); plt.plot([0, len(stim_angle_vector[trk])],[0,0],'k--'); plt.ylabel(r'$\phi$')
 # plt.subplot(313); plt.plot(rec_time[trk] - rec_time[trk][0], stim_ang_bar[trk]); plt.ylabel('bar'); #plt.xlabel('time (s)')
 plt.subplot(313); plt.plot(rec_time[trk] - rec_time[trk][0], pseudo_lab_ang[trk] , '.'); plt.ylabel('bar'); plt.xlabel('time (s)')
+
+# %% visualize example track
+trk = 91## 10, 25, 91
+trid = valid_tracks[trk]
+pos_stim_ = np.where((times[trid]>pre_stim_duration) & (times[trid]<pre_stim_duration+stim_duration))[0]
+pos_i = tracks[trid]#[pos_stim_]
+x = pos_i[:70, 0]
+y = pos_i[:70, 1]
+plt.figure(figsize=(8, 6))
+plt.plot(x, y, '-', label='Trajectory', color='k', linewidth=3)
+plt.plot(x[pos_stim[0]], y[pos_stim[0]], 'go', label='start')
+plt.plot(x[pos_stim[-1]], y[pos_stim[-1]], 'ro', label='end')
+
+ax = plt.gca()
+ax.set_aspect('equal', adjustable='box')   # equal scaling on both axes
+# (optional) add a small padding around the data limits
+pad = 0.05
+xmin, xmax = x.min(), x.max()
+ymin, ymax = y.min(), y.max()
+dx, dy = xmax - xmin, ymax - ymin
+ax.set_xlim(xmin - pad*dx, xmax + pad*dx)
+ax.set_ylim(ymin - pad*dy*10, ymax + pad*dy*10)
+
+ax.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), borderaxespad=0.)
+# plt.savefig("exp_track3.pdf", bbox_inches="tight")
 
 # %% show valid tacks
 trid = valid_tracks[trk]
@@ -657,6 +726,18 @@ def signed_angle(v1, theta):
     angle_diff = (angle_diff + 180) % 360 - 180
     return angle_diff
 
+def bar_speed(stim_ang):
+    """
+    Per-step angular change (radians) with same length as stim_ang.
+    First element is NaN; subsequent elements are unwrapped differences.
+    """
+    ang = np.deg2rad(np.asarray(stim_ang))
+    d = np.diff(np.unwrap(ang))
+    out = np.empty_like(ang, dtype=float)
+    out[0] = np.nan          # or 0.0 if you prefer
+    out[1:] = d
+    return out
+
 # %% making the lists
 valid_tracks = []  ### list of tracks that have stimuli and crossing the fly's eye
 loc_crossing = []  ### location of the crossing along the time axis
@@ -682,7 +763,7 @@ for ii in range(len(tracks)):
 
             ### using two angles with respect to 1,0 vector
             view_angle = angle_between_vectors( np.array([1, 0]) , stim_xyt - pos_i[pos_stim[tt]]) # angle between bar vector and reference
-            stim_angi[tt] = wrap_heading(view_angle - theta_i[pos_stim[tt]]) ### # difference between bar and heading
+            stim_angi[tt] = wrap_heading(view_angle*1 - 1*theta_i[pos_stim[tt]]) ### # difference between bar and heading
             
             ### directly using two vectors (stim and heading)
             stim_vector = stim_xyt - pos_i[pos_stim[tt]]
@@ -693,12 +774,14 @@ for ii in range(len(tracks)):
             # stim_angi[tt] = signed_angle(stim_xyt, theta_i[pos_stim[tt]])  ### biased??
             
         ### record crossing
-        pos = find_first_pos_to_neg_crossing_circular((stim_angi), crossing_ang=50) ## wrap_heading
-        # print(stim_angle_vector[ii][1])
+        pos = find_first_pos_to_neg_crossing_circular((stim_angi), crossing_ang=60) ## wrap_heading
         if pos is not None:
+            # plt.figure()
+            # plt.plot(stim_angi)
             valid_tracks.append(ii)
-            loc_crossing.append(pos + 1*was_stimed[0])
-            temp_debug.append(stim_angi)
+            loc_crossing.append(pos + 1*was_stimed[0]-0)
+            # temp_debug.append(stim_angi)
+            temp_debug.append(bar_speed(stim_angi)[pos])
             
 # %% plotting
 aligned_dtheta = []
@@ -707,11 +790,13 @@ plt.figure()
 for ii in range(len(valid_tracks)):
     vid = valid_tracks[ii]
     dthetai = dthetas[vid]
+    # dthetai = speeds[vid]
     time_aligned = times[vid] - times[vid][loc_crossing[ii]]
     # plt.plot(time_aligned, dthetai)
     plt.plot(temp_debug[ii],'ko', alpha=0.1)
-    aligned_dtheta.append(dthetai)
-    aligned_time.append(time_aligned)
+    if temp_debug[ii]<100:
+        aligned_dtheta.append(dthetai)
+        aligned_time.append(time_aligned)
 plt.xlabel('time since crossing (s)')
 plt.ylabel(r'd$\theta$')
 
@@ -719,7 +804,7 @@ plt.ylabel(r'd$\theta$')
 x = np.concatenate(aligned_time)
 y = np.concatenate(aligned_dtheta)
 # Define bin edges (e.g. 3 bins between min and max of x)
-num_bins = 60*4*2
+num_bins = 60*4
 bins = np.linspace(np.min(x), np.max(x), num_bins + 1)
 
 # Digitize x values into bins (bin index ranges from 1 to len(bins)-1)
@@ -743,9 +828,127 @@ for i in range(num_bins):
         std_y[i] = np.nan
 
 # Plotting
+plt.figure()
 plt.errorbar(bin_centers, mean_y, yerr=std_y, fmt='.-', capsize=5)
 plt.xlabel('time since crossing (s)')
 plt.ylabel(r'd$\theta$')
+# plt.ylabel(r'$\theta$')
+# plt.ylabel('speed')
 plt.grid(True)
-plt.xlim([-3, 3]); plt.ylim([-70,70])
+plt.xlim([-1, 1]); plt.ylim([-70,70])
+plt.show()
+
+
+# %% scan crossing
+crosses = np.array([90,60,30,0,-30,-60,-90])
+cmap = plt.cm.viridis
+colors = cmap(np.linspace(0, 1, len(crosses))) 
+
+fig, ax = plt.subplots(figsize=(8, 5))
+cmap = get_cmap('plasma')
+ax.set_prop_cycle(color=cmap(np.linspace(0, 1, len(crosses))))
+
+for cc in range(len(crosses)):
+    
+    valid_tracks = []  ### list of tracks that have stimuli and crossing the fly's eye
+    loc_crossing = []  ### location of the crossing along the time axis
+    temp_debug = []  ### a list of signal for debugging
+    
+    ### loop across tracks
+    for ii in range(len(tracks)):
+        ### load measurements
+        time_i = times[ii]
+        dtheta_i = dthetas[ii]
+        theta_i = thetas[ii]
+        speed_i = speeds[ii]
+        head_i = heading[ii]
+        pos_i = tracks[ii]
+        ### analyze the stimulated tracks
+        was_stimed = np.where((time_i>pre_stim_duration) & (time_i<pre_stim_duration+stim_duration))[0]
+        if len(was_stimed)>0:  # measurement during stim exists
+            pos_stim = was_stimed*1
+            stim_angi = np.zeros(len(pos_stim))  ### view angle (from fly heading)
+            for tt in range(0,len(pos_stim)):
+                ### test with bar location to calculate view angle
+                stim_xyt = find_stim_location_at_time_t(time_i[pos_stim[tt]])  ### stimulus location
+    
+                ### using two angles with respect to 1,0 vector
+                view_angle = angle_between_vectors( np.array([1, 0]) , stim_xyt - pos_i[pos_stim[tt]]) # angle between bar vector and reference
+                stim_angi[tt] = wrap_heading(view_angle*1 - 1*theta_i[pos_stim[tt]]) ### # difference between bar and heading
+                
+                ### directly using two vectors (stim and heading)
+                stim_vector = stim_xyt - pos_i[pos_stim[tt]]
+                head_vector = head_i[pos_stim[tt],:]
+                stim_angi[tt] = angle_between_vectors(head_vector, stim_vector)
+                
+                ### using a function to compute angle between angle and vector
+                # stim_angi[tt] = signed_angle(stim_xyt, theta_i[pos_stim[tt]])  ### biased??
+                
+            ### record crossing
+            pos = find_first_pos_to_neg_crossing_circular((stim_angi), crossing_ang=crosses[cc]) ## wrap_heading
+            if pos is not None:
+                # plt.figure()
+                # plt.plot(stim_angi)
+                valid_tracks.append(ii)
+                loc_crossing.append(pos + 1*was_stimed[0]-0)
+                # temp_debug.append(stim_angi)
+                temp_debug.append(bar_speed(stim_angi)[pos])
+    print(len(loc_crossing))
+                
+    ### alignment
+    aligned_dtheta = []
+    aligned_time = []
+    for ii in range(len(valid_tracks)):
+        vid = valid_tracks[ii]
+        dthetai = dthetas[vid]
+        # dthetai = speeds[vid]
+        time_aligned = times[vid] - times[vid][loc_crossing[ii]]
+        if temp_debug[ii]>-2:
+            aligned_dtheta.append(dthetai)
+            aligned_time.append(time_aligned)
+    
+    x = np.concatenate(aligned_time)
+    y = np.concatenate(aligned_dtheta)
+    # Define bin edges (e.g. 3 bins between min and max of x)
+    num_bins = 60*3
+    bins = np.linspace(np.min(x), np.max(x), num_bins + 1)
+    
+    # Digitize x values into bins (bin index ranges from 1 to len(bins)-1)
+    bin_indices = np.digitize(x, bins) - 1  # shift to 0-based index
+    
+    # Initialize arrays to store statistics
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+    mean_y = np.zeros(num_bins)
+    std_y = np.zeros(num_bins)
+    
+    # Compute mean and std for y in each bin
+    for i in range(num_bins):
+        mask = bin_indices == i
+        values = y[mask]
+        n = len(values)
+        if np.any(mask):  # check if there are any values in the bin
+            mean_y[i] = np.nanmean(y[mask])
+            std_y[i] = np.nanstd(y[mask])/(n**0.5)
+        else:
+            mean_y[i] = np.nan
+            std_y[i] = np.nan
+    
+    # plt.errorbar(bin_centers, mean_y, yerr=std_y, fmt='.-', capsize=5, color=colors[cc])
+    # ax.errorbar(bin_centers, mean_y, yerr=std_y, fmt='-', label='cross='+str(crosses[cc]))  # no need to pass color
+    (line,) = ax.plot(bin_centers, mean_y, '-', label=f'cross={crosses[cc]}')
+    c = line.get_color()
+    ax.fill_between(bin_centers,
+                    mean_y - std_y,
+                    mean_y + std_y,
+                    color=c, alpha=0.25, linewidth=0)
+ax.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), borderaxespad=0.)
+fig.tight_layout()
+
+plt.xlabel('time since crossing (s)')
+plt.ylabel(r'd$\theta$')
+# plt.ylabel(r'$\theta$')
+# plt.ylabel('speed')
+plt.grid(True)
+plt.xlim([-.5, 1.1]); plt.ylim([-50,50])
+# plt.savefig("time_tack_shade.pdf", bbox_inches="tight")
 plt.show()
