@@ -141,7 +141,8 @@ def sim_RT(alpha, h=1, tau=1):
 
 # %% scanning
 alphas = np.array([0.01, 0.1, 0.5, 1., 5, 10, 50, 100])
-cis = np.zeros((len(alphas), 2))
+reps = 10
+cis = np.zeros((len(alphas), reps, 2))
 
 infos_w = np.zeros((len(alphas), 6))
 infos_wo = infos_w*1 
@@ -149,12 +150,13 @@ dey = 1
 
 for ii in range(len(cis)):
     print(ii)
-    tracks_wo, s_wo, a_wo = sim_RT(alphas[ii], h=1, tau=1)
-    pos_wo = np.where(tracks_wo[:,-1]>0)[0]
-    cis[ii,0] = len(pos_wo)/N
-    tracks_w, s_w, a_w = sim_RT(alphas[ii], h=1, tau=5)
-    pos_w = np.where(tracks_w[:,-1]>0)[0]
-    cis[ii,1] = len(pos_w)/N
+    for rr in range(reps):
+        tracks_wo, s_wo, a_wo = sim_RT(alphas[ii], h=1, tau=1)
+        pos_wo = np.where(tracks_wo[:,-1]>0)[0]
+        cis[ii,rr, 0] = len(pos_wo)/N
+        tracks_w, s_w, a_w = sim_RT(alphas[ii], h=1, tau=5)
+        pos_w = np.where(tracks_w[:,-1]>0)[0]
+        cis[ii,rr, 1] = len(pos_w)/N
 
 ###############################################################################
     ### if compute TE ###
@@ -168,14 +170,17 @@ for ii in range(len(cis)):
 
 # %% plot 
 plt.figure()
-plt.semilogx(alphas, cis[:,0], '-o', label='w/o')
-plt.semilogx(alphas, cis[:,1], '-o', label='memory')
-plt.semilogx([alphas[0], alphas[-1]], [.5, .5], 'k--')
+plt.errorbar(alphas, np.mean(cis[:,:,0], axis=1),yerr=np.std(cis[:,:,0], axis=1)/1,  fmt='-o', label='w/o')
+plt.errorbar(alphas, np.mean(cis[:,:,1], axis=1),yerr=np.std(cis[:,:,1], axis=1)/1, fmt='-o', label='memory')
+plt.plot([alphas[0], alphas[-1]], [.5, .5], 'k--')
+plt.xscale('log')
 plt.xlabel('SNR of gradient'); plt.ylabel('chemotaxis index'); plt.legend()
 
 # %%
 plt.figure()
-plt.semilogx(alphas, cis[:,1] - cis[:,0], '-o', label='benifit')
+# plt.semilogx(alphas, cis[:,1] - cis[:,0], '-o', label='benifit')
+plt.errorbar(alphas, np.mean(cis[:,:,1]-cis[:,:,0],1),np.std(cis[:,:,1]-cis[:,:,0],1)/reps**.5, fmt='-o', label='memory')
+plt.xscale('log')
 plt.xlabel('SNR of gradient'); plt.ylabel('benefit');
 
 # %% plot information
