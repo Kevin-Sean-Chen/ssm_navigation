@@ -29,9 +29,11 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cr
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-09-09\kevin' ### gap crossing data
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-11\kevin' ### gap crossing data
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-30\kevin' ### gap crossing data
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-25\kevin' ### with control crosses
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-26\kevin'
 
 target_file = "exp_matrix.joblib"
-exp_type = 'increasing gap 60s Kir_EPG'
+exp_type = 'same'#'increasing gap 60s ocl_' #'increasing gap 60s Kir_EPG'
 # exp_type = 'short to gap 60s wind15'
 # forbidden_subs = ['Kir', 'TNT']
 forbidden_subs = []
@@ -48,7 +50,7 @@ for subfolder in subfolders:
         print(full_path)
         
 # %% load data
-target_files = pkl_files*1   ### from batch ###################################
+# target_files = pkl_files*1   ### from batch ###################################
 
 target_files_sorted = natsorted(target_files)
 data4fit = []  # list of tracks with its vx,vy,theta signal recorded;  conditioned on behavior and long-tracks
@@ -60,45 +62,45 @@ rec_signal = []  # record opto signal
 times = []   # record time in epoch
 thetas = []
 cond_id = 0
-threshold_track_l = 60*2
-
+threshold_track_l = 60*1
 for ff in range(nf):
     ### load file
-    print(ff)
     data = joblib.load(target_files_sorted[ff])
         
     ### extract tacks
     n_tracks = np.unique(data['trjn'])
     
-    for ii in n_tracks:
-        pos = np.where(data['trjn']==ii)[0] # find track elements
-        # if sum(data['behaving'][pos]):  # check if behaving
-        if 1==1: 
-            if len(pos) > threshold_track_l:
-                
-                ### make per track data
-                # temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos] , \
-                                        # data['theta_smooth'][pos] , data['signal'][pos]))
-                theta = data['theta'][pos]
-                temp = np.stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]),1)#######
-                temp_xy = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
-                                
-                ### criteria
-                mask_i = np.where(np.isnan(temp), 0, 1)
-                mask_j = np.where(np.isnan(theta), 0, 1)
-                mean_v = np.nanmean(np.sum(temp**2,1)**0.5)
-                max_v = np.max(np.sum(temp**2,1)**0.5)
-                # print(mean_v)
-                # if np.prod(mask_i)==1 and np.prod(mask_j)==1 
-                if np.prod(mask_i)==1 and mean_v>.1 and max_v<30: #max_v<20:  ###################################### removing nan for now
-                    data4fit.append(temp)  # get data for ssm fit
-                    rec_tracks.append(temp_xy)  # get raw tracks
-                    track_id.append(np.zeros(len(pos))+ii) 
-                    rec_signal.append(data['signal'][pos].squeeze())
-                    # rec_signal.append(np.ones((len(pos),1)))   ########################## hacking if needed
-                    cond_id += 1
-                    times.append(data['t'][pos])
-                    thetas.append(theta)
+    if "vx_smooth" in data and "signal" in data:
+        print(ff)
+        for ii in n_tracks:
+            pos = np.where(data['trjn']==ii)[0] # find track elements
+            # if sum(data['behaving'][pos]):  # check if behaving
+            if 1==1: 
+                if len(pos) > threshold_track_l:
+                    
+                    ### make per track data
+                    # temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos] , \
+                                            # data['theta_smooth'][pos] , data['signal'][pos]))
+                    theta = data['theta'][pos]
+                    temp = np.stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]),1)#######
+                    temp_xy = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
+                                    
+                    ### criteria
+                    mask_i = np.where(np.isnan(temp), 0, 1)
+                    mask_j = np.where(np.isnan(theta), 0, 1)
+                    mean_v = np.nanmean(np.sum(temp**2,1)**0.5)
+                    max_v = np.max(np.sum(temp**2,1)**0.5)
+                    # print(mean_v)
+                    # if np.prod(mask_i)==1 and np.prod(mask_j)==1 
+                    if np.prod(mask_i)==1 and mean_v>.1 and max_v<50: #max_v<20:  ###################################### removing nan for now
+                        data4fit.append(temp)  # get data for ssm fit
+                        rec_tracks.append(temp_xy)  # get raw tracks
+                        track_id.append(np.zeros(len(pos))+ii) 
+                        rec_signal.append(data['signal'][pos].squeeze())
+                        # rec_signal.append(np.ones((len(pos),1)))   ########################## hacking if needed
+                        cond_id += 1
+                        times.append(data['t'][pos])
+                        thetas.append(theta)
 
 # %% vectorize for simpliciy
 vec_signal = np.concatenate(rec_signal)  # odor signal
@@ -117,7 +119,7 @@ plt.plot(vec_xy[pos,0], vec_xy[pos,1],'r,')
 # %% upwind when in signal
 ntracks = len(rec_tracks)
 upwindx = []
-thre_signalt = 60*3
+thre_signalt = 60*1
 
 for ii in range(ntracks):
     tracki = rec_tracks[ii]
@@ -137,7 +139,8 @@ for ii in range(ntracks):
 # %% search during crossing
 window = 60*2  # window size in frames
 lossx = np.array([75, 131, 183, 233])-1  ### for increasing
-lossx = np.array([45, 105, 167, 232])-1  ### for decreasing
+# lossx = np.array([45, 105, 167, 232])-1  ### for decreasing
+lossx = np.array([76, 127, 181, 232])-3
 crossing_indices = {i: [] for i in range(len(lossx))}  # Dictionary to store indices for each condition
 crossing_segments = {i: [] for i in range(len(lossx))}  # Dictionary to store track segments
 
@@ -191,13 +194,13 @@ for ii in range(len(lossx)):#-1, -1, -1):  # Changed to iterate in reverse
     mean_dy.append(np.nanmean(displaceiy))
     std_dy.append(np.nanstd(displaceiy)/jj**0.5)
 
-plt.figure(figsize=(10,5))
+plt.figure(figsize=(14,4))
 plt.subplot(1,2,1)
 plt.errorbar([1,2,3,4], mean_dx, yerr=std_dx, fmt='o')
-plt.xlabel('gap order'); plt.ylabel('up wind displacement (x)'); plt.ylim([50,150])
+plt.xlabel('gap order'); plt.ylabel('up wind displacement (x)'); #plt.ylim([50,150])
 plt.subplot(1,2,2)
 plt.errorbar([1,2,3,4], mean_dy, yerr=std_dy, fmt='o')
-plt.xlabel('gap order'); plt.ylabel('cross wind displacement (y)'); plt.ylim([10,100])
+plt.xlabel('gap order'); plt.ylabel('cross wind displacement (y)'); #plt.ylim([10,100])
 
 # %% checking odor reponse
 mask_pos = (vec_xy[:,0] > 25) & (vec_xy[:,0] < 170) & (vec_xy[:,1] > 20) & (vec_xy[:,1] < 295)
@@ -273,13 +276,13 @@ for ii in range(ntracks):  ### loop for tracks
                             ### z-score
                             # history_signal[ll].append(np.nanstd(hist_signal)/np.nanmean(hist_signal))
                             ### mean (intermittency)
-                            # temp = hist_signal*0
-                            # temp[hist_signal>0] = 1 
-                            # history_signal[ll].append(np.nanmean(temp))
-                            ### encounters
                             temp = hist_signal*0
                             temp[hist_signal>0] = 1 
-                            history_signal[ll].append(len(np.where(np.diff(temp)>0)[0]))
+                            history_signal[ll].append(np.nansum(temp))
+                            ### encounters
+                            # temp = hist_signal*0
+                            # temp[hist_signal>0] = 1 
+                            # history_signal[ll].append(len(np.where(np.diff(temp)>0)[0]))
                             
                             v_temp = np.array([[vxyi[idx:idx+window,0]],[(vxyi[idx:idx+window,1])]])
                             cross_action[ll].append(v_temp.reshape(-1))
@@ -468,149 +471,149 @@ plt.legend(fontsize=15)
 plt.show()
 
 # %% same-gap comparison
-reps = 150
-n_samps = 100
-dec_pcross, dec_sig = cross_events_dec[1], history_signal_dec[1]
-inc_pcross, inc_sig = cross_events_inc[0], history_signal_inc[0]
-colors = ['r', 'k']  # Different color for each loss point
+# reps = 150
+# n_samps = 100
+# dec_pcross, dec_sig = cross_events_dec[1], history_signal_dec[1]
+# inc_pcross, inc_sig = cross_events_inc[0], history_signal_inc[0]
+# colors = ['r', 'k']  # Different color for each loss point
 
-dec_pcross, dec_sig = cross_events_dec[0], history_signal_dec[0]
-inc_pcross, inc_sig = cross_events_inc[1], history_signal_inc[1]
-colors = ['b', 'g']
+# dec_pcross, dec_sig = cross_events_dec[0], history_signal_dec[0]
+# inc_pcross, inc_sig = cross_events_inc[1], history_signal_inc[1]
+# colors = ['b', 'g']
 
-for rr in range(reps):
-    print(rr)
-    n_crosses = len(dec_pcross)
-    sampled_indices = np.random.choice(n_crosses, size=min(n_samps, n_crosses), replace=False)
-    sigi = np.nanmean(np.array(dec_sig)[sampled_indices])
-    pcrosi = np.mean(np.array(dec_pcross)[sampled_indices])
-    plt.plot(sigi, pcrosi, 'o', color=colors[0], alpha=0.5)
+# for rr in range(reps):
+#     print(rr)
+#     n_crosses = len(dec_pcross)
+#     sampled_indices = np.random.choice(n_crosses, size=min(n_samps, n_crosses), replace=False)
+#     sigi = np.nanmean(np.array(dec_sig)[sampled_indices])
+#     pcrosi = np.mean(np.array(dec_pcross)[sampled_indices])
+#     plt.plot(sigi, pcrosi, 'o', color=colors[0], alpha=0.5)
     
-    n_crosses = len(inc_pcross)
-    sampled_indices = np.random.choice(n_crosses, size=min(n_samps, n_crosses), replace=False)
-    sigi = np.nanmean(np.array(inc_sig)[sampled_indices])
-    pcrosi = np.mean(np.array(inc_pcross)[sampled_indices])
-    plt.plot(sigi, pcrosi, 'o', color=colors[1], alpha=0.5)
+#     n_crosses = len(inc_pcross)
+#     sampled_indices = np.random.choice(n_crosses, size=min(n_samps, n_crosses), replace=False)
+#     sigi = np.nanmean(np.array(inc_sig)[sampled_indices])
+#     pcrosi = np.mean(np.array(inc_pcross)[sampled_indices])
+#     plt.plot(sigi, pcrosi, 'o', color=colors[1], alpha=0.5)
 
-plt.xlabel('Mean History Signal')
-plt.xlabel('Fano(history signal)')
-plt.ylabel('Probability of Refinding')
-plt.title('Refinding Probability vs. History Signal')
-plt.show()
+# plt.xlabel('Mean History Signal')
+# plt.xlabel('Fano(history signal)')
+# plt.ylabel('Probability of Refinding')
+# plt.title('Refinding Probability vs. History Signal')
+# plt.show()
 
-# %% test clusering
-gapi = 0
-X_cross = np.array(cross_action[gapi])
-X_sig = np.array(raw_hist_sig[gapi])
+# # %% test clusering
+# gapi = 0
+# X_cross = np.array(cross_action[gapi])
+# X_sig = np.array(raw_hist_sig[gapi])
 
-# for ii in range(1,3):
-#     X_cross = np.concatenate(( np.array(cross_action[ii]), X_cross))
-#     X_sig = np.concatenate((np.array(raw_hist_sig[ii]), X_sig))
+# # for ii in range(1,3):
+# #     X_cross = np.concatenate(( np.array(cross_action[ii]), X_cross))
+# #     X_sig = np.concatenate((np.array(raw_hist_sig[ii]), X_sig))
 
-from sklearn.cluster import KMeans
-from sklearn.metrics import pairwise_distances
-import plotly.io as pio
-# pio.renderers.default = 'browser'   # opens in your default web browser
-pio.renderers.default = 'png'     # static fallback if needed
-# pio.renderers.default = 'svg'     # another static option
+# from sklearn.cluster import KMeans
+# from sklearn.metrics import pairwise_distances
+# import plotly.io as pio
+# # pio.renderers.default = 'browser'   # opens in your default web browser
+# pio.renderers.default = 'png'     # static fallback if needed
+# # pio.renderers.default = 'svg'     # another static option
 
-def kmeans_central_ids(X, n_clusters, random_state=0, return_reps=False):
-    """
-    X: (n_samples, n_features) array
-    n_clusters: int
-    return_reps: if True, also return representative sample index per cluster
+# def kmeans_central_ids(X, n_clusters, random_state=0, return_reps=False):
+#     """
+#     X: (n_samples, n_features) array
+#     n_clusters: int
+#     return_reps: if True, also return representative sample index per cluster
 
-    Returns
-    -------
-    labels : (n_samples,) int array of cluster IDs in [0, n_clusters-1]
-    reps   : (n_clusters,) int array of representative sample indices (optional)
-    """
-    km = KMeans(n_clusters=n_clusters, n_init="auto", random_state=random_state)
-    labels = km.fit_predict(X)  # length = n_samples
+#     Returns
+#     -------
+#     labels : (n_samples,) int array of cluster IDs in [0, n_clusters-1]
+#     reps   : (n_clusters,) int array of representative sample indices (optional)
+#     """
+#     km = KMeans(n_clusters=n_clusters, n_init="auto", random_state=random_state)
+#     labels = km.fit_predict(X)  # length = n_samples
 
-    if not return_reps:
-        return labels
+#     if not return_reps:
+#         return labels
 
-    # representative index per cluster: closest sample to the centroid
-    reps = np.empty(n_clusters, dtype=int)
-    for c in range(n_clusters):
-        idx = np.where(labels == c)[0]
-        if idx.size == 0:
-            reps[c] = -1  # empty cluster (rare with k-means)
-            continue
-        d = pairwise_distances(X[idx], km.cluster_centers_[c:c+1], metric="euclidean").ravel()
-        reps[c] = idx[np.argmin(d)]
-    return labels, reps
+#     # representative index per cluster: closest sample to the centroid
+#     reps = np.empty(n_clusters, dtype=int)
+#     for c in range(n_clusters):
+#         idx = np.where(labels == c)[0]
+#         if idx.size == 0:
+#             reps[c] = -1  # empty cluster (rare with k-means)
+#             continue
+#         d = pairwise_distances(X[idx], km.cluster_centers_[c:c+1], metric="euclidean").ravel()
+#         reps[c] = idx[np.argmin(d)]
+#     return labels, reps
 
-labels = kmeans_central_ids(X_cross, n_clusters=4)                 # length = n_samples
-cols = ['r','g','b','k','c']
-plt.figure()
-for ii in range(len(labels)):
-    pos = np.where(labels[:200]==ii)[0]
-    for jj in range(len(pos)):
-        trackj = crossing_segments[gapi][pos[jj]]
-        plt.plot(trackj[:,0]-trackj[0,0], trackj[:,1]-trackj[0,1], color=cols[ii], alpha=0.5)
+# labels = kmeans_central_ids(X_cross, n_clusters=4)                 # length = n_samples
+# cols = ['r','g','b','k','c']
+# plt.figure()
+# for ii in range(len(labels)):
+#     pos = np.where(labels[:200]==ii)[0]
+#     for jj in range(len(pos)):
+#         trackj = crossing_segments[gapi][pos[jj]]
+#         plt.plot(trackj[:,0]-trackj[0,0], trackj[:,1]-trackj[0,1], color=cols[ii], alpha=0.5)
 
-labels_sig = kmeans_central_ids(X_sig, n_clusters=2)
-temp = np.nanmean(X_sig,1) #np.std(X_sig,1)/(np.mean(X_sig,1)+1)
-labels_sig = temp*0
-labels_sig[temp>50*1.2] = 1
+# labels_sig = kmeans_central_ids(X_sig, n_clusters=2)
+# temp = np.nanmean(X_sig,1) #np.std(X_sig,1)/(np.mean(X_sig,1)+1)
+# labels_sig = temp*0
+# labels_sig[temp>50*1.2] = 1
 
-labels = np.array(labels, dtype=int)
-labels_sig = np.array(labels_sig, dtype=int)
+# labels = np.array(labels, dtype=int)
+# labels_sig = np.array(labels_sig, dtype=int)
 
-# %% turn into names
-names  = ["small", "large"]  # names by index
-labels_sig = np.array(names, dtype=object)[labels_sig]
-names  = ["right", "left","dwell","cross"]  # names by index
-labels = np.array(names, dtype=object)[labels]
+# # %% turn into names
+# names  = ["small", "large"]  # names by index
+# labels_sig = np.array(names, dtype=object)[labels_sig]
+# names  = ["right", "left","dwell","cross"]  # names by index
+# labels = np.array(names, dtype=object)[labels]
 
-# %% cool catagory plots
-import pandas as pd
-import plotly.graph_objects as go
-import plotly.io as pio
+# # %% cool catagory plots
+# import pandas as pd
+# import plotly.graph_objects as go
+# import plotly.io as pio
 
-def alluvial_from_categories(cats_t, cats_tp1, stage_labels=("t", "t+1"),
-                             renderer="browser"):
-    """
-    cats_t   : iterable of categories at time t      (length N(t))
-    cats_tp1 : iterable of categories at time t+1    (length N(t+1))
-               (If they represent the same cohort, lengths should match.
-                If not, we still show flows between observed categories.)
-    stage_labels : names for the two stages
-    renderer     : plotly renderer (e.g., 'browser', 'notebook', 'png')
-    """
-    pio.renderers.default = renderer
+# def alluvial_from_categories(cats_t, cats_tp1, stage_labels=("t", "t+1"),
+#                              renderer="browser"):
+#     """
+#     cats_t   : iterable of categories at time t      (length N(t))
+#     cats_tp1 : iterable of categories at time t+1    (length N(t+1))
+#                (If they represent the same cohort, lengths should match.
+#                 If not, we still show flows between observed categories.)
+#     stage_labels : names for the two stages
+#     renderer     : plotly renderer (e.g., 'browser', 'notebook', 'png')
+#     """
+#     pio.renderers.default = renderer
 
-    # Build a flow table (counts) between categories of t and t+1
-    df = pd.DataFrame({"left": cats_t, "right": cats_tp1})
-    flow = df.groupby(["left", "right"]).size().reset_index(name="value")
+#     # Build a flow table (counts) between categories of t and t+1
+#     df = pd.DataFrame({"left": cats_t, "right": cats_tp1})
+#     flow = df.groupby(["left", "right"]).size().reset_index(name="value")
 
-    # Label nodes with stage prefixes to keep ordering clear
-    flow["left_lab"]  = stage_labels[0] + ":" + flow["left"].astype(str)
-    flow["right_lab"] = stage_labels[1] + ":" + flow["right"].astype(str)
+#     # Label nodes with stage prefixes to keep ordering clear
+#     flow["left_lab"]  = stage_labels[0] + ":" + flow["left"].astype(str)
+#     flow["right_lab"] = stage_labels[1] + ":" + flow["right"].astype(str)
 
-    # Create node list and mapping
-    labels = pd.Index(pd.concat([flow["left_lab"], flow["right_lab"]]).unique()).tolist()
-    lab2idx = {lab: i for i, lab in enumerate(labels)}
+#     # Create node list and mapping
+#     labels = pd.Index(pd.concat([flow["left_lab"], flow["right_lab"]]).unique()).tolist()
+#     lab2idx = {lab: i for i, lab in enumerate(labels)}
 
-    # Build sankey source/target/value arrays
-    sources = flow["left_lab"].map(lab2idx).to_list()
-    targets = flow["right_lab"].map(lab2idx).to_list()
-    values  = flow["value"].to_list()
+#     # Build sankey source/target/value arrays
+#     sources = flow["left_lab"].map(lab2idx).to_list()
+#     targets = flow["right_lab"].map(lab2idx).to_list()
+#     values  = flow["value"].to_list()
 
-    # Plot
-    fig = go.Figure(go.Sankey(
-        arrangement="snap",
-        node=dict(label=labels, pad=20, thickness=14),
-        link=dict(source=sources, target=targets, value=values)
-    ))
-    fig.update_layout(title=f"Alluvial-style flow: {stage_labels[0]} → {stage_labels[1]}",
-                      font_size=12)
-    fig.show()
-    return fig
+#     # Plot
+#     fig = go.Figure(go.Sankey(
+#         arrangement="snap",
+#         node=dict(label=labels, pad=20, thickness=14),
+#         link=dict(source=sources, target=targets, value=values)
+#     ))
+#     fig.update_layout(title=f"Alluvial-style flow: {stage_labels[0]} → {stage_labels[1]}",
+#                       font_size=12)
+#     fig.show()
+#     return fig
 
-# --- Example ---
-cats_t   = labels_sig
-cats_tp1 = labels
-alluvial_from_categories(cats_t, cats_tp1, stage_labels=("signal","action"))
+# # --- Example ---
+# cats_t   = labels_sig
+# cats_tp1 = labels
+# alluvial_from_categories(cats_t, cats_tp1, stage_labels=("signal","action"))

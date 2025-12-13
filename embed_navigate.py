@@ -74,7 +74,7 @@ for tr in range(n_tracks):
     pos = np.where(trjNum==track_id[tr])[0]  # position of this track
     temp_xy = np.column_stack((x_smooth[pos] , y_smooth[pos]))
     temp_vxy = np.column_stack((vx_smooth[pos] , vy_smooth[pos]))
-    # temp_vxy = np.column_stack((vx_smooth[pos] , vy_smooth[pos], dtheta_smooth[pos]))   ### test with dtheta feature!
+    # temp_vxy = np.column_stack((speed_smooth[pos], dtheta_smooth[pos]))   ### test with dtheta feature!
     
     ### recording
     data4fit.append(temp_vxy)  # get data for ssm fit
@@ -331,7 +331,7 @@ color_abs = np.max(np.abs(phi2[window_show]))
 X_xy, track_id = build_X(rec_tracks, return_id=True)
 xy_back = X_xy[:, [0,int(K_star)]]
 plt.figure()
-plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5, vmin=-color_abs*1.1, vmax=color_abs/2)
+plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5, vmin=-color_abs*1., vmax=color_abs/1)
 # pos = np.where(phi2[window_show]<0)[0]
 # plt.scatter(xy_back[window_show, 0][pos],xy_back[window_show, 1][pos],c=-phi2[window_show][pos],cmap='coolwarm',s=.5, vmin=-color_abs*1, vmax=color_abs/1)
 
@@ -341,7 +341,7 @@ plt.title(f'mode#{imode}')
 # %% modes back to velocity
 X_speed = build_signal(speeds, K_star)
 plt.figure()
-plt.scatter(X_traj[window_show, 1+K_star*1], phi2[window_show],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs) # veloctiy
+# plt.scatter(X_traj[window_show, 1+K_star*1], phi2[window_show],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs) # veloctiy
 plt.scatter(X_traj[window_show, 1+K_star*0], X_traj[window_show, 1+K_star*1],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
 # plt.scatter(X_speed[window_show,0], phi2[window_show],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)  # speed
 plt.xlabel('vx'); plt.ylabel('vy')

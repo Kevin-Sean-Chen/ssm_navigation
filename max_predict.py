@@ -45,19 +45,27 @@ threshold_track_l = 60 * 30  # 20 # look at long-enough tracks
 # %% for perturbed data
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'  ### for OU-ribbons
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'  ### for lots of ribbon data
-root_dir = 'C:/Users/kevin/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'
+root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/ribbon_data_kc' #kiri_choi/data/ribbon_sleap/2024-9-17/'
 # root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/odor_vision/2024-11-5'
-target_file = "exp_matrix.pklz"
+target_file = "exp_matrix"#".pklz"
 
 # List all subfolders in the root directory
-subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
+# subfolders = [f.path for f in os.scandir(root_dir) if f.is_dir()]
+subfolders = [root_dir]
 pkl_files = []
 
 # Loop through each subfolder to search for the target file
-for subfolder in subfolders:
-    for dirpath, dirnames, filenames in os.walk(subfolder):
-        if target_file in filenames:
-            full_path = os.path.join(dirpath, target_file)
+# for subfolder in subfolders:
+#     for dirpath, dirnames, filenames in os.walk(subfolder):
+#         if target_file in filenames:
+#             full_path = os.path.join(dirpath, target_file)
+#             pkl_files.append(full_path)
+#             print(full_path)
+
+for dirpath, dirnames, filenames in os.walk(root_dir):
+    for fname in filenames:
+        if target_file.lower() in fname.lower():   # substring match
+            full_path = os.path.join(dirpath, fname)
             pkl_files.append(full_path)
             print(full_path)
 
@@ -760,7 +768,7 @@ plt.plot(bins[:-1], count_simu/count_simu.sum(), label='delayed Markov')
 plt.xlabel(r'$v_x$'); plt.ylabel('count'); plt.legend(); plt.yscale('log')
 
 # %% compute mixing
-Ts = np.array([1,5,10,20,40,80,160])#, 320])
+Ts = np.array([1,5,10,20,40,80,160, 320])
 # Ts = np.array([1, 2,4,8,16,32,64,128])
 init_state = np.argmin(phi2_vec)
 reps = 50
@@ -770,9 +778,9 @@ for rr in range(reps):
     for tau in range(len(Ts)):
         samp_xy1, samp_v1 = gen_tracks_given_substates(np.arange(N), Ts[tau], return_v=True, init=init_state)
         samp_xy2, samp_v2 = gen_tracks_given_substates(np.arange(N), Ts[tau], return_v=True, init=init_state)
-        # erri = (np.sum((samp_v1[-1,:] - samp_v2[-1,:])**2))**0.5   # v diference
+        erri = (np.sum((samp_v1[-1,:] - samp_v2[-1,:])**2))**0.5   # v diference
         # erri = (np.sum((samp_xy1[-1,:] - samp_xy2[-1,:])**2))**0.5  # x difference
-        erri = (np.sum((samp_xy1[-1,:] - np.array([0,0]))**2))**0.5  # displacement
+        # erri = (np.sum((samp_xy1[-1,:] - np.array([0,0]))**2))**0.5  # displacement
         errt[tau,rr] = erri
 
 # %%
@@ -780,8 +788,8 @@ plt.figure()
 plt.plot(Ts*(tau/60), errt,'ko');
 plt.errorbar(Ts*(tau/60), np.mean(errt,1), np.std(errt,1), fmt='-o')
 plt.xlabel('time lag (s)')
-# plt.ylabel('velocity difference')
-plt.ylabel('displacement (mm)')
+plt.ylabel('velocity difference')
+# plt.ylabel('displacement (mm)')
 # plt.xscale('log')
 
 # %% check stop to speed-up time
