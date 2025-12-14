@@ -144,7 +144,7 @@ alphas = np.array([0.01, 0.1, 0.5, 1., 5, 10, 50, 100])
 reps = 10
 cis = np.zeros((len(alphas), reps, 2))
 
-infos_w = np.zeros((len(alphas), 6))
+infos_w = np.zeros((len(alphas), reps, 6))
 infos_wo = infos_w*1 
 dey = 1
 
@@ -160,12 +160,12 @@ for ii in range(len(cis)):
 
 ###############################################################################
     ### if compute TE ###
-    # TE_YX, TE_XY, Hx, Hy, Hxy = transfer_entropy_both(a_wo, s_wo, delay=dey)  ### X,Y
-    # estimate = Hxy - Hx - Hy + TE_XY + TE_YX
-    # infos_wo[ii, :] = np.array([ TE_YX, TE_XY, Hx, Hy, Hxy, estimate])
-    # TE_YX, TE_XY, Hx, Hy, Hxy = transfer_entropy_both(a_w, s_w, delay=dey)  ### X,Y
-    # estimate = Hxy - Hx - Hy + TE_XY + TE_YX
-    # infos_w[ii, :] = np.array([ TE_YX, TE_XY, Hx, Hy, Hxy, estimate])
+        TE_YX, TE_XY, Hx, Hy, Hxy = transfer_entropy_both(a_wo, s_wo, delay=dey)  ### X,Y
+        estimate = Hxy - Hx - Hy + TE_XY + TE_YX
+        infos_wo[ii, rr, :] = np.array([ TE_YX, TE_XY, Hx, Hy, Hxy, estimate])
+        TE_YX, TE_XY, Hx, Hy, Hxy = transfer_entropy_both(a_w, s_w, delay=dey)  ### X,Y
+        estimate = Hxy - Hx - Hy + TE_XY + TE_YX
+        infos_w[ii, rr, :] = np.array([ TE_YX, TE_XY, Hx, Hy, Hxy, estimate])
 ###############################################################################
 
 # %% plot 
@@ -184,11 +184,14 @@ plt.xscale('log')
 plt.xlabel('SNR of gradient'); plt.ylabel('benefit');
 
 # %% plot information
-# # [Hx, Hy, TE_YX, TE_XY]
-# labs = ['s->a', 'a->s', 'a', 's' ]
-# plt.figure()
-# # plt.plot(infos_wo[:,:4] / infos_wo[:,4][:,None])
-# for ii in range(4):
-#     plt.semilogx(alphas, infos_w[:,ii] / infos_w[:,4], label=labs[ii])
-# plt.legend()
-# plt.xlabel('SNR of gradient'); plt.ylabel('chemotaxis index'); plt.legend()
+# [Hx, Hy, TE_YX, TE_XY]
+labs = ['s->a', 'a->s', 'a', 's' ]
+plt.figure()
+# plt.plot(infos_wo[:,:4] / infos_wo[:,4][:,None])
+for ii in range(2):
+    # plt.semilogx(alphas, infos_w[:,ii] / infos_w[:,4], label=labs[ii])
+    plt.errorbar(alphas, np.mean(infos_w[:,:,ii], axis=1),yerr=np.std(infos_w[:,:,ii], axis=1)/1,  fmt='-o', label=labs[ii]+' meomory')
+    plt.errorbar(alphas, np.mean(infos_wo[:,:,ii], axis=1),yerr=np.std(infos_wo[:,:,ii], axis=1)/1, fmt='--o', label=labs[ii]+' w/o')
+plt.legend()
+plt.xlabel('SNR of gradient'); plt.ylabel('TE'); plt.legend()
+plt.xscale('log'); plt.yscale('log')
