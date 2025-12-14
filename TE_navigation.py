@@ -31,6 +31,17 @@ with h5py.File(file_dir, 'r') as file:
     col_v = list(your_struct['Smoke']['col'].values())
     # print(col.keys())
 
+### for straight plume
+with h5py.File(file_dir, 'r') as file:
+    # Access the structure
+    your_struct = file['StraightPlume']
+
+    # Access fields within the structure
+    expmat_str = your_struct['Smoke']['Dose4']['expmat'][:]  # Load the dataset as a numpy array
+    print(expmat_str.shape)
+    col_k_str = list(your_struct['Smoke']['Dose4']['col'].keys())
+    col_v_str = list(your_struct['Smoke']['Dose4']['col'].values())
+    
 # %% now extract track data
 chop = 3000000
 down_samp = 3
@@ -44,6 +55,14 @@ x_smooth = expmat[31,:][::down_samp][:chop]
 y_smooth = expmat[32,:][::down_samp][:chop]
 speed_smooth = expmat[30,:][::down_samp][:chop]  #11 31
 dtheta_smooth = expmat[34,:][::down_samp][:chop]  #14 35
+
+# %% for straighe plume
+trjNum_str = expmat_str[0,:][::down_samp][:chop]
+signal_str = expmat_str[12,:][::down_samp][:chop]
+vx_str = expmat_str[8,:][::down_samp][:chop]
+vy_str = expmat_str[9,:][::down_samp][:chop]
+x_str = expmat_str[6,:][::down_samp][:chop]
+y_str = expmat_str[7,:][::down_samp][:chop]
 
 # %% plot track
 trk = 11
@@ -64,8 +83,12 @@ dtheta_threshold = 360
 dtheta_smooth[np.abs(dtheta_smooth)>dtheta_threshold] = dtheta_threshold
 dtheta_smooth[np.isnan(dtheta_smooth)] = 0
 
+vx_str[np.abs(vx_str)>v_threshold] = v_threshold
+vy_str[np.abs(vy_str)>v_threshold] = v_threshold
+signal_str[np.isnan(signal_str)] = 0
+
 # %% discretization for now
-thre = 3
+thre = 5
 bin_signal = signal*1
 bin_signal[signal<thre] = 0
 bin_signal[signal>=thre] = 1
@@ -83,6 +106,16 @@ bin_turns[turns>0] = 1  ##### turns
 bin_vi = discretize_time_series(speed_smooth*1,  [5,15])  #### try more continuous variables
 # bin_vi = discretize_time_series(vy_smooth*1,  [-15,-5,5,15])  ### test this
 
+# %% for straight plume 
+###############################################################################
+# speed_smooth = np.sqrt(vx_str**2+vy_str**2)
+# bin_vi = discretize_time_series(speed_smooth*1,  [5,15])  
+# bin_signal = signal_str*1
+# bin_signal[signal_str<thre] = 0
+# bin_signal[signal_str>=thre] = 1
+# x_smooth, y_smooth = x_str*1, y_str*1 
+
+###############################################################################
 # %% compute TE
 def transfer_entropy(X,Y,delay=1,gaussian_sigma=None):
 	'''
@@ -215,8 +248,8 @@ plt.plot(lags[lag_range], cross_corr[lag_range])
 plt.xlabel("Lag"); plt.ylabel("Cross-Correlation"); plt.grid(True)
 
 # sample for location
-xy_grid = (19,9)#(17,9)
-delay = 40  ### 10,20,30
+xy_grid = (19,9)#(19,9)
+delay = 20  ### 10,20,30
 grid_xy = coarse_grain_2d_scatter_indices(x_smooth, y_smooth, xy_grid)
 
 # %%
