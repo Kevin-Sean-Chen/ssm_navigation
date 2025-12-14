@@ -140,7 +140,7 @@ for ii in range(ntracks):
 window = 60*2  # window size in frames
 lossx = np.array([75, 131, 183, 233])-1  ### for increasing
 # lossx = np.array([45, 105, 167, 232])-1  ### for decreasing
-lossx = np.array([76, 127, 181, 232])-3
+lossx = np.array([76, 127, 181, 232])-1
 crossing_indices = {i: [] for i in range(len(lossx))}  # Dictionary to store indices for each condition
 crossing_segments = {i: [] for i in range(len(lossx))}  # Dictionary to store track segments
 
@@ -230,7 +230,7 @@ plt.tight_layout(); plt.show()
 ###############################################################################
 # %% measure pre, post
 window = 60*5  # window size in frames
-wind_past = int(60*10) # window prior to loss
+wind_past = int(60*5) # window prior to loss
 min_spd = 0
 # lossx = np.array([75, 131, 183, 233])  ### for increasing
 # lossx = np.array([45, 105, 167, 232])-1   ### for decreasing
@@ -274,11 +274,11 @@ for ii in range(ntracks):  ### loop for tracks
                             hist_signal[np.isnan(hist_signal)] = 0
                             raw_hist_sig[ll].append(hist_signal)
                             ### z-score
-                            # history_signal[ll].append(np.nanstd(hist_signal)/np.nanmean(hist_signal))
+                            history_signal[ll].append(np.nanstd(hist_signal))#/np.nanmean(hist_signal))
                             ### mean (intermittency)
-                            temp = hist_signal*0
-                            temp[hist_signal>0] = 1 
-                            history_signal[ll].append(np.nansum(temp))
+                            # temp = hist_signal*0
+                            # temp[hist_signal>0] = 1 
+                            # history_signal[ll].append(np.nansum(temp))
                             ### encounters
                             # temp = hist_signal*0
                             # temp[hist_signal>0] = 1 
@@ -440,8 +440,8 @@ mean_dy.append(np.nanmean(displaceiy))
 std_dy.append(np.nanstd(displaceiy)/jj**0.5)
 
 # %% P(crossing analysis)
-reps = 100
-n_samps = 50
+reps = 200
+n_samps = 100
 p_cross = {i: [] for i in range(4)}  # Dictionary for each loss point
 mean_signal = {i: [] for i in range(4)}  # Dictionary for each loss point
 colors = ['r', 'g', 'b', 'k']  # Different color for each loss point
@@ -463,10 +463,11 @@ plt.xlabel('Mean History Signal')
 plt.xlabel('Fano(history signal)')
 plt.ylabel('Probability of Crossing')
 # plt.ylabel('Probability of Refind')
-plt.xlabel('mean # encounter')
+# plt.xlabel('mean # encounter')
 # plt.xlabel('intermittency')
+plt.xlabel('std(signal)')
 plt.title('Crossing Probability vs. History Signal')
-plt.title('Refinding Probability vs. History Signal')
+# plt.title('Refinding Probability vs. History Signal')
 plt.legend(fontsize=15)
 plt.show()
 
