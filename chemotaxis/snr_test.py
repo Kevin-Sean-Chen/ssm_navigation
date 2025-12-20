@@ -140,6 +140,8 @@ def sim_RT(alpha, h=1, tau=1):
     return tracks, st, at
 
 # %% scanning
+np.random.seed(42)
+
 alphas = np.array([0.01, 0.1, 0.5, 1., 5, 10, 50, 100])
 reps = 10
 cis = np.zeros((len(alphas), reps, 2))
@@ -151,7 +153,7 @@ dey = 1
 for ii in range(len(cis)):
     print(ii)
     for rr in range(reps):
-        tracks_wo, s_wo, a_wo = sim_RT(alphas[ii], h=1, tau=1)
+        tracks_wo, s_wo, a_wo = sim_RT(alphas[ii], h=1, tau=2)
         pos_wo = np.where(tracks_wo[:,-1]>0)[0]
         cis[ii,rr, 0] = len(pos_wo)/N
         tracks_w, s_w, a_w = sim_RT(alphas[ii], h=1, tau=5)
@@ -194,4 +196,14 @@ for ii in range(2):
     plt.errorbar(alphas, np.mean(infos_wo[:,:,ii], axis=1),yerr=np.std(infos_wo[:,:,ii], axis=1)/1, fmt='--o', label=labs[ii]+' w/o')
 plt.legend()
 plt.xlabel('SNR of gradient'); plt.ylabel('TE'); plt.legend()
-plt.xscale('log'); plt.yscale('log')
+plt.xscale('log'); #plt.yscale('log')
+
+# %%
+plt.figure()
+temp = infos_w[:,:,0]*infos_w[:,:,1]
+plt.errorbar(alphas, np.mean(temp, axis=1),yerr=np.std(temp, axis=1)/1,  fmt='-o', label='meomory')
+temp = infos_wo[:,:,0]*infos_wo[:,:,1]
+plt.errorbar(alphas, np.mean(temp, axis=1),yerr=np.std(temp, axis=1)/1,  fmt='-o', label='w/o')
+plt.legend()
+plt.xlabel('SNR of gradient'); plt.ylabel('TE'); plt.legend()
+plt.xscale('log');

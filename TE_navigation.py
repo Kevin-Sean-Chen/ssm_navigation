@@ -88,7 +88,7 @@ vy_str[np.abs(vy_str)>v_threshold] = v_threshold
 signal_str[np.isnan(signal_str)] = 0
 
 # %% discretization for now
-thre = 5
+thre = 3
 bin_signal = signal*1
 bin_signal[signal<thre] = 0
 bin_signal[signal>=thre] = 1
@@ -248,7 +248,7 @@ plt.plot(lags[lag_range], cross_corr[lag_range])
 plt.xlabel("Lag"); plt.ylabel("Cross-Correlation"); plt.grid(True)
 
 # sample for location
-xy_grid = (19,9)#(19,9)
+xy_grid = (15,9)#(19,9)
 delay = 20  ### 10,20,30
 grid_xy = coarse_grain_2d_scatter_indices(x_smooth, y_smooth, xy_grid)
 
@@ -259,7 +259,7 @@ grid_xy = coarse_grain_2d_scatter_indices(x_smooth, y_smooth, xy_grid)
 TE_s2b = np.zeros(xy_grid)
 TE_b2s = np.zeros(xy_grid)
 obs_num = np.zeros(xy_grid)
-for xx in range(2,xy_grid[0]):
+for xx in range(0,xy_grid[0]):
     print(xx)
     for yy in range(xy_grid[1]):
         pos = grid_xy[xx][yy]
@@ -272,6 +272,10 @@ for xx in range(2,xy_grid[0]):
 TE_s2b = TE_s2b.T
 TE_b2s = TE_b2s.T
 
+mask = obs_num*0  + 1
+mask[obs_num==0] = np.nan
+mask = mask.T
+
 # %% plotting
 data1, data2, data3 = TE_s2b, TE_b2s, (TE_s2b - TE_b2s)  * 1
 vmin = min(data1.min(), data2.min(), data3.min())
@@ -281,16 +285,21 @@ fig, axs = plt.subplots(3, 1, figsize=(18, 8))
 for ax in axs:
     ax.set_xticks([])  # Remove x-axis ticks
     ax.set_yticks([]) 
-cax1 = axs[0].imshow(data1, cmap='viridis',vmin=vmin, vmax=vmax)
+cax1 = axs[0].imshow(data1* mask, cmap='viridis',vmin=vmin, vmax=vmax)
 axs[0].set_title(r"TE(s $\rightarrow$ a)")
 # axs[0].set_title("MI(S',S)")
-cax2 = axs[1].imshow(data2, cmap='viridis',vmin=vmin, vmax=vmax)
+cax2 = axs[1].imshow(data2* mask, cmap='viridis',vmin=vmin, vmax=vmax)
 axs[1].set_title(r"TE(a $\rightarrow$ s)")
-cax3 = axs[2].imshow(data3, cmap='viridis',vmin=vmin, vmax=vmax)
+cax3 = axs[2].imshow(data3* mask, cmap='viridis',vmin=vmin, vmax=vmax)
 axs[2].set_title("difference")
 fig.colorbar(cax3, ax=axs, orientation='horizontal', fraction=0.02, pad=0.1)
 
 
+# %% show data
+plt.figure()
+plt.plot(x_smooth, y_smooth, 'k,')
+pos = np.where(bin_signal==1)[0]
+plt.plot(x_smooth[pos], y_smooth[pos], 'r,')
 
 # %% quick test for mode-TE calculation
 # TEs = np.zeros(20)
