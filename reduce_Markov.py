@@ -345,4 +345,14 @@ for ns in range(len(n_reduced)):
     plt.loglog(lags, acf_mark)
     plt.xlabel('Lag'); plt.ylabel('Autocorrelation'); plt.title('Autocorrelation of Discrete States')
     plt.grid(True)
-    
+
+# %% saving example Q-state navigation
+# N_state_label (labels from the Markov matrix)
+# Q_state_label
+# xy_position
+# signal_t  (unbinarized X_odor)
+# ids
+# vx,vy
+
+# np.savez_compressed("q_state_navigation.npz", N_state_label=N_state_label, Q_state_label=Q_state_label,\
+#                     xy_position=xy_position, signal_t=signal_t, track_id=ids, vx=vx, vy=vy)

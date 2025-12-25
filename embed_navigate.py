@@ -34,7 +34,7 @@ with h5py.File(file_dir, 'r') as file:
     # print(col.keys())
 
 # %% now extract track data
-chop = 500000
+chop = 500000 #*4
 down_samp = 3
 trjNum = expmat[0,:][::down_samp][:chop]
 signal = expmat[12,:][::down_samp][:chop]
