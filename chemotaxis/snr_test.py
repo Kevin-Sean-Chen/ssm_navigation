@@ -25,7 +25,7 @@ from scipy.interpolate import interp1d
 ### add memory to see improvement
 
 # %% settings
-T = 1000
+T = 1000 #1000/2
 N = 100
 v = 1
 vs = .5
@@ -140,7 +140,7 @@ def sim_RT(alpha, h=1, tau=1):
     return tracks, st, at
 
 # %% scanning
-np.random.seed(42)
+np.random.seed(42) #42
 
 alphas = np.array([0.01, 0.1, 0.5, 1., 5, 10, 50, 100])
 reps = 10
@@ -200,10 +200,11 @@ plt.xscale('log'); #plt.yscale('log')
 
 # %%
 plt.figure()
-temp = infos_w[:,:,0]*infos_w[:,:,1]
-plt.errorbar(alphas, np.mean(temp, axis=1),yerr=np.std(temp, axis=1)/1,  fmt='-o', label='meomory')
 temp = infos_wo[:,:,0]*infos_wo[:,:,1]
 plt.errorbar(alphas, np.mean(temp, axis=1),yerr=np.std(temp, axis=1)/1,  fmt='-o', label='w/o')
+temp = infos_w[:,:,0]*infos_w[:,:,1]
+plt.errorbar(alphas, np.mean(temp, axis=1),yerr=np.std(temp, axis=1)/1,  fmt='-o', label='meomory')
+
 plt.legend()
 plt.xlabel('SNR of gradient'); plt.ylabel('TE'); plt.legend()
 plt.xscale('log');
