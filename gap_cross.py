@@ -31,6 +31,7 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cr
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-30\kevin' ### gap crossing data
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-25\kevin' ### with control crosses
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-26\kevin'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-10\kevin'
 
 target_file = "exp_matrix.joblib"
 exp_type = 'same'#'increasing gap 60s ocl_' #'increasing gap 60s Kir_EPG'
@@ -241,6 +242,7 @@ cross_events = {i: [] for i in range(len(lossx))}  # Dictionary to store crossin
 cross_action = {i: [] for i in range(len(lossx))}  ### record the action for clustering
 raw_hist_sig = {i: [] for i in range(len(lossx))} ### measure raw history trace for classification
 hist_features = {i: [] for i in range(len(lossx))}  ### place some a priori chosen factors to make crossing prediction later
+track_cross_id = {i: [] for i in range(len(lossx))}  ### keep track of identiy to later analyze history dependency
 
 for ii in range(ntracks):  ### loop for tracks
     ### load track
@@ -263,13 +265,13 @@ for ii in range(ntracks):  ### loop for tracks
                     # Store track segment after crossing
                     if idx + window <= len(tracki) and len(tracki[:idx])>wind_past:  ### check for history  ### can be relaxed if not clustering for same-size!
                         
-                        if np.nanmean(meani[:idx])>min_spd:  ### conditional of past behavior
+                        pre_wind = np.min([len(signali[:idx]), wind_past])
+                        if np.nanmean(meani[idx-pre_wind:idx])>min_spd and np.nanmean(signali[idx-pre_wind:idx])>0:  ### conditional of past behavior and signal
                             segment = tracki[idx:idx+window]
                             seg_signal = signali[idx:idx+window]
                             pos_signal = np.where(seg_signal!=0)[0]
                             # segment[pos_signal,:] = np.nan
                             crossing_segments[ll].append(segment)
-                            pre_wind = np.min([len(signali[:idx]), wind_past])
                             hist_signal = signali[idx-pre_wind:idx]
                             hist_signal[np.isnan(hist_signal)] = 0
                             raw_hist_sig[ll].append(hist_signal)
@@ -288,8 +290,8 @@ for ii in range(ntracks):  ### loop for tracks
                             cross_action[ll].append(v_temp.reshape(-1))
 
                             ### Check if there are future positions beyond current loss point with signal (aks crossing)
-                            future_positions = tracki[idx:, 0] < lossx[ll]  # positions beyond current loss point  #### UP (<) or DOWN (>) ###
-                            future_signals = signali[idx:] > 0  # non-zero signals in future positions
+                            future_positions = tracki[idx:idx+window, 0] < lossx[ll]  # positions beyond current loss point  #### UP (<) or DOWN (>) ###
+                            future_signals = signali[idx:idx+window] > 0  # non-zero signals in future positions
                             if np.any(future_positions & future_signals):  # if any positions match both conditions
                                 cross_events[ll].append(1)  # mark as crossing event
                             else:
@@ -310,7 +312,9 @@ for ii in range(ntracks):  ### loop for tracks
                             net_displacement = np.sqrt(np.nansum((path_positions[-1] - path_positions[0])**2))
                             path_tortuosity = path_length / (net_displacement + 1e-6)  # add small value to avoid division by zero
                             hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal])
-
+                            
+                            track_cross_id[ll].append(ii)
+                            
 # %% simple logistic prediction
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
@@ -470,6 +474,53 @@ plt.title('Crossing Probability vs. History Signal')
 # plt.title('Refinding Probability vs. History Signal')
 plt.legend(fontsize=15)
 plt.show()
+
+# %% ROC curve to show difference
+
+def ecdf(data):
+    x = np.sort(data)
+    y = np.arange(1, len(x) + 1) / len(x)
+    return x, y
+
+plt.figure(figsize=(7, 6))
+
+for ll in range(4):
+    x, y = ecdf(p_cross[ll])
+    plt.step(x, y, where="post", label=f'Loss point {lossx[ll]}mm', color=colors[ll])
+
+plt.xlabel("Value")
+plt.ylabel("Empirical CDF")
+plt.title("Empirical CDFs of Four Distributions")
+plt.legend()
+plt.grid()
+plt.show()
+
+# %% analysis of single vs. double crossing
+# use track_cross_id for id and cross_events for crossing
+which_gap = 0
+event_i, idx_i = cross_events[which_gap], track_cross_id[which_gap]
+single_x = []
+multi_x = []
+for ww in range(4):
+    event_i, idx_i = cross_events[which_gap], track_cross_id[which_gap]
+    for ii in range(ntracks):  ### loop for tracks
+        ### load event and ID
+        pos = np.where(np.array(idx_i)==ii)[0]
+        # if len(pos)>=2:
+        if len(pos)==1:
+            single_x.append(event_i[pos[0]])
+        elif len(pos)>=2:
+            multi_x.append(event_i[pos[-1]])
+
+errors = [
+    np.std(single_x, ddof=1) / np.sqrt(len(single_x)),
+    np.std(multi_x, ddof=1) / np.sqrt(len(multi_x))
+]
+
+plt.figure()
+plt.bar(['single', 'last of multi'], [np.mean(single_x), np.mean(multi_x)], yerr=errors)
+# plt.bar(['first', 'last'], [np.mean(single_x), np.mean(multi_x)], yerr=errors)
+plt.ylabel('P(cross)')
 
 # %% same-gap comparison
 # reps = 150
