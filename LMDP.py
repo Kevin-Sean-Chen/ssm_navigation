@@ -29,8 +29,42 @@ def passive_transition(state):
 # Reward function: goal state has reward 0, others have -1
 Q = -np.ones(n_states)
 Q[goal_state] = 0
-Q = np.arange(0, n_states)/1
+Q = -np.arange(0, n_states)/n_states
+# ### make Q peice-wise linear, with positive and negative slopes
+# # Ensure Q is a float array and compute slice lengths robustly
+# Q = Q.astype(float)
+# l1 = n_states // 3
+# l2 = n_states // 3
+# l3 = n_states - l1 - l2
+# if l1 > 0:
+#     Q[:l1] = np.linspace(0.0, 1.0, l1)
+# if l2 > 0:
+#     Q[l1:l1 + l2] = np.linspace(1.0, -1.0, l2)
+# if l3 > 0:
+#     Q[l1 + l2:] = np.linspace(-1.0, 0.0, l3)
 
+### test with complex Q form
+# Gaussian bumps: tune centers (means), widths (std devs) and amplitudes here
+means = [5, 30]                # center locations of the Gaussian bumps (state indices)
+sigmas = [2.0, 5.0]            # widths (standard deviations) for each bump
+amps = [1.0, 10.0]              # amplitudes for each bump
+
+Q = np.zeros_like(states, dtype=float)
+for mu, sigma, amp in zip(means, sigmas, amps):
+    Q += amp * np.exp(-0.5 * ((states - mu) / sigma) ** 2)
+
+# Optional: normalize to [0,1] and/or invert to represent costs instead of rewards
+Q = Q / Q.max()   # normalize
+Q = -Q            # invert so peaks become low-cost valleys (remove if you prefer positive bumps)
+Q = Q - Q.min() + 1  # make non-negative
+
+plt.figure()
+plt.plot(states, Q, '-o')
+plt.xlabel('State')
+plt.ylabel('Cost-to-go Q(s)')
+plt.title('Cost-to-go Function Q(s)')
+plt.grid()
+plt.show()
 # Compute cost for a given policy at state: Q + beta * KL
 def compute_policy_cost(beta):
     policy_costs = []
@@ -88,6 +122,7 @@ plt.show()
 import random
 from collections import defaultdict
 from sklearn.metrics import mutual_info_score
+from matplotlib import cm, colors
 
 # Set random seed for reproducibility
 # np.random.seed(42)
@@ -144,66 +179,37 @@ def TE_track(trajectory):
 
     return te_s_to_a, te_a_to_s
 
-def transfer_entropy(X,Y,delay=1):
-	n = float(len(X[delay:]))
-	binX = len(np.unique(X))
-	binY = len(np.unique(Y))
+def transfer_entropy(X, Y, delay=1):
+    n = float(len(X[delay:]))
+    binX = len(np.unique(X))
+    binY = len(np.unique(Y))
     
-	x3 = np.array([X[delay:],Y[:-delay],X[:-delay]])
-	x2 = np.array([X[delay:],Y[:-delay]])
-	x2_delay = np.array([X[delay:],X[:-delay]])
+    x3 = np.array([X[delay:], Y[:-delay], X[:-delay]])
+    x2 = np.array([X[delay:], Y[:-delay]])
+    x2_delay = np.array([X[delay:], X[:-delay]])
+    
+    # Compute histograms
+    p3, _ = np.histogramdd(x3.T, bins=[binX, binY, binX])
+    p2, _ = np.histogramdd(x2.T, bins=[binX, binY])
+    p2delay, _ = np.histogramdd(x2_delay.T, bins=[binX, binX])
+    p1, _ = np.histogramdd(np.array(X[delay:]).reshape(-1,1), bins=binX)
+    
+    # Add small pseudocount to avoid zeros
+    epsilon = 1e-8
+    p3 = (p3 + epsilon) / np.sum(p3 + epsilon)
+    p2 = (p2 + epsilon) / np.sum(p2 + epsilon)
+    p2delay = (p2delay + epsilon) / np.sum(p2delay + epsilon)
+    p1 = (p1 + epsilon) / np.sum(p1 + epsilon)
+    
+    # Compute TE
+    TE = 0.0
+    for i in range(binX):
+        for j in range(binY):
+            for k in range(binX):
+                TE += p3[i,j,k] * np.log2( (p3[i,j,k] * p1[i]) / (p2[i,j] * p2delay[i,k]) )
+    
+    return TE
 
-	p3,bin_p3 = np.histogramdd(
-		sample = x3.T,
-		bins = [binX,binY,binX])
-
-	p2,bin_p2 = np.histogramdd(
-		sample = x2.T,
-		bins=[binX,binY])
-
-	p2delay,bin_p2delay = np.histogramdd(
-		sample = x2_delay.T,
-		bins=[binX,binX])
-
-	p1,bin_p1 = np.histogramdd(
-		sample = np.array(X[delay:]),
-		bins=binX)
-
-	# Hists normalized to obtain densities
-	p1 = p1/n
-	p2 = p2/n
-	p2delay = p2delay/n
-	p3 = p3/n
-
-	# Ranges of values in time series
-	Xrange = bin_p3[0][:-1]
-	Yrange = bin_p3[1][:-1]
-	X2range = bin_p3[2][:-1]
-
-	# Calculating elements in TE summation
-	elements = []
-	for i in range(len(Xrange)):
-		px = p1[i]
-		for j in range(len(Yrange)):
-			pxy = p2[i][j]
-
-			for k in range(len(X2range)):
-				pxx2 = p2delay[i][k]
-				pxyx2 = p3[i][j][k]
-
-				arg1 = float(pxy*pxx2)
-				arg2 = float(pxyx2*px)
-
-				# Corrections avoding log(0)
-				if arg1 == 0.0: arg1 = float(1e-8)
-				if arg2 == 0.0: arg2 = float(1e-8)
-
-				term = pxyx2*np.log2(arg2) - pxyx2*np.log2(arg1) 
-				elements.append(term)
-
-	# Transfer Entropy
-	TE = np.sum(elements)
-	return TE
 
 def TE_local(trajectory):
     temp = np.array(traj)
@@ -271,3 +277,27 @@ plt.title('Transfer Entropy and Free Energy vs β')
 plt.tight_layout()
 plt.show()
 
+### plot some tracks
+plt.figure(figsize=(10, 6))
+# plot two trajectories for 4 equally-spaced beta values, color-coded by beta
+betas_to_plot = np.linspace(beta_values.min(), beta_values.max(), 4)
+cmap = cm.viridis
+norm = colors.Normalize(vmin=betas_to_plot.min(), vmax=betas_to_plot.max())
+sm = cm.ScalarMappable(norm=norm, cmap=cmap)
+sm.set_array([])
+
+for b in betas_to_plot:
+    c = cmap(norm(b))
+    for j in range(2):  # two trajectories per beta
+        traj = generate_trajectory(beta=b, T=1000)
+        states_traj = [s for (s, a, s_next) in traj]
+        plt.plot(states_traj, color=c, alpha=0.6, linewidth=0.8)
+
+plt.xlabel('Time step')
+plt.ylabel('State')
+plt.title('Sample Trajectories (2 per β, 4 equally spaced β values)')
+ax = plt.gca()
+cbar = plt.colorbar(sm, ax=ax)
+cbar.set_label('β')
+plt.grid()
+plt.show()
