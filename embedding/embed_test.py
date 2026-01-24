@@ -40,7 +40,7 @@ threshold_track_l = 60 * 20  # 20 # look at long-enough tracks
 
 # %% for perturbed data
 root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/100424_new/'
-# root_dir = 'C:/Users/kevin/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'
+root_dir = 'C:/Users/ksc75/Yale University Dropbox/users/kiri_choi/data/ribbon_sleap/2024-9-17/'
 target_file = "exp_matrix.pklz"
 
 # List all subfolders in the root directory
@@ -118,7 +118,7 @@ vec_xy = np.concatenate(rec_tracks)
 vec_ids = np.concatenate(track_id)
 
 # %% build features
-window = int(60*2.)
+window = int(60*2.)  #2
 def build_features(data, window=window):
     T = len(data)
     samp_vec = data[:-np.mod(T, window),:]
@@ -221,7 +221,7 @@ feat_ids = build_signal(vec_ids)
 
 # %% condition on odor
 odor_on = np.where(np.sum(feat_odor,1)>0)[0]
-odor_off = np.where((feat_time[:,0]>45+30+1) & (feat_time[:,-1]<45+30+20))[0]
+odor_off = np.where((feat_time[:,0]>45+30+1) & (feat_time[:,-1]<45+30+15))[0]
 
 plt.figure()
 plt.scatter(data_2d[:, 0], data_2d[:, 1], color='k', s=5, alpha=0.8)
@@ -354,12 +354,13 @@ x,y = x[::down_samp], y[::down_samp]
 
 plt.figure(figsize=(8, 6))
 sns.kdeplot(x=x, y=y, cmap="viridis", fill=True, thresh=0, bw_method='silverman')
+# plt.colorbar(label="Density")
 plt.scatter(x, y, s=10, color="black", alpha=0.1)  # Optional: overlay scatter points
-plt.colorbar(label="Density")
 plt.xlabel('since odor off (s)'); plt.ylabel('projected action')
 plt.axvline(x=-30, color='r', linestyle='--'); plt.axvline(x=0, color='r', linestyle='--')
 plt.title("Smoothed Density Plot")
-plt.xlim([x.min(), x.max()]); plt.ylim([y.min(), y.max()])
+# plt.xlim([x.min(), x.max()]); plt.ylim([y.min(), y.max()])
+plt.ylim([-0.4, 0.4]); plt.xlim([-74,60])
 
 # %% sample in time for typical tracks
 n_bins = 150

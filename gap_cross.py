@@ -31,7 +31,7 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cr
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-30\kevin' ### gap crossing data
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-25\kevin' ### with control crosses
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-26\kevin'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-10\kevin'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-18\kevin' ### 10,12,15,18
 
 target_file = "exp_matrix.joblib"
 exp_type = 'same'#'increasing gap 60s ocl_' #'increasing gap 60s Kir_EPG'
@@ -85,6 +85,7 @@ for ff in range(nf):
                     theta = data['theta'][pos]
                     temp = np.stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]),1)#######
                     temp_xy = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
+                    temp_xy = np.column_stack((data['headx_smooth'][pos] , data['heady_smooth'][pos]))
                                     
                     ### criteria
                     mask_i = np.where(np.isnan(temp), 0, 1)
@@ -138,19 +139,20 @@ for ii in range(ntracks):
 # plt.ylabel("upwind via tracking (mm)")
 
 # %% search during crossing
-window = 60*2  # window size in frames
+window = int(60*1.)  # window size in frames
 lossx = np.array([75, 131, 183, 233])-1  ### for increasing
 # lossx = np.array([45, 105, 167, 232])-1  ### for decreasing
 lossx = np.array([76, 127, 181, 232])-1
 crossing_indices = {i: [] for i in range(len(lossx))}  # Dictionary to store indices for each condition
 crossing_segments = {i: [] for i in range(len(lossx))}  # Dictionary to store track segments
 
+# plt.figure()
 for ii in range(ntracks):
     ### load track
     tracki = rec_tracks[ii]
     signali = rec_signal[ii]
     pos = np.where(signali>0)[0]
-    ### if crossing
+    ### if had signal
     if len(pos)>thre_signalt:
         for ll in range(len(lossx)):
             xi = tracki[:,0]
@@ -159,28 +161,34 @@ for ii in range(ntracks):
             if len(cross_idx) > 0:
                 # Found crossing point(s)
                 for idx in cross_idx:
-                    # Store crossing indices
-                    crossing_indices[ll].append((ii, idx))
-                    # Store track segment after crossing
-                    if idx + window <= len(tracki):
-                        segment = tracki[idx:idx+window]
-                        seg_signal = signali[idx:idx+window]
-                        pos_signal = np.where(seg_signal!=0)[0]
-                        segment[pos_signal,:] = np.nan
-                        crossing_segments[ll].append(segment)
+                    ### cross and just out of signal
+                    # if np.nansum(signali[idx-1:idx])>0:  ##################### might need to include more logics
+                    if True:
+                        # Store crossing indices
+                        crossing_indices[ll].append((ii, idx))
+                        # Store track segment after crossing
+                        if idx + window <= len(tracki):
+                            segment = tracki[idx:idx+window,:]
+                            seg_signal = signali[idx:idx+window]
+                            pos_signal = np.where(seg_signal!=0)[0]
+                            # segment[pos_signal,:] = np.nan
+                            crossing_segments[ll].append(segment)
+                            
+                            # plt.plot(segment[:,0], segment[:,1], 'k-', alpha=0.1)
 
 # %% plots
 plt.figure(figsize=(15,5))
 mean_dx, std_dx = [],[]
 mean_dy, std_dy = [],[]
 kk = 0
+offset = 1
 for ii in range(len(lossx)):#-1, -1, -1):  # Changed to iterate in reverse
     plt.subplot(1,4,kk+1)
     displaceix = np.zeros(len(crossing_segments[ii]))
     displaceiy = np.zeros(len(crossing_segments[ii]))
     for jj in range(len(crossing_segments[ii])):
         trackj = crossing_segments[ii][jj]
-        plt.plot(trackj[:,0]-trackj[0,0], trackj[:,1]-trackj[0,1],'k-', alpha=0.1)
+        plt.plot(trackj[:,0]-trackj[0,0]*offset, trackj[:,1]-trackj[0,1]*offset,'k-', alpha=0.1)
         displaceix[jj] = np.nanmean((trackj[:,0]-trackj[0,0])**2)
         displaceiy[jj] = np.nanmean((trackj[:,1]-trackj[0,1])**2)
     kk += 1
@@ -497,20 +505,22 @@ plt.show()
 
 # %% analysis of single vs. double crossing
 # use track_cross_id for id and cross_events for crossing
-which_gap = 0
+which_gap = 1
 event_i, idx_i = cross_events[which_gap], track_cross_id[which_gap]
 single_x = []
 multi_x = []
+cnts_by_tracks = np.zeros(ntracks)
 for ww in range(4):
     event_i, idx_i = cross_events[which_gap], track_cross_id[which_gap]
     for ii in range(ntracks):  ### loop for tracks
         ### load event and ID
         pos = np.where(np.array(idx_i)==ii)[0]
-        # if len(pos)>=2:
-        if len(pos)==1:
+        if len(pos)>=2:
+        # if len(pos)==1:
             single_x.append(event_i[pos[0]])
-        elif len(pos)>=2:
+        # elif len(pos)>=3:
             multi_x.append(event_i[pos[-1]])
+        cnts_by_tracks[ii] += len(pos)
 
 errors = [
     np.std(single_x, ddof=1) / np.sqrt(len(single_x)),
@@ -521,6 +531,40 @@ plt.figure()
 plt.bar(['single', 'last of multi'], [np.mean(single_x), np.mean(multi_x)], yerr=errors)
 # plt.bar(['first', 'last'], [np.mean(single_x), np.mean(multi_x)], yerr=errors)
 plt.ylabel('P(cross)')
+
+
+###############################################################################
+# %% VISUAL
+###############################################################################
+# %% visualize crossing
+plt.figure(figsize=(5,5))
+mean_dx, std_dx = [],[]
+mean_dy, std_dy = [],[]
+ii=3
+displaceix = np.zeros(len(crossing_segments[ii]))
+displaceiy = np.zeros(len(crossing_segments[ii]))
+for ii in range(3):
+    for jj in range(len(crossing_segments[ii])):
+        trackj = crossing_segments[ii][jj]
+        plt.plot(trackj[:,0]-trackj[0,0]*0, trackj[:,1]-trackj[0,1]*0,'k-', alpha=0.1)
+plt.title(f'crossing at {lossx[ii]}mm')
+# plt.ylim([-50, 50])
+plt.xlabel('x (mm)')
+plt.ylabel('y (mm)')
+
+# %% singal track
+good_tracks = np.where(cnts_by_tracks>1)[0]
+ii = good_tracks[80] #1, 7, 32, 53
+plt.figure()
+plt.plot(rec_tracks[ii][:,0], rec_tracks[ii][:,1],'k')
+plt.plot(rec_tracks[ii][-1,0], rec_tracks[ii][-1,1],'ro')
+plt.plot(rec_tracks[ii][0,0], rec_tracks[ii][0,1],'bo')
+pos = np.where(rec_signal[ii]>2)[0]
+# plt.plot(rec_tracks[ii][pos,0], rec_tracks[ii][pos,1],'ro')
+# pos = np.where(vec_signal>0)[0]
+# plt.plot(vec_xy[pos,0], vec_xy[pos,1],'r,')
+
+plt.xlim([0,300]); plt.ylim([30,180])
 
 # %% same-gap comparison
 # reps = 150

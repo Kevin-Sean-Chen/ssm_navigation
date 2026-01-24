@@ -323,33 +323,33 @@ def sorted_spectrum(R,k=5,which='LR'):
     return eigvals[sorted_indices],eigvecs[:,sorted_indices]
 
 # %% scan tau
-N = 1000  # number of states
-K = 2*60  # delay window
-X_traj, track_id = build_X(data4fit, return_id=True, K=K)
-X_traj, track_id = build_X(data4fit, return_id=True, K=K)
-labels, centrals = kmeans_knn_partition(X_traj, N, return_centers=True)
+# N = 1000  # number of states
+# K = 2*60  # delay window
+# X_traj, track_id = build_X(data4fit, return_id=True, K=K)
+# X_traj, track_id = build_X(data4fit, return_id=True, K=K)
+# labels, centrals = kmeans_knn_partition(X_traj, N, return_centers=True)
 
-taus = np.array([1,5,10,30,30,60,120,180])
-specs_tau = np.zeros((len(taus), N-1))
-for tt in range(len(taus)):
-    taui = taus[tt]
-    P = compute_transition_matrix(labels[::taui], track_id[::taui], N)
-    uu,vv = np.linalg.eig(P)
-    idx = uu.argsort()[::-1]  # Get indices to sort eigenvalues
-    sorted_eigenvalues = uu[idx]
-    specs_tau[tt,:] = (-1/60*taui)/np.log(sorted_eigenvalues[1:])
-    print(tt)
+# taus = np.array([1,5,10,30,30,60,120,180])
+# specs_tau = np.zeros((len(taus), N-1))
+# for tt in range(len(taus)):
+#     taui = taus[tt]
+#     P = compute_transition_matrix(labels[::taui], track_id[::taui], N)
+#     uu,vv = np.linalg.eig(P)
+#     idx = uu.argsort()[::-1]  # Get indices to sort eigenvalues
+#     sorted_eigenvalues = uu[idx]
+#     specs_tau[tt,:] = (-1/60*taui)/np.log(sorted_eigenvalues[1:])
+#     print(tt)
 
-# %% 
-plt.figure()
-plt.plot(taus/60, specs_tau[:,:5],'-o')
-# plt.xscale('log')
-plt.xlabel(r'step $\tau$ (s)'); plt.ylabel('relaxation time (s)')
+# # %% 
+# plt.figure()
+# plt.plot(taus/60, specs_tau[:,:5],'-o')
+# # plt.xscale('log')
+# plt.xlabel(r'step $\tau$ (s)'); plt.ylabel('relaxation time (s)')
 
 # %% fix param now
 N = 1000  # number of states
 K = 2*60  # delay window
-tau = 10   # transition steps
+tau = 1   # transition steps
 X_traj, track_id = build_X(data4fit, return_id=True, K=K)
 X_traj, track_id = X_traj[::tau, :], track_id[::tau]
 labels, centrals = kmeans_knn_partition(X_traj, N, return_centers=True)
@@ -359,7 +359,7 @@ P = compute_transition_matrix(labels, track_id, N)
 # %%
 R = get_reversible_transition_matrix(P)
 eigvals,eigvecs = sorted_spectrum(R,k=7)  # choose the top k modes
-phi2=eigvecs[labels,2].real
+phi2=eigvecs[labels,1].real
 u,s,v = np.linalg.svd(X_traj,full_matrices=False)
 
 plt.figure(figsize=(10,7))
@@ -398,17 +398,21 @@ plt.ylim([0.001, 20])
 
 # %% color code tracks]
 imode = 2
-tau = 10
+tau = 1
 phi2 = eigvecs[labels,imode].real
 # phi2 = np.ma.masked_array(phi2, mask=np.isin(labels, idx[600:]))
-window_show = np.arange(10000,20000)
+window_show = np.arange(40000, 45000)
 # X_xy = build_X(rec_tracks, K)[::tau, :]
 X_xy, track_id = build_X(rec_tracks, return_id=True, K=K)
-X_xy, track_id = X_xy[::tau, :], track_id[::tau]
+X_xy, track_id, phi2 = X_xy[::tau, :], track_id[::tau], phi2[::tau]
+time_in_trial = build_signal(times, K=K)
+tempt = time_in_trial[:,0][::tau]
+window_show = np.where(((tempt >= 45+10) & (tempt <= 45+30)))[0]
 xy_back = X_xy[:, [0,K]]
 plt.figure()
 plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
 plt.title(f'mode#{imode}')
+plt.ylim([0,184]); plt.colorbar()
 
 # %% analyze in the task!
 X_time = build_signal(times, K)[::tau]
@@ -749,12 +753,12 @@ def compute_autocorrelation(data, max_lag):
     return np.arange(1, max_lag + 1), np.array(autocorr_values)/max(autocorr_values)
 samp_xy, samp_vxy = gen_tracks_given_substates(np.arange(N), 70000, return_v=True)
 
-###
+# %%### 
 xy_id = 1
-lags, acf_data = compute_autocorrelation(vec_vxy[::tau, xy_id], 1000)
-lags, acf_mark = compute_autocorrelation(samp_vxy[:, xy_id], 1000)
+lagsd, acf_data = compute_autocorrelation(vec_vxy[::1, xy_id], 1200)
+lags, acf_mark = compute_autocorrelation(samp_vxy[::tau, xy_id], 1200)
 plt.figure()
-plt.plot(np.arange(len(lags))*tau/60, acf_data, label='data')
+plt.plot(np.arange(len(lagsd))*1/60, acf_data, label='data')
 plt.plot(np.arange(len(lags))*tau/60, acf_mark, label='delayed Markov')
 plt.legend(); plt.xlabel(r'$\tau$ (s)');  plt.ylabel(r'$<v(t),v(t+\tau)>$')
 
@@ -843,5 +847,5 @@ def reversibility_score(P):
 
 # Example
 N = 1000
-P = random_markov_matrix(N)
-score, P_rev = reversibility_score(P)
+Pr = random_markov_matrix(N)
+score, P_rev = reversibility_score(Pr)
