@@ -31,7 +31,7 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cr
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-30\kevin' ### gap crossing data
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-25\kevin' ### with control crosses
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-26\kevin'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-18\kevin' ### 10,12,15,18
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-18\kevin' ### 10,12,15,18
 
 target_file = "exp_matrix.joblib"
 exp_type = 'same'#'increasing gap 60s ocl_' #'increasing gap 60s Kir_EPG'
@@ -139,10 +139,10 @@ for ii in range(ntracks):
 # plt.ylabel("upwind via tracking (mm)")
 
 # %% search during crossing
-window = int(60*1.)  # window size in frames
+window = int(60*2.)  # window size in frames
 lossx = np.array([75, 131, 183, 233])-1  ### for increasing
 # lossx = np.array([45, 105, 167, 232])-1  ### for decreasing
-lossx = np.array([76, 127, 181, 232])-1
+lossx = np.array([76, 128, 181, 232])-1
 crossing_indices = {i: [] for i in range(len(lossx))}  # Dictionary to store indices for each condition
 crossing_segments = {i: [] for i in range(len(lossx))}  # Dictionary to store track segments
 
@@ -238,7 +238,7 @@ plt.tight_layout(); plt.show()
 # %% visualization
 ###############################################################################
 # %% measure pre, post
-window = 60*5  # window size in frames
+window = 60*3  # window size in frames
 wind_past = int(60*5) # window prior to loss
 min_spd = 0
 # lossx = np.array([75, 131, 183, 233])  ### for increasing
@@ -411,6 +411,247 @@ plt.title("Prediction Confidence")
 
 plt.tight_layout()
 plt.show()
+
+# %% TESTING ###
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+
+from sklearn.model_selection import GroupShuffleSplit
+from sklearn.metrics import (
+    confusion_matrix, ConfusionMatrixDisplay,
+    accuracy_score, balanced_accuracy_score, f1_score,
+    log_loss,
+    roc_curve, auc
+)
+
+# -----------------------------
+# Build dataset + GROUPS
+# -----------------------------
+X_list, y_list, g_list = [], [], []
+
+# each ll is treated as one group (kept entirely in train or test)
+for ll in range(1, len(lossx)):
+    Xll = np.asarray(hist_features[ll])
+    yll = np.asarray(cross_events[ll])
+
+    if len(Xll) == 0:
+        continue
+    if len(Xll) != len(yll):
+        raise ValueError(f"Length mismatch at ll={ll}: X={len(Xll)} y={len(yll)}")
+
+    X_list.append(Xll)
+    y_list.append(yll)
+    g_list.append(np.full(len(yll), ll, dtype=int))
+
+X_all = np.concatenate(X_list, axis=0)
+y_all = np.concatenate(y_list, axis=0).astype(int)
+groups = np.concatenate(g_list, axis=0)
+
+feature_names = [
+    'Mean Signal', 'Std Signal', 'Encounter Freq',
+    'Past Speed', 'Speed Std', 'Path Tortuosity',
+    'Duration in Signal'
+]
+
+# -----------------------------
+# Evaluation: Group-correct splits
+# -----------------------------
+K = 30
+test_size = 0.3
+seed0 = 0
+
+gss = GroupShuffleSplit(n_splits=K, test_size=test_size, random_state=seed0)
+
+# metrics per split
+accs, baccs, f1s = [], [], []
+train_losses, test_losses = [], []
+aucs = []
+
+# confusion matrices, weights, probabilities
+confs = []
+Ws = []
+probas_by_split = []   # list of (p_test, y_test)
+y_oof = []             # pooled out-of-fold labels
+p_oof = []             # pooled out-of-fold probabilities
+
+# ROC aggregation
+fpr_grid = np.linspace(0, 1, 300)
+tprs_interp = []
+
+for split_i, (train_idx, test_idx) in enumerate(gss.split(X_all, y_all, groups=groups), 1):
+    X_train, X_test = X_all[train_idx], X_all[test_idx]
+    y_train, y_test = y_all[train_idx], y_all[test_idx]
+
+    # pipeline fixes scaling leakage; L1 logistic is refit each split
+    pipe = make_pipeline(
+        StandardScaler(),
+        LogisticRegression(
+            penalty="l1",
+            C=1.0,
+            solver="saga",
+            max_iter=5000
+        )
+    )
+    pipe.fit(X_train, y_train)
+
+    # predictions
+    p_train = pipe.predict_proba(X_train)[:, 1]
+    p_test  = pipe.predict_proba(X_test)[:, 1]
+    y_pred  = (p_test >= 0.5).astype(int)
+
+    # metrics
+    accs.append(accuracy_score(y_test, y_pred))
+    baccs.append(balanced_accuracy_score(y_test, y_pred))
+    f1s.append(f1_score(y_test, y_pred, zero_division=0))
+
+    train_losses.append(log_loss(y_train, p_train))
+    test_losses.append(log_loss(y_test, p_test))
+
+    fpr, tpr, _ = roc_curve(y_test, p_test)
+    aucs.append(auc(fpr, tpr))
+
+    # store ROC curve interpolated
+    tpr_i = np.interp(fpr_grid, fpr, tpr)
+    tpr_i[0] = 0.0
+    tprs_interp.append(tpr_i)
+
+    # confusion
+    confs.append(confusion_matrix(y_test, y_pred))
+
+    # weights (after standardization)
+    lr = pipe.named_steps["logisticregression"]
+    Ws.append(lr.coef_[0].copy())
+
+    # save for probability hist
+    probas_by_split.append((p_test, y_test))
+
+    # pooled out-of-fold
+    y_oof.append(y_test)
+    p_oof.append(p_test)
+
+# stack results
+accs = np.asarray(accs)
+baccs = np.asarray(baccs)
+f1s = np.asarray(f1s)
+train_losses = np.asarray(train_losses)
+test_losses = np.asarray(test_losses)
+aucs = np.asarray(aucs)
+
+Ws = np.asarray(Ws)
+mean_conf = np.mean(np.asarray(confs), axis=0)
+
+tprs_interp = np.asarray(tprs_interp)
+mean_tpr = tprs_interp.mean(axis=0)
+std_tpr  = tprs_interp.std(axis=0)
+mean_tpr[-1] = 1.0
+
+y_oof = np.concatenate(y_oof)
+p_oof = np.concatenate(p_oof)
+
+# pooled ROC/AUC (most honest “single curve” summary)
+fpr_pool, tpr_pool, _ = roc_curve(y_oof, p_oof)
+auc_pool = auc(fpr_pool, tpr_pool)
+
+# selection frequency for L1 stability
+sel_freq = (np.abs(Ws) > 1e-8).mean(axis=0)
+w_mean = Ws.mean(axis=0)
+w_std  = Ws.std(axis=0)
+
+print(f"Acc:   {accs.mean():.3f} ± {accs.std():.3f}")
+print(f"bAcc:  {baccs.mean():.3f} ± {baccs.std():.3f}")
+print(f"F1:    {f1s.mean():.3f} ± {f1s.std():.3f}")
+print(f"AUC:   {aucs.mean():.3f} ± {aucs.std():.3f}  | pooled AUC: {auc_pool:.3f}")
+print(f"LogLoss Train: {train_losses.mean():.3f} ± {train_losses.std():.3f}")
+print(f"LogLoss Test:  {test_losses.mean():.3f} ± {test_losses.std():.3f}")
+
+# -----------------------------
+# Plots
+# -----------------------------
+fig = plt.figure(figsize=(18, 10))
+
+# 1) Feature weights (with selection freq)
+plt.subplot(231)
+plt.errorbar(range(len(feature_names)), w_mean, yerr=w_std, fmt='o')
+plt.axhline(0, color='gray', ls='--')
+plt.xticks(
+    range(len(feature_names)),
+    [f"{n}\n(sel={sf:.2f})" for n, sf in zip(feature_names, sel_freq)],
+    rotation=45, ha='right'
+)
+plt.ylabel("Weight (z-scored features)")
+plt.title(
+    "Feature Weights (L1 Logistic)\n"
+    f"Acc: {accs.mean():.3f} ± {accs.std():.3f} | "
+    f"bAcc: {baccs.mean():.3f} ± {baccs.std():.3f} | "
+    f"F1: {f1s.mean():.3f} ± {f1s.std():.3f}"
+)
+
+# 2) Mean confusion matrix
+plt.subplot(232)
+disp = ConfusionMatrixDisplay(mean_conf)
+disp.plot(ax=plt.gca(), cmap='Blues', colorbar=False)
+plt.title("Mean Confusion Matrix (group-correct splits)")
+
+# 3) Probability histograms
+plt.subplot(233)
+p_true, p_false = [], []
+for p_test, y_test in probas_by_split:
+    p_true.extend(p_test[y_test == 1])
+    p_false.extend(p_test[y_test == 0])
+
+plt.hist(p_true, bins=20, alpha=0.7, label="true crossing", density=True)
+plt.hist(p_false, bins=20, alpha=0.4, label="no crossing", density=True)
+plt.xlabel("P(crossing)")
+plt.ylabel("density")
+plt.legend(fontsize=8)
+plt.title("Prediction Confidence")
+
+# 4) Cross-entropy loss train vs test
+plt.subplot(234)
+plt.plot(train_losses, 'o-', label='train log loss')
+plt.plot(test_losses, 'o-', label='test log loss')
+plt.xlabel("Split #")
+plt.ylabel("Log loss (cross-entropy)")
+plt.legend(fontsize=8)
+plt.title(
+    "Cross-Entropy Loss\n"
+    f"Train: {train_losses.mean():.3f} ± {train_losses.std():.3f} | "
+    f"Test: {test_losses.mean():.3f} ± {test_losses.std():.3f}"
+)
+
+# 5) ROC: mean±std + pooled ROC
+plt.subplot(235)
+plt.plot(fpr_grid, mean_tpr, label=f"Mean ROC (AUC={aucs.mean():.3f}±{aucs.std():.3f})")
+plt.fill_between(
+    fpr_grid,
+    np.maximum(mean_tpr - std_tpr, 0),
+    np.minimum(mean_tpr + std_tpr, 1),
+    alpha=0.2
+)
+plt.plot(fpr_pool, tpr_pool, lw=2, label=f"Pooled OOF ROC (AUC={auc_pool:.3f})")
+plt.plot([0, 1], [0, 1], '--', lw=1)
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Curves (group-correct)")
+plt.legend(fontsize=8)
+
+# 6) Score distributions
+plt.subplot(236)
+plt.hist(accs, bins=12, alpha=0.7, label="accuracy", density=True)
+plt.hist(baccs, bins=12, alpha=0.7, label="balanced acc", density=True)
+plt.hist(f1s, bins=12, alpha=0.7, label="F1", density=True)
+plt.xlabel("score")
+plt.ylabel("density")
+plt.legend(fontsize=8)
+plt.title("Score Distributions")
+
+plt.tight_layout()
+plt.show()
+
     
 # %% sorted by history
 plt.figure(figsize=(15,5))
@@ -501,6 +742,42 @@ plt.ylabel("Empirical CDF")
 plt.title("Empirical CDFs of Four Distributions")
 plt.legend()
 plt.grid()
+plt.show()
+
+# %%
+bins = 20
+
+all_data = np.concatenate([
+    np.asarray(p_cross[i])
+    for i in range(4)
+    if len(p_cross[i]) > 0
+])
+
+bin_edges = np.histogram_bin_edges(all_data, bins=bins)
+bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+
+plt.figure(figsize=(10, 6))
+
+for ll in range(4):
+    data = np.asarray(p_cross[ll])
+    if len(data) == 0:
+        continue
+
+    counts, _ = np.histogram(data, bins=bin_edges)
+
+    plt.plot(
+        bin_centers,
+        counts,
+        label=f'Loss point {lossx[ll]} mm',
+        color=colors[ll],
+        linewidth=2
+    )
+
+plt.xlabel("Value")
+plt.ylabel("Count")
+plt.legend()
+plt.grid(alpha=0.3)
+plt.tight_layout()
 plt.show()
 
 # %% analysis of single vs. double crossing

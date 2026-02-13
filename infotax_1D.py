@@ -107,14 +107,14 @@ def infotaxis_1d_with_kinematics(
 # ----------------------
 ###
 # params
-L = 10
+L = 20
 p0 = 0.01
 seed = np.random.randint(0,1000)
 taget_x = 15
 xmin, xmax = -15, 15
 ###
 times, path, hits, hit_probs = infotaxis_1d_with_kinematics( xmin=xmin, xmax=xmax,
-    start=0, true_source=taget_x, L=L, p0=p0, seed=seed,
+    start=5, true_source=taget_x, L=L, p0=p0, seed=seed,
     v_max=2, a_max=1, move_cost=.0
 )
 
@@ -150,3 +150,8 @@ plt.ylabel("Time t")
 plt.title("1D Infotaxis (kinematics-limited) with Stochastic Detections")
 plt.tight_layout()
 plt.show()
+
+plt.figure()
+plt.subplot(2,1,1); plt.plot(hits)
+plt.subplot(2,1,2); plt.plot(np.diff(path))
+# %% information trasnfer
