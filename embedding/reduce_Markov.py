@@ -346,6 +346,17 @@ for ns in range(len(n_reduced)):
     plt.xlabel('Lag'); plt.ylabel('Autocorrelation'); plt.title('Autocorrelation of Discrete States')
     plt.grid(True)
 
+# %% filling in data
+# N_state_label = labels*1
+# Q_state_label = map_time_series(mapping_matrix, labels)
+# xy_position = xy_back*1
+# signal_t = X_odor*1
+# ids = ids*1
+# vx = X_traj[:,0]
+# vy = X_traj[:,K_star]
+# theta = X_th[:,0]
+# dtheta = X_dth[:,0]
+
 # %% saving example Q-state navigation
 # N_state_label (labels from the Markov matrix)
 # Q_state_label
@@ -354,5 +365,17 @@ for ns in range(len(n_reduced)):
 # ids
 # vx,vy
 
-# np.savez_compressed("q_state_navigation.npz", N_state_label=N_state_label, Q_state_label=Q_state_label,\
-#                     xy_position=xy_position, signal_t=signal_t, track_id=ids, vx=vx, vy=vy)
+# np.savez_compressed("q_state_navigation_with_angle.npz", N_state_label=N_state_label, Q_state_label=Q_state_label,\
+#                     xy_position=xy_position, signal_t=signal_t, track_id=ids, vx=vx, vy=vy, theta=theta, dtheta=dtheta)
+
+# %% make some plots!
+# plt.figure()
+# for ii in range(2):
+#     pos = np.where(Q_state_label[:200000]==ii)[0]
+#     plt.plot(xy_position[pos,0], xy_position[pos,1],',')
+    
+# plt.figure()
+# for ii in range(2):
+#     pos = np.where(Q_state_label[:]==ii)[0]
+#     plt.hist(dtheta[pos],50, density=True, alpha=.6)
+# plt.yscale('log')

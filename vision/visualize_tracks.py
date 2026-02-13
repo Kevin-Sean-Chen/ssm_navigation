@@ -41,21 +41,21 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_r
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-1-24'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-3'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-5'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-6'
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-6'
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-13'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-6'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-6'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-13'
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-14'
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-17'
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-20'   ### missing dv and dth
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-27'
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-6' 
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-3-20'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-5-5' ### loom + ribbon
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-4-11'  ### visual loom + bar
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-17'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-2-20'   ### missing dv and dth
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-2-27'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-6' 
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-3-20'
+# # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-5-5' ### loom + ribbon
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\visual_behavior\2025-4-11'  ### visual loom + bar
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-5-19' ###
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-6-5'
 
-exp_type = ['05s'] #['center']#
+exp_type = ['150'] #['center']#
 exclude_keywords = ['bars']
 target_file = "exp_matrix.pklz"
 
@@ -170,7 +170,7 @@ ff = np.arange(12,20) ### 50, 1K
 # ff = np.arange(0,16) ### bars
 # ff = np.arange(16,26)  ### proj and bars
 # ff = np.arange(26,35)  ### full blue
-# ff = np.arange(34,42)  ### use LED
+ff = np.arange(34,42)  ### use LED
 # ff = np.arange(42,56)  ### use LED at 255
 ### VISION
 # ff = np.arange(0,10) ### 30, 2Hz
@@ -182,39 +182,39 @@ ff = np.arange(12,20) ### 50, 1K
 # ff = np.arange(53,60) ## 3 bars!
 
 ### 02/13
-ff = np.arange(0,8)  ### blue bar
-ff = np.arange(8,16)  ### black bar on blue
-ff = np.arange(16,24)  ### black on green
-ff = np.arange(24,32)  ### green bar
-ff = np.arange(48,56)  ### cross at proj-50
-ff = np.arange(56,64) ### cross at proj=150
-# ff = np.arange(64,72)  ### combined
-ff = np.arange(72,80)
-# ff = np.arange(80,88)
+# ff = np.arange(0,8)  ### blue bar
+# ff = np.arange(8,16)  ### black bar on blue
+# ff = np.arange(16,24)  ### black on green
+# ff = np.arange(24,32)  ### green bar
+# ff = np.arange(48,56)  ### cross at proj-50
+# ff = np.arange(56,64) ### cross at proj=150
+# # ff = np.arange(64,72)  ### combined
+# ff = np.arange(72,80)
+# # ff = np.arange(80,88)
 
-### 02/17
-ff = np.arange(24,32)
-# ff = np.arange(40,48)
-# ff = np.arange(56,64)
+# ### 02/17
+# ff = np.arange(24,32)
+# # ff = np.arange(40,48)
+# # ff = np.arange(56,64)
 
-### 02/20
-ff = np.arange(0,16)
-ff = np.arange(26,35)
-ff = np.arange(38,48)
+# ### 02/20
+# ff = np.arange(0,16)
+# ff = np.arange(26,35)
+# ff = np.arange(38,48)
 
-### 03/06
-# ff = np.arange(0,8)  ### odor +BP
-# ff = np.arange(9,16) ### odor
-# ff = np.arange(32,40)  ### w/o ATR +BP
-ff = np.arange(40,56) ### w/o ATR
+# ### 03/06
+# # ff = np.arange(0,8)  ### odor +BP
+# # ff = np.arange(9,16) ### odor
+# # ff = np.arange(32,40)  ### w/o ATR +BP
+# ff = np.arange(40,56) ### w/o ATR
 
-ff = np.arange(30,40)  ### loom with bars
-ff = np.arange(20,30) ### fast looms
+# ff = np.arange(30,40)  ### loom with bars
+# ff = np.arange(20,30) ### fast looms
 
 ff = np.arange(0, len(pkl_files))  ### if all
 # ff= np.arange(0,17)
 
-threshold_track_l = 60 * 1#5 #2 
+threshold_track_l = 60 * 5#5 #2 
 times = []
 tracks = []
 thetas = []
@@ -236,10 +236,10 @@ for ii in range(len(ff)):
         mean_speed = np.mean(np.sqrt(data['vx_smooth'][pos]**2+data['vy_smooth'][pos]**2))
         # mean_speed = np.nanmean(np.abs(data['dtheta_smooth'][pos]))
         if mean_speed>0:  # check if behaving ##################### if applies
-            if len(pos) > threshold_track_l:
+            if len(pos) > threshold_track_l and mean_speed>0:
                 
                 ### make per track data
-                theta = data['dtheta_smooth'][pos]
+                # theta = data['dtheta_smooth'][pos]
                 theta = data['theta_smooth'][pos]
                 temp_v = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]))
                 temp_x = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
@@ -275,7 +275,7 @@ for ii in range(len(tracks)):
     # pos = np.where((times[ii]>63) & (times[ii]<63+5))[0]
     pos = np.where((times[ii]<126))[0]
     # pos = np.where((times[ii]>0))[0]
-    plt.plot(xy_i[pos,0], xy_i[pos,1],'k',alpha=.5)
+    plt.plot(xy_i[pos,0], xy_i[pos,1],'k',alpha=.2)
     
 #     if len(pos)>0:
 #         diff_pos = xy_i[pos[0],0] - xy_i[pos[-1],0]
@@ -320,6 +320,8 @@ time_align = []
 dtheta_align = []
 vel_align = []
 speed_align = []
+turn_up = []
+loc_align = []
 plt.figure()
 for ii in range(len(tracks)):
     time_i = times[ii]
@@ -328,40 +330,47 @@ for ii in range(len(tracks)):
     vx_i = vxys[ii][:,0]
     # stim_i = signal[ii]
     pos = np.where(time_i>0)[0]
-    # pos_v = np.where(vx_i>0)[0]
-    # pos = np.intersect1d(pos, pos_v)
+    # pos_v = np.where(vx_i<0)[0]
+    # xy_i = tracks[ii]
+    # pos_space = np.where((xy_i[:,0]>10) & (xy_i[:,0]<280) & (xy_i[:,1]>10) & (xy_i[:,1]<160))[0]  ### condition in space
+    # pos = np.intersect1d(pos, pos_space)
     # plt.plot(time_i[pos], np.abs(dtheta_i[pos]),'k', alpha=0.2)
     # plt.plot(time_i[pos], np.abs(speed_i[pos]),'k', alpha=0.2)
     time_align.append(time_i[pos])
-    dtheta_align.append(dtheta_i[pos])
+    dtheta_align.append((dtheta_i[pos]-0))
     vel_align.append(vx_i[pos])
     speed_align.append(speed_i[pos])
+    up_pos = np.where(np.abs(dtheta_i[pos])>90)[0]
+    turn_up_i = dtheta_i[pos]*0
+    turn_up_i[up_pos] = 1
+    turn_up.append(turn_up_i)
     
 time_align = np.concatenate(time_align)
 dtheta_align = np.concatenate(dtheta_align)
 vel_align = np.concatenate(vel_align)
 speed_align = np.concatenate(speed_align)
+turn_up_align = np.concatenate(turn_up)
 
 # %%
-time_stim = np.arange(0,123,.2) ###
-# time_stim = np.arange(0,30,.2) ###
+# time_stim = np.arange(0,123,.2) ###
+time_stim = np.arange(0,60,  .2) ###
 # time_stim = np.arange(0,120*2,.4)
 mean_dtheta = time_stim*0+np.nan
 mean_speed = time_stim*0+np.nan
 for tt in range(len(time_stim)-1):
-    pos = np.where((time_align>time_stim[tt]) & (time_align<time_stim[tt+1]) )[0]
-    mean_dtheta[tt] = np.nanmean(np.abs(dtheta_align[pos]))
+    pos = np.where((time_align>time_stim[tt]) & (time_align<time_stim[tt+1])  & (speed_align>1))[0]
+    mean_dtheta[tt] = np.nanmean(np.abs(turn_up_align[pos]))
     mean_speed[tt] = np.nanmean((speed_align[pos]))
 
 plt.figure()
 plt.plot(time_stim, mean_dtheta)
-plt.xlabel('time (s)'); plt.ylabel('|degree|/s'); 
+plt.xlabel('time (s)'); plt.ylabel('P(up-wind)'); 
 # plt.ylim([25, 90])
 plt.figure()
 plt.plot(time_stim - 13, mean_speed)
-x = [0, 0.5,  0.5, 0]  # x-coordinates of corners
-y = [-20, -20, 30, 30]  # y-coordinates of corners
-plt.fill(x, y, color='gray', alpha=0.5); #plt.ylim([-5,17])
+# x = [0, 0.5,  0.5, 0]  # x-coordinates of corners
+# y = [-20, -20, 30, 30]  # y-coordinates of corners
+# plt.fill(x, y, color='gray', alpha=0.5); #plt.ylim([-5,17])
 plt.xlabel('time (s)'); plt.ylabel('speed (mm/s)'); 
 # plt.ylim([3, 11])
 

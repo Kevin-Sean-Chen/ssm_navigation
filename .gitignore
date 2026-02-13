@@ -39,5 +39,6 @@ build/
 *.pkl
 *.gif
 *.csv
+*.npz
 saved_params/
 exp_tracks/

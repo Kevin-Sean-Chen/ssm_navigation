@@ -46,6 +46,7 @@ x_smooth = expmat[31,:][::down_samp][:chop]
 y_smooth = expmat[32,:][::down_samp][:chop]
 speed_smooth = expmat[30,:][::down_samp][:chop]  #11 31
 dtheta_smooth = expmat[34,:][::down_samp][:chop]  #14 35
+theta_smooth = expmat[33,:][::down_samp][:chop] 
 
 # %% some pre-processing
 v_threshold = 30
@@ -67,6 +68,8 @@ rec_tracks = []  # record the full track x,y
 rec_signal = []  # record opto signal
 times = []   # record time in epoch
 speeds = []
+rec_theta = []
+rec_dtheta = []
 
 for tr in range(n_tracks):
     print(tr)
@@ -82,6 +85,8 @@ for tr in range(n_tracks):
     track_ids.append(np.zeros(len(pos))+tr) 
     rec_signal.append(signal[pos])
     speeds.append(speed_smooth[pos])
+    rec_theta.append(theta_smooth[pos])
+    rec_dtheta.append(dtheta_smooth[pos])
     # masks.append(thetas)
     # times.append(data['t'][pos])
 
@@ -340,6 +345,9 @@ plt.title(f'mode#{imode}')
 
 # %% modes back to velocity
 X_speed = build_signal(speeds, K_star)
+X_dtheta = build_signal(rec_dtheta, K_star)
+X_theta = build_signal(rec_theta, K_star)
+theta, dtheta = X_theta[:,0], X_dtheta[:,0]
 plt.figure()
 # plt.scatter(X_traj[window_show, 1+K_star*1], phi2[window_show],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs) # veloctiy
 plt.scatter(X_traj[window_show, 1+K_star*0], X_traj[window_show, 1+K_star*1],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
