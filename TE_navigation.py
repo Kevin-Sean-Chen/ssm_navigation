@@ -210,6 +210,17 @@ def transfer_entropy(X,Y,delay=1,gaussian_sigma=None):
 	TE = np.sum(elements)
 	return TE
 
+# %% re-process x,y tracks
+x_smooth_, y_smooth_ = [], []
+temp = np.unique(trjNum)
+for ii in range(len(temp)):
+    pos = np.where(trjNum==temp[ii])[0]
+    x_smooth_.append(x_smooth[pos[1:-1]])
+    y_smooth_.append(y_smooth[pos[1:-1]])
+    
+x_smooth_ = np.concatenate(x_smooth_)
+y_smooth_ = np.concatenate(y_smooth_)
+
 # %% 2D grid sampling
 def coarse_grain_2d_scatter_indices(x, y, grid_size):
     x_bins, y_bins = grid_size
@@ -248,8 +259,8 @@ plt.plot(lags[lag_range], cross_corr[lag_range])
 plt.xlabel("Lag"); plt.ylabel("Cross-Correlation"); plt.grid(True)
 
 # sample for location
-xy_grid = (15,9)#(19,9)
-delay = 20  ### 10,20,30
+xy_grid = (19,9) #(15,9)#
+delay = 25  ### 10,20,30
 grid_xy = coarse_grain_2d_scatter_indices(x_smooth, y_smooth, xy_grid)
 
 # %%
@@ -266,8 +277,8 @@ for xx in range(0,xy_grid[0]):
         xi = bin_signal[pos]  ### sensory drive
         yi = bin_vi[pos]   ### behavior output
         if len(pos)>1000:
-            TE_s2b[xx,yy] = transfer_entropy(xi,yi,delay) / (1/60*down_samp)
-            TE_b2s[xx,yy] = transfer_entropy(yi,xi,delay) / (1/60*down_samp)
+            TE_s2b[xx,yy] = transfer_entropy(xi,yi,delay) / (1/90*down_samp)
+            TE_b2s[xx,yy] = transfer_entropy(yi,xi,delay) / (1/90*down_samp)
             obs_num[xx,yy] = len(pos)
 TE_s2b = TE_s2b.T
 TE_b2s = TE_b2s.T
@@ -277,7 +288,8 @@ mask[obs_num==0] = np.nan
 mask = mask.T
 
 # %% plotting
-data1, data2, data3 = TE_s2b, TE_b2s, (TE_s2b - TE_b2s)  * 1
+data1, data2, data3 = TE_s2b[:,2:], TE_b2s[:,2:], (TE_s2b[:,2:] - TE_b2s[:,2:])  * 1
+masks = mask[:,2:]
 vmin = min(data1.min(), data2.min(), data3.min())
 vmax = max(data1.max(), data2.max(), data3.max())
 
@@ -285,15 +297,27 @@ fig, axs = plt.subplots(3, 1, figsize=(18, 8))
 for ax in axs:
     ax.set_xticks([])  # Remove x-axis ticks
     ax.set_yticks([]) 
-cax1 = axs[0].imshow(data1* mask, cmap='viridis',vmin=vmin, vmax=vmax)
+cax1 = axs[0].imshow(data1* masks, cmap='viridis',vmin=vmin, vmax=vmax)
 axs[0].set_title(r"TE(s $\rightarrow$ a)")
 # axs[0].set_title("MI(S',S)")
-cax2 = axs[1].imshow(data2* mask, cmap='viridis',vmin=vmin, vmax=vmax)
+cax2 = axs[1].imshow(data2* masks, cmap='viridis',vmin=vmin, vmax=vmax)
 axs[1].set_title(r"TE(a $\rightarrow$ s)")
-cax3 = axs[2].imshow(data3* mask, cmap='viridis',vmin=vmin, vmax=vmax)
+cax3 = axs[2].imshow(data3* masks, cmap='viridis',vmin=vmin, vmax=vmax)
 axs[2].set_title("difference")
 fig.colorbar(cax3, ax=axs, orientation='horizontal', fraction=0.02, pad=0.1)
 
+# %% without difference
+vmin, vmax  = min(data1.min(), data2.min()), max(data1.max(), data2.max())
+fig, axs = plt.subplots(2, 1, figsize=(18, 8))
+for ax in axs:
+    ax.set_xticks([])  # Remove x-axis ticks
+    ax.set_yticks([]) 
+cax1 = axs[0].imshow(data1* masks, cmap='viridis',vmin=vmin, vmax=vmax)
+axs[0].set_title(r"TE(s $\rightarrow$ a)")
+# axs[0].set_title("MI(S',S)")
+cax2 = axs[1].imshow(data2* masks, cmap='viridis',vmin=vmin, vmax=vmax)
+axs[1].set_title(r"TE(a $\rightarrow$ s)")
+fig.colorbar(cax2, ax=axs, orientation='horizontal', fraction=0.02, pad=0.1)
 
 # %% show data
 plt.figure()

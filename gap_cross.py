@@ -30,8 +30,8 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cr
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-11\kevin' ### gap crossing data
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-30\kevin' ### gap crossing data
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-25\kevin' ### with control crosses
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-26\kevin'
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-15\kevin' ### 10,12,15,18
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-26\kevin'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-10\kevin' ### 10,12,15,18
 
 target_file = "exp_matrix.joblib"
 exp_type = 'same'#'increasing gap 60s ocl_' #'increasing gap 60s Kir_EPG'
@@ -62,6 +62,7 @@ rec_tracks = []  # record the full track x,y
 rec_signal = []  # record opto signal
 times = []   # record time in epoch
 thetas = []
+dthetas = []
 cond_id = 0
 threshold_track_l = 60*1
 
@@ -94,6 +95,7 @@ for ff in range(len(target_files_sorted)):
                     # temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos] , \
                                             # data['theta_smooth'][pos] , data['signal'][pos]))
                     theta = data['theta'][pos]
+                    dtheta = data['dtheta_smooth'][pos]
                     temp = np.stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]),1)#######
                     temp_xy = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
                     temp_xy = np.column_stack((data['headx_smooth'][pos] , data['heady_smooth'][pos]))
@@ -114,6 +116,7 @@ for ff in range(len(target_files_sorted)):
                         cond_id += 1
                         times.append(data['t'][pos])
                         thetas.append(theta)
+                        dthetas.append(dtheta)
 
 # %% vectorize for simpliciy
 vec_signal = np.concatenate(rec_signal)  # odor signal
@@ -122,6 +125,7 @@ vec_vxy = np.concatenate(data4fit)  # velocity
 vec_xy = np.concatenate(rec_tracks)  # position
 vec_ids = np.concatenate(track_id)  # track ID
 vec_theta = np.concatenate(thetas)
+vec_dth = np.concatenate(dthetas)
 
 # %% visualization++
 pos = np.where(vec_signal>0)[0]
@@ -250,7 +254,7 @@ plt.tight_layout(); plt.show()
 ###############################################################################
 # %% measure pre, post
 window = 60*3  # window size in frames
-wind_past = int(60*3) # window prior to loss
+wind_past = int(60*5) # window prior to loss
 cross_pre_t = int(60*.5)  # smaller for crossing
 min_spd = 0
 # lossx = np.array([75, 131, 183, 233])  ### for increasing
@@ -339,7 +343,7 @@ for ii in range(ntracks):  ### loop for tracks
                             net_displacement = np.sqrt(np.nansum((path_positions[-1] - path_positions[0])**2))
                             path_tortuosity = path_length / (net_displacement + 1e-6)  # add small value to avoid division by zero
                             
-                            hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal, np.min([50,len(cross_idx)]) ])  #  
+                            hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal, np.min([50,len(cross_idx)])-1 ])  #  
 
                             
                             ### "making history" ###
