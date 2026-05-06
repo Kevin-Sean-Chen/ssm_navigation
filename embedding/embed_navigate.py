@@ -47,6 +47,8 @@ y_smooth = expmat[32,:][::down_samp][:chop]
 speed_smooth = expmat[30,:][::down_samp][:chop]  #11 31
 dtheta_smooth = expmat[34,:][::down_samp][:chop]  #14 35
 theta_smooth = expmat[33,:][::down_samp][:chop] 
+theta = expmat[11,:][::down_samp][:chop] 
+dtheta = expmat[13,:][::down_samp][:chop]  
 
 # %% some pre-processing
 v_threshold = 30

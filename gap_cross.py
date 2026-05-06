@@ -30,8 +30,8 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cr
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-11\kevin' ### gap crossing data
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-30\kevin' ### gap crossing data
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-25\kevin' ### with control crosses
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-26\kevin'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-10\kevin' ### 10,12,15,18
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-26\kevin'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-10\kevin' ### 10,12,15,18
 
 target_file = "exp_matrix.joblib"
 exp_type = 'same'#'increasing gap 60s ocl_' #'increasing gap 60s Kir_EPG'
@@ -253,7 +253,7 @@ plt.tight_layout(); plt.show()
 # %% visualization
 ###############################################################################
 # %% measure pre, post
-window = 60*3  # window size in frames
+window = 60*2  # window size in frames
 wind_past = int(60*5) # window prior to loss
 cross_pre_t = int(60*.5)  # smaller for crossing
 min_spd = 0
@@ -277,6 +277,8 @@ for ii in range(ntracks):  ### loop for tracks
     vxyi = data4fit[ii]  # velocity
     meani = np.mean(data4fit[ii]**2,1)
     pos = np.where(signali>0)[0]
+    timei = times[ii]
+    num_of_succ = 0
     ### if crossing
     if len(pos)>thre_signalt:  ### check for signal
         for ll in range(len(lossx)):
@@ -286,7 +288,7 @@ for ii in range(ntracks):  ### loop for tracks
             if len(cross_idx) > 0:  ### check for crossing
                 # Found crossing point(s)
                 temp_record[ll].append(len(cross_idx))
-                num_of_succ = 0
+                # num_of_succ = 0
                 for idx in cross_idx:  ### looop for tracks that cross
                     # # Store crossing indices
                     # crossing_indices[ll].append((ii, idx))
@@ -311,8 +313,8 @@ for ii in range(ntracks):  ### loop for tracks
                             # temp[hist_signal>0] = 1 
                             # history_signal[ll].append(np.nansum(temp))
                             ### encounters
-                            # temp = hist_signal*0
-                            # temp[hist_signal>0] = 1 
+                            temp = hist_signal*0
+                            temp[hist_signal>0] = 1 
                             # history_signal[ll].append(len(np.where(np.diff(temp)>0)[0]))
                             
                             v_temp = np.array([[vxyi[idx:idx+window,0]],[(vxyi[idx:idx+window,1])]])
@@ -343,14 +345,14 @@ for ii in range(ntracks):  ### loop for tracks
                             net_displacement = np.sqrt(np.nansum((path_positions[-1] - path_positions[0])**2))
                             path_tortuosity = path_length / (net_displacement + 1e-6)  # add small value to avoid division by zero
                             
-                            hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal, np.min([50,len(cross_idx)])-1 ])  #  
+                            # hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal, np.min([50,len(cross_idx)])-1 ])  #  
 
                             
                             ### "making history" ###
-                            # if len(cross_idx)>1:
-                            #     hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal, (num_of_succ-1)/len(cross_idx)])  #np.min([50,len(cross_idx)])   
-                            # else:
-                            #     hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal, 0])
+                            if len(cross_idx)>2:
+                                hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal, (num_of_succ-1)/len(cross_idx), np.min([50,len(cross_idx)])-1, timei[idx] ])  #np.min([50,len(cross_idx)])   
+                            else:
+                                hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal, 0, np.min([50,len(cross_idx)])-1 , timei[idx]])
                             ###################
                             
                             track_cross_id[ll].append(ii)
@@ -374,7 +376,7 @@ y_all = np.concatenate([np.array(cross_events[ll]) for ll in range(0,len(lossx))
 # Feature names for plotting
 feature_names = ['Mean Signal', 'Std Signal', 'Encounter Freq', 
                 'Past Speed', 'Speed Std', 'Path Tortuosity', 
-                'Duration in Signal', 'gap']
+                'Duration in Signal', 'success', 'gap', 'time']
 
 # K-fold sampling and training
 K = 30
@@ -491,7 +493,7 @@ groups = np.concatenate(g_list, axis=0)
 feature_names = [
     'Mean Signal', 'Std Signal', 'Encounter Freq',
     'Past Speed', 'Speed Std', 'Path Tortuosity',
-    'Duration in Signal', 'gap'
+    'Duration in Signal', 'succ','gap', 'time'
 ]
 
 # -----------------------------
@@ -689,6 +691,17 @@ plt.title("Score Distributions")
 plt.tight_layout()
 plt.show()
 
+# %% directly compare stats of cross and fail
+print(feature_names)
+feati = 8
+plt.figure()
+pos = np.where(y_all==0)[0]
+feat = X_all[pos, feati]
+plt.hist(feat, density=True)
+pos = np.where(y_all==1)[0]
+feat = X_all[pos, feati]
+plt.hist(feat , alpha=0.5, density=True)
+plt.title(feature_names[feati])
     
 # %% sorted by history
 plt.figure(figsize=(15,5))

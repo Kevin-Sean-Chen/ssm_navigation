@@ -108,12 +108,13 @@ bin_vi = discretize_time_series(speed_smooth*1,  [5,15])  #### try more continuo
 
 # %% for straight plume 
 ###############################################################################
-# speed_smooth = np.sqrt(vx_str**2+vy_str**2)
-# bin_vi = discretize_time_series(speed_smooth*1,  [5,15])  
-# bin_signal = signal_str*1
-# bin_signal[signal_str<thre] = 0
-# bin_signal[signal_str>=thre] = 1
-# x_smooth, y_smooth = x_str*1, y_str*1 
+trjNum = trjNum_str*1
+speed_smooth = np.sqrt(vx_str**2+vy_str**2)
+bin_vi = discretize_time_series(speed_smooth*1,  [5,15])  
+bin_signal = signal_str*1
+bin_signal[signal_str<thre] = 0
+bin_signal[signal_str>=thre] = 1
+x_smooth, y_smooth = x_str*1, y_str*1 
 
 ###############################################################################
 # %% compute TE
