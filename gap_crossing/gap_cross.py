@@ -30,8 +30,9 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cr
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-11\kevin' ### gap crossing data
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-30\kevin' ### gap crossing data
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-25\kevin' ### with control crosses
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-26\kevin'
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-10\kevin' ### 10,12,15,18
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-26\kevin'
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-18\kevin' ### 10,12,15,18
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2026-06-19\kevin'
 
 target_file = "exp_matrix.joblib"
 exp_type = 'same'#'increasing gap 60s ocl_' #'increasing gap 60s Kir_EPG'
@@ -106,7 +107,7 @@ for ff in range(len(target_files_sorted)):
                     mean_v = np.nanmean(np.sum(temp**2,1)**0.5)
                     max_v = np.max(np.sum(temp**2,1)**0.5)
                     # print(mean_v)
-                    # if np.prod(mask_i)==1 and np.prod(mask_j)==1 
+                    # if np.prod(mask_i)==1 and np.prod(mask_j)==1: 
                     if np.prod(mask_i)==1 and mean_v>.1 and max_v<50: #max_v<20:  ###################################### removing nan for now
                         data4fit.append(temp)  # get data for ssm fit
                         rec_tracks.append(temp_xy)  # get raw tracks
@@ -154,10 +155,11 @@ for ii in range(ntracks):
 # plt.ylabel("upwind via tracking (mm)")
 
 # %% search during crossing
-window = int(60*2.)  # window size in frames
+window = int(60*3.) #2 # window size in frames
 lossx = np.array([75, 131, 183, 233])-1  ### for increasing
 # lossx = np.array([45, 105, 167, 232])-1  ### for decreasing
 lossx = np.array([76, 128, 181, 232])-1
+lossx = np.array([76, 126, 178, 230])+0
 crossing_indices = {i: [] for i in range(len(lossx))}  # Dictionary to store indices for each condition
 crossing_segments = {i: [] for i in range(len(lossx))}  # Dictionary to store track segments
 
@@ -253,9 +255,9 @@ plt.tight_layout(); plt.show()
 # %% visualization
 ###############################################################################
 # %% measure pre, post
-window = 60*2  # window size in frames
+window = 60*3 #2 # window size in frames
 wind_past = int(60*5) # window prior to loss
-cross_pre_t = int(60*.5)  # smaller for crossing
+cross_pre_t = int(60*0.5)  # smaller for crossing
 min_spd = 0
 # lossx = np.array([75, 131, 183, 233])  ### for increasing
 # lossx = np.array([45, 105, 167, 232])-1   ### for decreasing
@@ -307,14 +309,14 @@ for ii in range(ntracks):  ### loop for tracks
                             hist_signal[np.isnan(hist_signal)] = 0
                             raw_hist_sig[ll].append(hist_signal)
                             ### z-score
-                            history_signal[ll].append(np.nanstd(hist_signal))#/np.nanmean(hist_signal))
+                            # history_signal[ll].append(np.nanmean(hist_signal))#/np.nanmean(hist_signal))
                             ### mean (intermittency)
-                            # temp = hist_signal*0
-                            # temp[hist_signal>0] = 1 
-                            # history_signal[ll].append(np.nansum(temp))
-                            ### encounters
                             temp = hist_signal*0
                             temp[hist_signal>0] = 1 
+                            # history_signal[ll].append(np.nansum(temp))
+                            ### encounters
+                            # temp = hist_signal*0
+                            # temp[hist_signal>0] = 1 
                             # history_signal[ll].append(len(np.where(np.diff(temp)>0)[0]))
                             
                             v_temp = np.array([[vxyi[idx:idx+window,0]],[(vxyi[idx:idx+window,1])]])
@@ -350,9 +352,11 @@ for ii in range(ntracks):  ### loop for tracks
                             
                             ### "making history" ###
                             if len(cross_idx)>2:
-                                hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal, (num_of_succ-1)/len(cross_idx), np.min([50,len(cross_idx)])-1, timei[idx] ])  #np.min([50,len(cross_idx)])   
+                                hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal, (num_of_succ-1)/len(cross_idx), np.min([50,len(cross_idx)])-1, timei[idx] ])  #np.min([50,len(cross_idx)]) 
+                                history_signal[ll].append((num_of_succ-1)/len(cross_idx))
                             else:
                                 hist_features[ll].append([mean_sig, std_sig, freq_sig, past_speed, past_spd_std, path_tortuosity, duration_in_signal, 0, np.min([50,len(cross_idx)])-1 , timei[idx]])
+                                history_signal[ll].append(0)
                             ###################
                             
                             track_cross_id[ll].append(ii)
@@ -693,14 +697,15 @@ plt.show()
 
 # %% directly compare stats of cross and fail
 print(feature_names)
-feati = 8
+feati = 0
+bins = np.arange(np.min( X_all[:, feati]),  np.max( X_all[:, feati]), 10)
 plt.figure()
 pos = np.where(y_all==0)[0]
 feat = X_all[pos, feati]
-plt.hist(feat, density=True)
+plt.hist(feat, bins, density=True)
 pos = np.where(y_all==1)[0]
 feat = X_all[pos, feati]
-plt.hist(feat , alpha=0.5, density=True)
+plt.hist(feat , bins, alpha=0.5, density=True)
 plt.title(feature_names[feati])
     
 # %% sorted by history
@@ -741,6 +746,30 @@ mean_dx.append(np.nanmean(displaceix))
 std_dx.append(np.nanstd(displaceix)/jj**0.5)
 mean_dy.append(np.nanmean(displaceiy))
 std_dy.append(np.nanstd(displaceiy)/jj**0.5)
+
+# %% compare tracks with top and bottom percentile
+plt.figure(figsize=(7, 7))
+for gg in range(0,4):
+    which_gap = gg #3
+    sort_id = np.argsort(history_signal[which_gap])
+    top_bottom_percentile = 0.2
+    ### make list of top and bottom percentile
+    n_tracks = len(sort_id)
+    top_indices = sort_id[-int(n_tracks * top_bottom_percentile):]
+    bottom_indices = sort_id[:int(n_tracks * top_bottom_percentile)]
+    ### plot tracks with two colors
+    for ii in top_indices:
+        trackj = crossing_segments[which_gap][ii]
+        plt.plot(trackj[:,0]-trackj[0,0], trackj[:,1]-trackj[0,1], c='b', alpha=0.5)
+    print(np.mean(np.array(cross_events[gg])[top_indices]))
+    for ii in bottom_indices:
+        trackj = crossing_segments[which_gap][ii]
+        plt.plot(trackj[:,0]-trackj[0,0], trackj[:,1]-trackj[0,1], c='C1', alpha=0.5)
+    print(np.mean(np.array(cross_events[gg])[bottom_indices]))
+plt.ylim([-50, 50])
+plt.xlabel('x (mm)')
+plt.ylabel('y (mm)')
+plt.show()
 
 # %% P(crossing analysis)
 reps = 200
@@ -832,7 +861,7 @@ plt.show()
 
 # %% analysis of single vs. double crossing
 # use track_cross_id for id and cross_events for crossing
-which_gap = 1
+which_gap = 3
 event_i, idx_i = cross_events[which_gap], track_cross_id[which_gap]
 single_x = []
 multi_x = []
@@ -888,7 +917,7 @@ plt.ylabel('y (mm)')
 
 # %% singal track
 good_tracks = np.where(cnts_by_tracks>1)[0]
-ii = good_tracks[80] #1, 7, 32, 53
+ii = good_tracks[1] #1, 7, 32, 53, 80
 plt.figure()
 plt.plot(rec_tracks[ii][:,0], rec_tracks[ii][:,1],'k')
 plt.plot(rec_tracks[ii][-1,0], rec_tracks[ii][-1,1],'ro')

@@ -1,0 +1,190 @@
+"""Database-backed gap-crossing analysis.
+
+This script queries optogui recordings, loads the selected matrices, and runs
+the analysis in gap_cross_track. Edit QUERY_FILTERS before a full data load.
+"""
+
+import numpy as np
+import pandas as pd
+
+from optogui.analysis import load_experiment_data, query_experiments
+
+import gap_cross_track as analysis
+
+
+# %% Database settings
+DATABASE_LOCATION = "server"
+DATA_LOCATION = "server"
+QUERY_FILTERS = {
+    "experimenter": "kevin",
+    "year": 2026,
+    "month": [5,6, 7],
+    # "day": 18,
+    # "vial": [0, 1],
+    "genotype_file": "117_GMUCR.yaml",
+    "stim_protocol": "users.kevin.intermittent_gaps_ribbon",
+}
+MAX_EXPERIMENTS = None
+
+MATRIX_FIELDS = [
+    "headx_smooth",
+    "heady_smooth",
+    "signal",
+    "t",
+    "vx_smooth",
+    "vy_smooth",
+    "spd_smooth",
+]
+RECORDING_FIELDS = [
+    "path",
+    "year",
+    "month",
+    "day",
+    "experimenter",
+    "vial",
+    "trial",
+    "stim_name",
+    "stim_protocol",
+    "genotype",
+]
+
+
+# %% Load tracks
+def select_experiments():
+    """Return the database records selected for analysis."""
+    experiments = query_experiments(
+        db_location=DATABASE_LOCATION,
+        order_by="id",
+        **QUERY_FILTERS,
+    )
+    if experiments.empty:
+        raise RuntimeError("No database records matched QUERY_FILTERS.")
+    if MAX_EXPERIMENTS is not None:
+        experiments = experiments.head(MAX_EXPERIMENTS).copy()
+    return experiments
+
+
+def load_recordings(experiments):
+    """Load only the matrix fields required by the gap analysis."""
+    return load_experiment_data(
+        experiments,
+        data_location=DATA_LOCATION,
+        load_obj=False,
+        load_flies=False,
+        load_shapes_proj=False,
+        load_shapes_screen=False,
+        load_data=True,
+        matrix_fields=MATRIX_FIELDS,
+        combine=False,
+        skip_errors=True,
+        n_jobs=1,
+        show_progress=True,
+    )
+
+
+def make_recording_metadata(loaded_recordings):
+    """Return one metadata row for each loaded recording."""
+    rows = []
+    for recording in loaded_recordings:
+        sql = recording["sql"]
+        source_file = str(sql["path"])
+        rows.append(
+            {
+                "source_file": source_file,
+                **{f"recording_{field}": sql.get(field) for field in RECORDING_FIELDS},
+            }
+        )
+    return pd.DataFrame(rows).drop_duplicates("source_file")
+
+
+def make_tracks(loaded_recordings):
+    """Return valid tracks with recording-level identity."""
+    tracks = []
+    min_frames = int(analysis.MIN_TRACK_S * analysis.FRAME_RATE_HZ)
+    required = {"trjn", *MATRIX_FIELDS}
+
+    for recording in loaded_recordings:
+        data = recording["data"]
+        sql = recording["sql"]
+        source_file = str(sql["path"])
+        missing = required.difference(data)
+        if missing:
+            print(f"Skip file with missing data: {source_file} | {sorted(missing)}")
+            continue
+
+        for local_id in np.unique(data["trjn"]):
+            index = np.flatnonzero(data["trjn"] == local_id)
+            if len(index) <= min_frames:
+                continue
+
+            xy = np.column_stack((data["headx_smooth"][index], data["heady_smooth"][index]))
+            signal = np.asarray(data["signal"][index]).squeeze().astype(float)
+            time_s = np.asarray(data["t"][index]).squeeze().astype(float)
+            velocity = np.column_stack((data["vx_smooth"][index], data["vy_smooth"][index]))
+            speed_smooth = np.asarray(data["spd_smooth"][index]).squeeze().astype(float)
+
+            if (
+                xy.shape != (len(index), 2)
+                or signal.shape != (len(index),)
+                or time_s.shape != (len(index),)
+                or speed_smooth.shape != (len(index),)
+                or not np.isfinite(velocity).all()
+            ):
+                continue
+
+            speed = np.linalg.norm(velocity, axis=1)
+            if np.nanmean(speed) <= 0.1 or np.nanmax(speed) >= 50:
+                continue
+
+            tracks.append(
+                {
+                    "track_id": f"{source_file}::track{local_id}",
+                    "source_file": source_file,
+                    "xy": xy,
+                    "signal": signal,
+                    "time_s": time_s,
+                    "velocity": velocity,
+                    "speed_smooth": speed_smooth,
+                }
+            )
+    return tracks
+
+
+# %% Run
+def run():
+    """Query, load, and analyze the selected recordings."""
+    experiments = select_experiments()
+    print(f"Database records: {len(experiments)}")
+    print(experiments[RECORDING_FIELDS].to_string(index=False))
+
+    loaded_recordings = load_recordings(experiments)
+    print(f"Loaded recordings: {len(loaded_recordings)}")
+    tracks = make_tracks(loaded_recordings)
+    print(f"Valid tracks: {len(tracks)}")
+    if not tracks:
+        raise RuntimeError("No valid tracks. Check QUERY_FILTERS and matrix fields.")
+
+    geometry = analysis.get_gap_geometry(tracks)
+    print(f"Gap regions: {len(geometry)}")
+    events = analysis.make_event_table(tracks, geometry)
+    events = events.merge(make_recording_metadata(loaded_recordings), on="source_file")
+    print(f"Repeated-attempt tracks: {events['track_id'].nunique()}")
+    print(f"Valid attempts: {len(events)}")
+    print(events.groupby("outcome").size().reindex(analysis.OUTCOME_ORDER, fill_value=0))
+
+    analysis.plot_gap_geometry(tracks, geometry)
+    analysis.plot_centerline_profiles(tracks, geometry)
+    analysis.plot_event_summary(events)
+    analysis.plot_within_track_summary(events)
+    speed_events = analysis.get_post_entry_speed(events)
+    print(f"Events with post-entry speed: {len(speed_events)}")
+    analysis.plot_post_entry_speed(speed_events)
+    analysis.plot_transition_model(events)
+    analysis.plot_motif_enrichment(events)
+    analysis.plot_event_paths(events)
+    analysis.evaluate_track_model(events)
+    analysis.plt.show()
+
+
+if __name__ == "__main__":
+    run()
