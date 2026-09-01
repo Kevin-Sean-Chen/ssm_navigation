@@ -113,6 +113,7 @@ for ff in range(nf):
                 thetas = data['theta'][pos]
                 temp = np.column_stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]))
                 # temp = np.stack((data['vx_smooth'][pos] , data['vy_smooth'][pos]),1)#######
+                # temp = np.column_stack((data['vx_smooth'][pos][:,None]*data['signal'][pos] , data['vy_smooth'][pos][:,None]*data['signal'][pos]))
                 
                 temp_xy = np.column_stack((data['x_smooth'][pos] , data['y_smooth'][pos]))
                                 
@@ -123,14 +124,18 @@ for ff in range(nf):
                 max_v = np.max(np.sum(temp**2,1)**0.5)
                 # print(mean_v)
                 if np.prod(mask_i)==1 and np.prod(mask_j)==1 and mean_v>1 and max_v<20:  ###################################### removing nan for now
-                    data4fit.append(temp)  # get data for ssm fit
-                    rec_tracks.append(temp_xy)  # get raw tracks
-                    # track_id.append(np.array([ff,ii]))  # get track id
-                    track_id.append(np.zeros(len(pos))+ii) 
-                    rec_signal.append(data['signal'][pos])
-                    cond_id += 1
-                    masks.append(thetas)
-                    times.append(data['t'][pos])
+                    if  np.nansum(data['signal'][pos])>1: ############################ focus on signal-tracking
+                        # temp = np.column_stack((data['vx_smooth'][pos][:,None]*data['signal'][pos] , data['vy_smooth'][pos][:,None]*data['signal'][pos]))
+                        data4fit.append(temp)  # get data for ssm fit
+                        rec_tracks.append(temp_xy)  # get raw tracks
+                        # track_id.append(np.array([ff,ii]))  # get track id
+                        track_id.append(np.zeros(len(pos))+ii)
+                        sig_temp = data['signal'][pos]
+                        sig_temp[np.isnan(sig_temp)] = 0
+                        rec_signal.append(sig_temp)
+                        cond_id += 1
+                        masks.append(thetas)
+                        times.append(data['t'][pos])
                 # masks.append(mask_i)
 
 # %% vectorize for simpliciy
@@ -141,7 +146,7 @@ vec_xy = np.concatenate(rec_tracks)
 vec_ids = np.concatenate(track_id)
 
 # %% build features with delayed time series
-window = int(60*2.)
+window = int(60*3.)
 def build_signal(data, K=window):
     K = int(K)
     features = []
@@ -368,20 +373,20 @@ plt.scatter(u[:,0],u[:,1],c=phi2,cmap='coolwarm',s=.1,vmin=-color_abs,vmax=color
 plt.show()
 
 # %% try U-MAP
-import umap
+# import umap
 
-sub_samp = np.random.choice(X_traj.shape[0], 20000, replace=False)
-reducer = umap.UMAP(n_components=3, random_state=42)
-data_2d = reducer.fit_transform(X_traj[sub_samp,:])
+# sub_samp = np.random.choice(X_traj.shape[0], 20000, replace=False)
+# reducer = umap.UMAP(n_components=3, random_state=42)
+# data_2d = reducer.fit_transform(X_traj[sub_samp,:])
 
-# %%
-from mpl_toolkits.mplot3d import Axes3D
-fig=plt.figure(figsize=(10,7))
-ax = fig.add_subplot(111, projection='3d')
-color_abs = np.max(np.abs(phi2[sub_samp]))
-# sc = plt.scatter(data_2d[:,0], data_2d[:,1], c=phi2[sub_samp], cmap='coolwarm', s=.1, vmin=-color_abs, vmax=color_abs)
-sc = ax.scatter(data_2d[:,0], data_2d[:,1],data_2d[:,2], c=phi2[sub_samp], cmap='coolwarm', s=.1, vmin=-color_abs, vmax=color_abs)
-plt.colorbar(sc)
+# # %%
+# from mpl_toolkits.mplot3d import Axes3D
+# fig=plt.figure(figsize=(10,7))
+# ax = fig.add_subplot(111, projection='3d')
+# color_abs = np.max(np.abs(phi2[sub_samp]))
+# # sc = plt.scatter(data_2d[:,0], data_2d[:,1], c=phi2[sub_samp], cmap='coolwarm', s=.1, vmin=-color_abs, vmax=color_abs)
+# sc = ax.scatter(data_2d[:,0], data_2d[:,1],data_2d[:,2], c=phi2[sub_samp], cmap='coolwarm', s=.1, vmin=-color_abs, vmax=color_abs)
+# plt.colorbar(sc)
 
 # %% spectral analysis
 P_shuff = compute_transition_matrix(np.random.permutation(labels),track_id, N)
@@ -396,21 +401,26 @@ plt.xlabel('eigenvalue index')
 plt.yscale('log')
 plt.ylim([0.001, 20])
 
-# %% color code tracks]
+# %% color code tracks
 imode = 2
 tau = 1
 phi2 = eigvecs[labels,imode].real
 # phi2 = np.ma.masked_array(phi2, mask=np.isin(labels, idx[600:]))
-window_show = np.arange(40000, 45000)
+window_show = np.arange(0, 45000)
 # X_xy = build_X(rec_tracks, K)[::tau, :]
 X_xy, track_id = build_X(rec_tracks, return_id=True, K=K)
 X_xy, track_id, phi2 = X_xy[::tau, :], track_id[::tau], phi2[::tau]
+X_odor = build_signal(rec_signal, K)[::tau]
+# odor_weight = X_odor[:,0]
+# odor_weight = np.convolve(odor_weight, np.ones(30), 'same')*2+1
+# odor_weight = odor_weight - np.mean(odor_weight)
 time_in_trial = build_signal(times, K=K)
 tempt = time_in_trial[:,0][::tau]
 window_show = np.where(((tempt >= 45+10) & (tempt <= 45+30)))[0]
 xy_back = X_xy[:, [0,K]]
+# color_abs = np.max(np.abs(phi2))#* odor_weight))*0.1
 plt.figure()
-plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=phi2[window_show],cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
+plt.scatter(xy_back[window_show, 0],xy_back[window_show, 1],c=-phi2[window_show]*1,cmap='coolwarm',s=.5,vmin=-color_abs,vmax=color_abs)
 plt.title(f'mode#{imode}')
 plt.ylim([0,184]); plt.colorbar()
 
@@ -433,6 +443,33 @@ plt.figure()
 plt.plot(time_since_off, proj_val_offt, 'k.',alpha=.01)
 plt.axvline(x=-30, color='r', linestyle='--'); plt.axvline(x=0, color='r', linestyle='--')
 plt.xlabel('since odor off (s)'); plt.ylabel(r'$\phi$')
+
+# %% trackness vs. searchness
+n_list = np.unique(track_id)
+n_tracks = len(n_list)
+pre_signal = []
+post_search = []
+
+for nn in range(n_tracks):
+    ### find the neural ID and location
+    ni = n_list[nn]
+    pos = np.where(track_id==ni)[0]
+    ### load signal and projection
+    sigi = X_odor[:,0][pos]
+    veci = phi2[pos]
+    
+    ### gather signal and search pairs
+    if np.nansum(sigi)>1:
+        last_sig = np.where(sigi>0)[0][-1]
+        mean_sig = np.nansum(sigi[:last_sig][-60:])
+        mean_search = np.nanmean(veci[last_sig:][:60])
+    pre_signal.append(mean_sig)
+    post_search.append(mean_search)
+        
+# %%
+plt.figure()
+plt.plot(pre_signal, post_search, 'o')
+
 
 # %% visualization
 import seaborn as sns

@@ -43,7 +43,7 @@ with h5py.File(file_dir, 'r') as file:
     col_v_str = list(your_struct['Smoke']['Dose4']['col'].values())
     
 # %% now extract track data
-chop = 3000000
+chop = 5000000  # 3000000 6000000
 down_samp = 3
 trjNum = expmat[0,:][::down_samp][:chop]
 signal = expmat[12,:][::down_samp][:chop]
@@ -57,12 +57,12 @@ speed_smooth = expmat[30,:][::down_samp][:chop]  #11 31
 dtheta_smooth = expmat[34,:][::down_samp][:chop]  #14 35
 
 # %% for straighe plume
-trjNum_str = expmat_str[0,:][::down_samp][:chop]
-signal_str = expmat_str[12,:][::down_samp][:chop]
-vx_str = expmat_str[8,:][::down_samp][:chop]
-vy_str = expmat_str[9,:][::down_samp][:chop]
-x_str = expmat_str[6,:][::down_samp][:chop]
-y_str = expmat_str[7,:][::down_samp][:chop]
+# trjNum_str = expmat_str[0,:][::down_samp][:chop]
+# signal_str = expmat_str[12,:][::down_samp][:chop]
+# vx_str = expmat_str[8,:][::down_samp][:chop]
+# vy_str = expmat_str[9,:][::down_samp][:chop]
+# x_str = expmat_str[6,:][::down_samp][:chop]
+# y_str = expmat_str[7,:][::down_samp][:chop]
 
 # %% plot track
 trk = 11
@@ -83,9 +83,9 @@ dtheta_threshold = 360
 dtheta_smooth[np.abs(dtheta_smooth)>dtheta_threshold] = dtheta_threshold
 dtheta_smooth[np.isnan(dtheta_smooth)] = 0
 
-vx_str[np.abs(vx_str)>v_threshold] = v_threshold
-vy_str[np.abs(vy_str)>v_threshold] = v_threshold
-signal_str[np.isnan(signal_str)] = 0
+# vx_str[np.abs(vx_str)>v_threshold] = v_threshold
+# vy_str[np.abs(vy_str)>v_threshold] = v_threshold
+# signal_str[np.isnan(signal_str)] = 0
 
 # %% discretization for now
 thre = 3
@@ -108,13 +108,13 @@ bin_vi = discretize_time_series(speed_smooth*1,  [5,15])  #### try more continuo
 
 # %% for straight plume 
 ###############################################################################
-trjNum = trjNum_str*1
-speed_smooth = np.sqrt(vx_str**2+vy_str**2)
-bin_vi = discretize_time_series(speed_smooth*1,  [5,15])  
-bin_signal = signal_str*1
-bin_signal[signal_str<thre] = 0
-bin_signal[signal_str>=thre] = 1
-x_smooth, y_smooth = x_str*1, y_str*1 
+# trjNum = trjNum_str*1
+# speed_smooth = np.sqrt(vx_str**2+vy_str**2)
+# bin_vi = discretize_time_series(speed_smooth*1,  [5,15])  
+# bin_signal = signal_str*1
+# bin_signal[signal_str<thre] = 0
+# bin_signal[signal_str>=thre] = 1
+# x_smooth, y_smooth = x_str*1, y_str*1 
 
 ###############################################################################
 # %% compute TE
@@ -260,7 +260,7 @@ plt.plot(lags[lag_range], cross_corr[lag_range])
 plt.xlabel("Lag"); plt.ylabel("Cross-Correlation"); plt.grid(True)
 
 # sample for location
-xy_grid = (19,9) #(15,9)#
+xy_grid = (18,9) #(15,9)#
 delay = 25  ### 10,20,30
 grid_xy = coarse_grain_2d_scatter_indices(x_smooth, y_smooth, xy_grid)
 
@@ -268,6 +268,7 @@ grid_xy = coarse_grain_2d_scatter_indices(x_smooth, y_smooth, xy_grid)
 ###############################################################################
 # %% compute TE!!
 #### might need to remove transitions across tracks later... #########################
+np.random.seed(42)
 TE_s2b = np.zeros(xy_grid)
 TE_b2s = np.zeros(xy_grid)
 obs_num = np.zeros(xy_grid)
@@ -277,9 +278,16 @@ for xx in range(0,xy_grid[0]):
         pos = grid_xy[xx][yy]
         xi = bin_signal[pos]  ### sensory drive
         yi = bin_vi[pos]   ### behavior output
-        if len(pos)>1000:
-            TE_s2b[xx,yy] = transfer_entropy(xi,yi,delay) / (1/90*down_samp)
-            TE_b2s[xx,yy] = transfer_entropy(yi,xi,delay) / (1/90*down_samp)
+        if len(pos)>300*3: ### 1000
+            ### testing finite-size
+            TE_XY, TE_YX = TE_finite_size_correction(xi, yi, delay=1, N_finite=5, reps=20)
+            if TE_XY>0 and TE_YX>0:
+                TE_s2b[xx,yy] = TE_XY / (1/90*down_samp)
+                TE_b2s[xx,yy] = TE_YX / (1/90*down_samp)
+            ### old
+            # TE_s2b[xx,yy] = transfer_entropy(xi,yi,delay) / (1/90*down_samp)
+            # TE_b2s[xx,yy] = transfer_entropy(yi,xi,delay) / (1/90*down_samp)
+            
             obs_num[xx,yy] = len(pos)
 TE_s2b = TE_s2b.T
 TE_b2s = TE_b2s.T

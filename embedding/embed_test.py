@@ -178,7 +178,7 @@ features = 10  # Number of features
 data, labels = feature_vxy, labels
 
 # Step 2: Apply UMAP to reduce dimensionality to 2D
-n_dim = 10
+n_dim = 5
 reducer = umap.UMAP(n_components=n_dim, random_state=42) #42
 data_2d = reducer.fit_transform(data)
 

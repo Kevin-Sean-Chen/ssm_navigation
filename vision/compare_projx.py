@@ -26,10 +26,10 @@ from scipy.sparse.linalg import eigs
 # %% vx projection across sensory environments
 
 # %% for perturbed data
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-13'  ### V+O exp
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-17'  ### O or empty exp
-root_dir = r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-4-4'  ### O or empty exp
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-17'  ### wider ribbons
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-13'  ### V+O exp
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\odor_vision\2025-3-17'  ### O or empty exp
+# root_dir = r'C:/Users/ksc75/Yale University Dropbox/users/kevin_chen/data/opto_rig/perturb_ribbon/2025-4-4'  ### O or empty exp
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\opto_rig\perturb_ribbon\2025-4-17'  ### wider ribbons
  
 target_file = "exp_matrix.pklz"
 exp_type = "gaussianribbon_vial"
@@ -53,19 +53,19 @@ pkl_files = sorted(pkl_files, key=lambda x: int(''.join(filter(str.isdigit, x)))
 
 # %% filing
 ### 3/13
-ff = np.arange(40,59) ### ribbon
-# ff = np.arange(0,10)  ### edge
+# ff = np.arange(40,59) ### ribbon
+ff = np.arange(0,10)  ### edge
 
 ### 3/17
-ff = np.arange(20,40) ### ribbon
+# ff = np.arange(20,40) ### ribbon
 # ff = np.arange(0,15)  ### edge
 
 ### 4/4
-ff = np.arange(10,20)  ### landscape
+# ff = np.arange(10,20)  ### landscape
 # ff = np.arange(20,30)
 
 ### 4/17
-ff = np.arange(0,25)
+# ff = np.arange(0,25)
 
 threshold_track_l = 60 * 2*1 #2 
 times = []
