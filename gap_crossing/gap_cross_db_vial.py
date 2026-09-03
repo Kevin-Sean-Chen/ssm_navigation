@@ -10,8 +10,12 @@ from itertools import product
 import numpy as np
 import pandas as pd
 
-import gap_cross_db as pooled
-import gap_cross_track as analysis
+try:
+    from gap_crossing import gap_cross_db as pooled
+    from gap_crossing import gap_cross_track as analysis
+except ModuleNotFoundError:
+    import gap_cross_db as pooled
+    import gap_cross_track as analysis
 
 
 SESSION_FIELDS = [
@@ -24,6 +28,180 @@ SESSION_FIELDS = [
 BOOTSTRAP_SAMPLES = 10_000
 MOTIF_LENGTHS = [2, 3]
 MOTIFS_PER_TAIL = 6
+TRIAL_WINDOW_SIZE = 3
+
+
+def get_session_trial_table(events):
+    """Return numeric trial order and count for each vial-date session."""
+    required = {*SESSION_FIELDS, "recording_trial"}
+    missing = required.difference(events.columns)
+    if missing:
+        raise RuntimeError(f"Events lack trial fields: {sorted(missing)}")
+
+    trials = events[[*SESSION_FIELDS, "recording_trial"]].drop_duplicates().copy()
+    trials["trial_number"] = pd.to_numeric(trials["recording_trial"], errors="coerce")
+    if trials["trial_number"].isna().any():
+        raise RuntimeError("Recording trials must be numeric.")
+    trials = trials.sort_values([*SESSION_FIELDS, "trial_number"])
+    trials["trial_rank"] = trials.groupby(SESSION_FIELDS).cumcount() + 1
+    trials["trial_count"] = trials.groupby(SESSION_FIELDS)["trial_number"].transform("size")
+    return trials
+
+
+def make_trial_regain_cross_summary(events):
+    """Return session-mean P(cross | previous regain) by trial number."""
+    trials = get_session_trial_table(events)
+    available = (
+        trials.groupby("trial_number").size()
+        .rename("available_session_count")
+        .reset_index()
+    )
+    transition_events = events.loc[events["previous_outcome"] == "regain"].copy()
+    transition_events["trial_number"] = pd.to_numeric(
+        transition_events["recording_trial"], errors="coerce"
+    )
+    session_rates = (
+        transition_events.groupby([*SESSION_FIELDS, "trial_number"], as_index=False)
+        .agg(cross_probability=("is_cross", "mean"))
+    )
+    summary = (
+        session_rates.groupby("trial_number")["cross_probability"]
+        .agg(mean_cross="mean", session_count="size", std_cross="std")
+        .reset_index()
+    )
+    summary = available.merge(summary, on="trial_number", how="left")
+    summary["session_count"] = summary["session_count"].fillna(0).astype(int)
+    summary["std_cross"] = summary["std_cross"].fillna(0.0)
+    summary["sem_cross"] = np.divide(
+        summary["std_cross"],
+        np.sqrt(summary["session_count"]),
+        out=np.full(len(summary), np.nan),
+        where=summary["session_count"] > 0,
+    )
+    return summary.rename(columns={"trial_number": "recording_trial"})
+
+
+def make_first_last_trial_transition_matrices(events, trial_window=TRIAL_WINDOW_SIZE):
+    """Return session-mean matrices for non-overlapping trial windows."""
+    trials = get_session_trial_table(events)
+    trials = trials.loc[trials["trial_count"] >= 2 * trial_window].copy()
+    trials["phase"] = np.where(
+        trials["trial_rank"] <= trial_window,
+        "first",
+        np.where(trials["trial_rank"] > trials["trial_count"] - trial_window, "last", None),
+    )
+    trial_phases = trials.dropna(subset=["phase"])
+    session_counts = {
+        phase: int(
+            trial_phases.loc[trial_phases["phase"] == phase, SESSION_FIELDS]
+            .drop_duplicates()
+            .shape[0]
+        )
+        for phase in ["first", "last"]
+    }
+    transition_events = events.loc[events["previous_outcome"].notna()].copy()
+    transition_events["trial_number"] = pd.to_numeric(
+        transition_events["recording_trial"], errors="coerce"
+    )
+    transition_events = transition_events.merge(
+        trial_phases[[*SESSION_FIELDS, "trial_number", "phase"]],
+        on=[*SESSION_FIELDS, "trial_number"],
+        how="inner",
+    )
+    matrices = {
+        phase: pd.DataFrame(
+            np.nan, index=analysis.OUTCOME_ORDER, columns=analysis.OUTCOME_ORDER
+        )
+        for phase in ["first", "last"]
+    }
+    if transition_events.empty:
+        return matrices, session_counts
+
+    count_columns = [*SESSION_FIELDS, "phase", "previous_outcome", "outcome"]
+    counts = transition_events.groupby(count_columns).size().unstack("outcome", fill_value=0)
+    counts = counts.reindex(columns=analysis.OUTCOME_ORDER, fill_value=0)
+    rates = counts.div(counts.sum(axis=1), axis=0)
+    for phase in ["first", "last"]:
+        if phase not in rates.index.get_level_values("phase"):
+            continue
+        phase_rates = rates.xs(phase, level="phase", drop_level=False)
+        mean_rates = phase_rates.groupby("previous_outcome").mean()
+        matrices[phase] = mean_rates.T.reindex(
+            index=analysis.OUTCOME_ORDER, columns=analysis.OUTCOME_ORDER
+        )
+    return matrices, session_counts
+
+
+def plot_trial_regain_cross_summary(events):
+    """Plot session-mean P(cross | previous regain) by trial number."""
+    summary = make_trial_regain_cross_summary(events)
+    valid = summary.loc[summary["session_count"] > 0]
+    if valid.empty:
+        print("No regain-following transitions by trial.")
+        return
+
+    fig, axis = analysis.plt.subplots(figsize=(9, 5))
+    axis.errorbar(
+        valid["recording_trial"],
+        valid["mean_cross"],
+        yerr=valid["sem_cross"],
+        fmt="o-",
+        color=analysis.OUTCOME_COLOR["cross"],
+        capsize=4,
+    )
+    for _, result in valid.iterrows():
+        axis.annotate(
+            f"n={result['session_count']}/{result['available_session_count']}",
+            (result["recording_trial"], result["mean_cross"]),
+            xytext=(0, 8),
+            textcoords="offset points",
+            ha="center",
+            fontsize=9,
+        )
+    axis.set(
+        xlabel="Recorded trial number",
+        ylabel="P(cross | previous regain)",
+        ylim=(-0.05, 1.05),
+        title="Crossing after regain across trials (session mean ± SEM)",
+    )
+    fig.tight_layout()
+    print("Crossing after regain by recorded trial:")
+    print(summary.to_string(index=False))
+
+
+def plot_first_last_trial_transition_matrices(events):
+    """Plot session-mean matrices for first and last trial windows."""
+    matrices, session_counts = make_first_last_trial_transition_matrices(events)
+    fig, axes = analysis.plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+    for axis, phase in zip(axes, ["first", "last"]):
+        matrix = matrices[phase]
+        if matrix.notna().any().any():
+            labels = matrix.map(
+                lambda value: "" if pd.isna(value) else f"{value:.2f}"
+            )
+            analysis.sns.heatmap(
+                matrix,
+                vmin=0,
+                vmax=1,
+                cmap="Blues",
+                annot=labels,
+                fmt="",
+                mask=matrix.isna(),
+                cbar=axis is axes[1],
+                ax=axis,
+            )
+        else:
+            axis.text(0.5, 0.5, "No transitions", ha="center", va="center")
+        axis.set(
+            xlabel="Previous outcome",
+            ylabel="Current outcome",
+            title=(
+                f"{phase.title()} {TRIAL_WINDOW_SIZE} trials "
+                f"(eligible sessions: n={session_counts[phase]})"
+            ),
+        )
+    fig.suptitle("Transition matrices across trial windows")
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
 
 
 def make_session_summary(events):
@@ -184,7 +362,11 @@ def run():
     """Query, load, and summarize the selected recordings by day-vial session."""
     experiments = pooled.select_experiments()
     print(f"Database records: {len(experiments)}")
-    loaded_recordings = pooled.load_recordings(experiments)
+    loaded_recordings, failed_experiments = pooled.load_recordings(experiments)
+    print(f"Loaded recordings: {len(loaded_recordings)}")
+    print(f"Failed recordings: {len(failed_experiments)}")
+    if not failed_experiments.empty:
+        print(failed_experiments.to_string(index=False))
     tracks = pooled.make_tracks(loaded_recordings)
     if not tracks:
         raise RuntimeError("No valid tracks. Check QUERY_FILTERS and matrix fields.")
@@ -196,6 +378,8 @@ def run():
     print(f"Day-vial sessions: {summary['session_id'].nunique()}")
 
     analysis.plot_gap_geometry(tracks, geometry)
+    plot_trial_regain_cross_summary(events)
+    plot_first_last_trial_transition_matrices(events)
     plot_session_motif_scores(events)
     analysis.plt.show()
 

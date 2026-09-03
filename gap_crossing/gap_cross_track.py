@@ -30,7 +30,7 @@ from sklearn.preprocessing import StandardScaler
 
 # %% Settings
 ROOT_DIR = Path(
-    r"C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-12\kevin"
+    r"C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-15\kevin"
 )
 EXPERIMENT_TEXT = "same"
 FORBIDDEN_TEXT = []
@@ -49,6 +49,7 @@ POST_SPEED_S = 1
 MIN_POST_SPEED_SAMPLES = 30
 MOTIF_PERMUTATIONS = 1000
 MOTIF_RANDOM_SEED = 0
+MIN_TRANSITIONS_FOR_PHASE = 3
 
 # Detection settings. Use these only with GAP_GEOMETRY_METHOD = "detected".
 GRID_MM = 0.2
@@ -56,10 +57,15 @@ SMOOTH_X_MM = .5
 SMOOTH_Y_MM = .5
 EXPECTED_RIBBON_COUNT = 4
 EXPECTED_GAPS_PER_RIBBON = 4
+GAP_FIT_SEARCH_HALF_WINDOW_MM = 5
+MIN_GAP_WIDTH_MM = 2
+MAX_GAP_WIDTH_MM = 12
 
 OUTCOME_ORDER = ["cross", "regain", "abort"]
 OUTCOME_COLOR = {"cross": "C0", "regain": "C2", "abort": "C3"}
 
+PLOT_MAX_TRACKS = 1000
+PLOT_MAX_FRAMES_PER_TRACK = 300
 sns.set_style("white")
 sns.set_context("talk")
 
@@ -157,14 +163,115 @@ def get_position_signal(tracks):
     return xy[valid], signal[valid] > 0
 
 
-def get_centerline_signal_trace(xy, odor, y_min, y_max, x_edges):
+def get_plot_position_signal(
+    tracks,
+    max_tracks=PLOT_MAX_TRACKS,
+    max_frames_per_track=PLOT_MAX_FRAMES_PER_TRACK,
+):
+    """Return a bounded, deterministic sample for the geometry plot."""
+    if max_tracks < 1 or max_frames_per_track < 1:
+        raise ValueError("Plot sample limits must be positive.")
+
+    raw_track_count = len(tracks)
+    raw_frame_count = sum(len(track["signal"]) for track in tracks)
+    track_count = min(raw_track_count, max_tracks)
+    track_indices = np.linspace(0, raw_track_count - 1, track_count, dtype=int)
+    plot_xy = []
+    plot_signal = []
+    track_ids = []
+
+    for track_index in track_indices:
+        track = tracks[track_index]
+        frame_count = min(len(track["signal"]), max_frames_per_track)
+        frame_indices = np.linspace(
+            0, len(track["signal"]) - 1, frame_count, dtype=int
+        )
+        xy = np.asarray(track["xy"])[frame_indices]
+        signal = np.asarray(track["signal"])[frame_indices]
+        valid = np.isfinite(xy).all(axis=1) & np.isfinite(signal)
+        plot_xy.append(xy[valid])
+        plot_signal.append(signal[valid])
+        track_ids.append(track["track_id"])
+
+    xy = np.concatenate(plot_xy)
+    signal = np.concatenate(plot_signal)
+    details = {
+        "raw_track_count": raw_track_count,
+        "displayed_track_count": track_count,
+        "raw_frame_count": raw_frame_count,
+        "displayed_frame_count": len(xy),
+        "track_ids": track_ids,
+    }
+    return xy, signal, details
+
+
     """Estimate odor probability along one ribbon centerline strip."""
-    in_strip = (xy[:, 1] >= y_min) & (xy[:, 1] <= y_max)
-    all_count, _ = np.histogram(xy[in_strip, 0], bins=x_edges)
-    odor_count, _ = np.histogram(xy[in_strip & odor, 0], bins=x_edges)
+def get_centerline_signal_trace(xy, odor, y_min, y_max, x_edges):
+    all_count, odor_count = get_centerline_signal_counts(
+        xy, odor, y_min, y_max, x_edges
+    )
     smooth_odor = gaussian_filter1d(odor_count.astype(float), SMOOTH_X_MM / GRID_MM)
     smooth_all = gaussian_filter1d(all_count.astype(float), SMOOTH_X_MM / GRID_MM)
     return np.divide(smooth_odor, smooth_all, out=np.zeros_like(smooth_odor), where=smooth_all > 0)
+
+
+def get_centerline_signal_counts(xy, odor, y_min, y_max, x_edges):
+    """Return total and odor sample counts in one ribbon centerline strip."""
+    in_strip = (xy[:, 1] >= y_min) & (xy[:, 1] <= y_max)
+    all_count, _ = np.histogram(xy[in_strip, 0], bins=x_edges)
+    odor_count, _ = np.histogram(xy[in_strip & odor, 0], bins=x_edges)
+    return all_count, odor_count
+
+
+def get_robust_gap_edges(
+    x_centers,
+    odor_count,
+    all_count,
+    gap_center_x_mm,
+    search_half_window_mm,
+    min_gap_width_mm,
+    max_gap_width_mm,
+):
+    """Fit one gap interval by weighted agreement with binary signal data."""
+    x_centers = np.asarray(x_centers, dtype=float)
+    odor_count = np.asarray(odor_count, dtype=float)
+    all_count = np.asarray(all_count, dtype=float)
+    if not (len(x_centers) and x_centers.shape == odor_count.shape == all_count.shape):
+        raise ValueError("x centers and sample counts must have the same nonzero length.")
+    if np.any(odor_count < 0) or np.any(all_count < odor_count):
+        raise ValueError("odor counts must be between zero and all sample counts.")
+
+    x_edges = np.empty(len(x_centers) + 1, dtype=float)
+    x_edges[1:-1] = 0.5 * (x_centers[:-1] + x_centers[1:])
+    x_edges[0] = x_centers[0] - 0.5 * (x_centers[1] - x_centers[0])
+    x_edges[-1] = x_centers[-1] + 0.5 * (x_centers[-1] - x_centers[-2])
+
+    # A positive value favors odor. A negative value favors a gap. Counts
+    # preserve the evidence strength, so a sparse outlier cannot set an edge.
+    gap_delta = 2 * odor_count - all_count
+    best = None
+    for start_index in range(len(x_centers)):
+        left_edge = x_edges[start_index]
+        if not gap_center_x_mm - search_half_window_mm <= left_edge <= gap_center_x_mm:
+            continue
+        for stop_index in range(start_index + 1, len(x_centers) + 1):
+            right_edge = x_edges[stop_index]
+            width = right_edge - left_edge
+            if right_edge < gap_center_x_mm:
+                continue
+            if right_edge > gap_center_x_mm + search_half_window_mm:
+                break
+            if not min_gap_width_mm <= width <= max_gap_width_mm:
+                continue
+            score = gap_delta[start_index:stop_index].sum()
+            candidate = (score, left_edge, right_edge)
+            if best is None or candidate < best:
+                best = candidate
+
+    if best is None:
+        raise RuntimeError("No valid gap interval near the detected center.")
+    _, left_edge, right_edge = best
+    return left_edge, right_edge
 
 
 def select_strongest_peaks(trace, expected_count, invert=False):
@@ -247,19 +354,31 @@ def detect_gap_geometry(tracks):
         _, _, left_ip, right_ip = peak_widths(y_density, [peak_index], rel_height=0.5)
         ribbon_y_min = np.interp(left_ip[0], np.arange(len(y_centers)), y_centers)
         ribbon_y_max = np.interp(right_ip[0], np.arange(len(y_centers)), y_centers)
-        x_density = get_centerline_signal_trace(
+        all_count, odor_count = get_centerline_signal_counts(
             xy, odor, ribbon_y_min, ribbon_y_max, x_edges
+        )
+        smooth_odor = gaussian_filter1d(
+            odor_count.astype(float), SMOOTH_X_MM / GRID_MM
+        )
+        smooth_all = gaussian_filter1d(
+            all_count.astype(float), SMOOTH_X_MM / GRID_MM
+        )
+        x_density = np.divide(
+            smooth_odor, smooth_all, out=np.zeros_like(smooth_odor), where=smooth_all > 0
         )
         valley_indices = select_strongest_peaks(
             x_density, EXPECTED_GAPS_PER_RIBBON, invert=True
         )
         for gap_id, valley_index in enumerate(valley_indices):
-            edges = get_half_height_edges(x_density, valley_index)
-            if edges is None:
-                raise RuntimeError(
-                    f"Ribbon {ribbon_id + 1}, gap {gap_id + 1}: no local signal edges."
-                )
-            regain_index, loss_index = edges
+            regain_edge, loss_edge = get_robust_gap_edges(
+                x_centers,
+                odor_count,
+                all_count,
+                x_centers[valley_index],
+                GAP_FIT_SEARCH_HALF_WINDOW_MM,
+                MIN_GAP_WIDTH_MM,
+                MAX_GAP_WIDTH_MM,
+            )
             rows.append(
                 {
                     "geometry_id": len(rows),
@@ -272,9 +391,9 @@ def detect_gap_geometry(tracks):
                     "attempt_y_min_mm": center_y - ATTEMPT_RIBBON_HALF_WIDTH_MM,
                     "attempt_y_max_mm": center_y + ATTEMPT_RIBBON_HALF_WIDTH_MM,
                     "gap_center_x_mm": x_centers[valley_index],
-                    "regain_edge_x_mm": x_centers[regain_index],
-                    "loss_edge_x_mm": x_centers[loss_index],
-                    "gap_width_mm": x_centers[loss_index] - x_centers[regain_index],
+                    "regain_edge_x_mm": regain_edge,
+                    "loss_edge_x_mm": loss_edge,
+                    "gap_width_mm": loss_edge - regain_edge,
                 }
             )
 
@@ -295,13 +414,11 @@ def get_gap_geometry(tracks):
 
 def plot_gap_geometry(tracks, geometry):
     """Overlay the selected gap geometry on the pooled odor map."""
-    xy = np.concatenate([track["xy"] for track in tracks])
-    signal = np.concatenate([track["signal"] for track in tracks])
-    valid = np.isfinite(xy).all(axis=1) & np.isfinite(signal)
-    odor = valid & (signal > 0)
+    xy, signal, details = get_plot_position_signal(tracks)
+    odor = signal > 0
 
     fig, axis = plt.subplots(figsize=(11, 7))
-    axis.plot(xy[valid, 0], xy[valid, 1], "k,", alpha=0.2, label="all samples")
+    axis.plot(xy[:, 0], xy[:, 1], "k,", alpha=0.2, label="displayed samples")
     axis.plot(xy[odor, 0], xy[odor, 1], "r,", alpha=0.8, label="odor signal")
     for _, gap in geometry.iterrows():
         if np.isfinite(gap["attempt_y_min_mm"]):
@@ -318,7 +435,15 @@ def plot_gap_geometry(tracks, geometry):
             axis.plot(gap["gap_center_x_mm"], gap["ribbon_center_y_mm"], "co", ms=3)
         else:
             axis.axvline(gap["loss_edge_x_mm"], color="cyan", lw=1.5)
-    axis.set(xlabel="x (mm)", ylabel="y (mm)", title=f"Gap geometry: {GAP_GEOMETRY_METHOD}")
+    axis.set(
+        xlabel="x (mm)",
+        ylabel="y (mm)",
+        title=(
+            f"Gap geometry: {GAP_GEOMETRY_METHOD} "
+            f"({details['displayed_frame_count']:,}/{details['raw_frame_count']:,} frames; "
+            f"{details['displayed_track_count']}/{details['raw_track_count']} tracks)"
+        ),
+    )
     axis.legend(markerscale=8)
     fig.tight_layout()
 
@@ -464,6 +589,38 @@ def make_event_table(tracks, geometry):
     return events
 
 
+def get_cross_after_regain_by_attempt(events):
+    """Return current-cross statistics for attempts after a regain."""
+    after_regain = events.loc[events["previous_outcome"] == "regain"]
+    summary = (
+        after_regain.groupby("track_attempt")["is_cross"]
+        .agg(mean_cross="mean", track_count="size", std_cross="std")
+        .reset_index()
+    )
+    summary["std_cross"] = summary["std_cross"].fillna(0.0)
+    summary["sem_cross"] = summary["std_cross"] / np.sqrt(summary["track_count"])
+    return summary
+
+
+def get_regain_transition_durations(events):
+    """Return elapsed times from a regain to the next same-track attempt."""
+    ordered = events.sort_values(["track_id", "attempt_time_s"]).copy()
+    ordered["previous_outcome"] = ordered.groupby("track_id")["outcome"].shift(1)
+    ordered["previous_attempt_time_s"] = (
+        ordered.groupby("track_id")["attempt_time_s"].shift(1)
+    )
+    durations = ordered.loc[
+        ordered["previous_outcome"].eq("regain")
+        & ordered["outcome"].isin(OUTCOME_ORDER)
+    ].copy()
+    durations["elapsed_s"] = (
+        durations["attempt_time_s"] - durations["previous_attempt_time_s"]
+    )
+    durations = durations.loc[np.isfinite(durations["elapsed_s"])].copy()
+    durations["transition"] = "regain → " + durations["outcome"]
+    return durations
+
+
 # %% Summary plots
 def plot_event_summary(events):
     """Plot event counts and outcomes by loss boundary."""
@@ -554,6 +711,66 @@ def plot_within_track_summary(events):
     fig.tight_layout()
 
 
+def plot_cross_after_regain_by_attempt(events):
+    """Plot crossing probability after a regain by current attempt number."""
+    summary = get_cross_after_regain_by_attempt(events)
+    if summary.empty:
+        print("No attempts follow a regain event.")
+        return
+
+    fig, axis = plt.subplots(figsize=(8, 5))
+    axis.errorbar(
+        summary["track_attempt"],
+        summary["mean_cross"],
+        yerr=summary["sem_cross"],
+        fmt="o-",
+        color=OUTCOME_COLOR["cross"],
+        capsize=4,
+    )
+    for _, result in summary.iterrows():
+        axis.annotate(
+            f"n={int(result['track_count'])}",
+            (result["track_attempt"], result["mean_cross"]),
+            xytext=(0, 8),
+            textcoords="offset points",
+            ha="center",
+            fontsize=9,
+        )
+    axis.set(
+        xlabel="Current attempt number within track",
+        ylabel="P(cross | previous regain)",
+        title="Crossing after regain by attempt number (mean ± SEM)",
+        ylim=(-0.05, 1.05),
+    )
+    fig.tight_layout()
+
+
+def plot_regain_transition_durations(events):
+    """Plot durations from regain events to the next outcome attempt."""
+    durations = get_regain_transition_durations(events)
+    if durations.empty:
+        print("No attempts follow a regain event.")
+        return
+
+    fig, axes = plt.subplots(1, len(OUTCOME_ORDER), figsize=(15, 4), sharex=True)
+    for axis, outcome in zip(axes, OUTCOME_ORDER):
+        values = durations.loc[durations["outcome"] == outcome, "elapsed_s"].to_numpy()
+        transition = f"regain → {outcome}"
+        axis.set(title=f"{transition}: n={len(values)}", xlabel="Time to next attempt (s)")
+        if not len(values):
+            axis.text(0.5, 0.5, "No transitions", ha="center", va="center",
+                      transform=axis.transAxes)
+            continue
+        bins = min(20, max(1, int(np.ceil(np.sqrt(len(values))))))
+        axis.hist(values, bins=bins, color=OUTCOME_COLOR[outcome], alpha=0.8)
+        mean = values.mean()
+        axis.axvline(mean, color="black", ls="--", lw=1, label=f"Mean: {mean:.2f} s")
+        axis.legend(fontsize=9)
+    axes[0].set_ylabel("Transition count")
+    fig.suptitle("Timing from regain to the next attempt")
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+
+
 # %% Speed analysis
 def get_post_entry_speed(events):
     """Return mean smooth speed during the first second after gap entry."""
@@ -625,6 +842,58 @@ def plot_post_entry_speed(speed_events):
 
 
 # %% Sequence analysis
+def make_second_order_transition_matrices(events):
+    """Return future-row matrices conditioned on the outcome two attempts back."""
+    ordered = events.sort_values(["track_id", "attempt_time_s"]).copy()
+    ordered["conditioning_outcome"] = (
+        ordered.groupby("track_id")["outcome"].shift(2)
+    )
+    ordered["current_outcome"] = ordered.groupby("track_id")["outcome"].shift(1)
+    triplets = ordered.dropna(subset=["conditioning_outcome", "current_outcome"])
+    matrices = {}
+    counts = {}
+    for conditioning_outcome in OUTCOME_ORDER:
+        subset = triplets.loc[
+            triplets["conditioning_outcome"] == conditioning_outcome
+        ]
+        counts[conditioning_outcome] = len(subset)
+        matrices[conditioning_outcome] = pd.crosstab(
+            subset["current_outcome"], subset["outcome"], normalize="index"
+        ).T.reindex(index=OUTCOME_ORDER, columns=OUTCOME_ORDER, fill_value=0)
+    return matrices, counts
+
+
+def plot_second_order_transition_matrices(events):
+    """Plot future-row matrices conditioned on the two-back outcome."""
+    matrices, counts = make_second_order_transition_matrices(events)
+    if not any(counts.values()):
+        print("Too few attempts for second-order transition analysis.")
+        return
+
+    fig, axes = plt.subplots(1, len(OUTCOME_ORDER), figsize=(16, 5), sharey=True)
+    for axis, conditioning_outcome in zip(axes, OUTCOME_ORDER):
+        sns.heatmap(
+            matrices[conditioning_outcome],
+            vmin=0,
+            vmax=1,
+            cmap="Blues",
+            annot=True,
+            fmt=".2f",
+            cbar=axis is axes[-1],
+            ax=axis,
+        )
+        axis.set(
+            xlabel="Current outcome",
+            ylabel="Next outcome",
+            title=(
+                f"Two attempts back: {conditioning_outcome}\n"
+                f"Triplets: n={counts[conditioning_outcome]}"
+            ),
+        )
+    fig.suptitle("Second-order outcome transitions")
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+
+
 def plot_transition_model(events):
     """Plot raw and track-controlled outcome transition probabilities."""
     transition_events = events.dropna(subset=["previous_outcome"]).copy()
@@ -670,6 +939,62 @@ def plot_transition_model(events):
         sns.heatmap(matrix, vmin=0, vmax=1, cmap="Blues", annot=True, fmt=".2f",
                     cbar=axis is axes[1], ax=axis)
         axis.set(xlabel="Previous outcome", ylabel="Current outcome", title=title)
+    fig.tight_layout()
+
+
+def make_early_late_transition_matrices(events):
+    """Return early and late transition matrices from eligible tracks."""
+    transition_events = events.loc[
+        (events["track_attempt_count"] - 1 >= MIN_TRANSITIONS_FOR_PHASE)
+        & events["previous_outcome"].notna()
+    ].copy()
+    if transition_events.empty:
+        raise RuntimeError(
+            "No tracks have more than two transitions for phase analysis."
+        )
+
+    transition_position = (
+        transition_events["track_attempt"] - 1
+    ) / (transition_events["track_attempt_count"] - 1)
+    transition_events["phase"] = np.where(
+        transition_position <= 0.5, "early", "late"
+    )
+
+    matrices = {}
+    counts = {}
+    for phase in ["early", "late"]:
+        phase_events = transition_events.loc[transition_events["phase"] == phase]
+        matrices[phase] = pd.crosstab(
+            phase_events["outcome"], phase_events["previous_outcome"],
+            normalize="columns",
+        ).reindex(index=OUTCOME_ORDER, columns=OUTCOME_ORDER, fill_value=0)
+        counts[phase] = len(phase_events)
+    return matrices, counts
+
+
+def plot_early_late_transition_matrices(events):
+    """Plot transitions in the first and later portions of eligible tracks."""
+    try:
+        matrices, counts = make_early_late_transition_matrices(events)
+    except RuntimeError as error:
+        print(error)
+        return
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+    for axis, phase, title in [
+        (axes[0], "early", "Early transitions"),
+        (axes[1], "late", "Later transitions"),
+    ]:
+        sns.heatmap(
+            matrices[phase], vmin=0, vmax=1, cmap="Blues", annot=True,
+            fmt=".2f", cbar=axis is axes[1], ax=axis,
+        )
+        axis.set(
+            xlabel="Previous outcome",
+            ylabel="Current outcome",
+            title=f"{title} (n={counts[phase]})",
+        )
+    fig.suptitle("Tracks with more than two transitions", y=1.02)
     fig.tight_layout()
 
 
@@ -843,10 +1168,13 @@ def run():
     plot_centerline_profiles(tracks, geometry)
     plot_event_summary(events)
     plot_within_track_summary(events)
+    plot_cross_after_regain_by_attempt(events)
+    plot_regain_transition_durations(events)
     speed_events = get_post_entry_speed(events)
     print(f"Events with post-entry speed: {len(speed_events)}")
     plot_post_entry_speed(speed_events)
     plot_transition_model(events)
+    plot_second_order_transition_matrices(events)
     plot_motif_enrichment(events)
     plot_event_paths(events)
     evaluate_track_model(events)

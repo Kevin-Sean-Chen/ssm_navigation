@@ -28,10 +28,12 @@ MAX_FILES = None
 FRAME_RATE_HZ = 60
 MIN_TRACK_S = 10
 PRE_SIGNAL_S = 2
-OUTCOME_S = 3
+OUTCOME_S = 2
 DISTANCE_MM = 0
 SIGNAL_THRESHOLD = 0
 MAX_LOSS_POSITION_GAP_S = 1 / FRAME_RATE_HZ * 1.5
+STOP_SPEED_THRESHOLD_MM_S = 1.5
+STOP_DURATION_S = 0.3
 MOTIF_PERMUTATIONS = 1000
 MOTIF_RANDOM_SEED = 0
 
@@ -186,6 +188,30 @@ def classify_outcome(track, loss_index, loss_time_s):
     return "downwind", outcome_index
 
 
+def has_sustained_stop(
+    time_s, speed_mm_s, loss_time_s, threshold_mm_s, duration_s, window_s,
+):
+    """Return true when one low-speed interval lasts for the required time."""
+    eligible = (
+        (time_s >= loss_time_s)
+        & (time_s <= loss_time_s + window_s)
+        & np.isfinite(speed_mm_s)
+        & (speed_mm_s < threshold_mm_s)
+    )
+    low_speed_index = np.flatnonzero(eligible)
+    if not len(low_speed_index):
+        return False
+
+    split_index = np.flatnonzero(
+        (np.diff(low_speed_index) > 1)
+        | (np.diff(time_s[low_speed_index]) > MAX_LOSS_POSITION_GAP_S)
+    ) + 1
+    for interval in np.split(low_speed_index, split_index):
+        if time_s[interval[-1]] - time_s[interval[0]] >= duration_s:
+            return True
+    return False
+
+
 def find_attempts(tracks, timing):
     """Find track attempts at every pooled global signal loss."""
     rows = []
@@ -233,6 +259,7 @@ def find_attempts(tracks, timing):
                     "xy": track["xy"],
                     "time_s": time_s,
                     "signal": signal,
+                    "speed_smooth": track["speed_smooth"],
                 }
             )
     return rows
@@ -249,6 +276,13 @@ def make_event_table(tracks, timing):
     events["track_attempt"] = events.groupby("track_id").cumcount() + 1
     events["track_attempt_count"] = events.groupby("track_id")["track_id"].transform("size")
     events["is_upwind"] = (events["outcome"] == "upwind").astype(int)
+    events["is_stop"] = events.apply(
+        lambda event: has_sustained_stop(
+            event["time_s"], event["speed_smooth"], event["loss_time_s"],
+            STOP_SPEED_THRESHOLD_MM_S, STOP_DURATION_S, OUTCOME_S,
+        ),
+        axis=1,
+    ).astype(int)
     events["previous_outcome"] = events.groupby("track_id")["outcome"].shift(1)
     return events
 
@@ -346,6 +380,24 @@ def plot_event_paths(events):
             title=f"{outcome}: n={len(subset)}",
         )
     axes[0].set_ylabel("x relative to global loss (mm)")
+    fig.tight_layout()
+
+
+def plot_stop_probability(events):
+    """Plot stopping probability at each pooled global signal loss."""
+    rates = events.groupby("loss_number")["is_stop"].agg(["mean", "count"])
+    error = np.sqrt(rates["mean"] * (1 - rates["mean"]) / rates["count"])
+    fig, axis = plt.subplots(figsize=(8, 5))
+    axis.errorbar(
+        rates.index, rates["mean"], yerr=error, fmt="o-", color="C4", capsize=4,
+    )
+    axis.set(
+        xlabel="Global loss number", ylabel="P(stop)", ylim=(0, 1),
+        title=(
+            f"Stopping after global signal loss (< {STOP_SPEED_THRESHOLD_MM_S} mm/s "
+            f"for {STOP_DURATION_S} s)"
+        ),
+    )
     fig.tight_layout()
 
 
@@ -462,8 +514,10 @@ def run():
     print(f"Tracks with attempts: {events['track_id'].nunique()}")
     print(f"Valid attempts: {len(events)}")
     print(events.groupby("outcome").size().reindex(OUTCOME_ORDER, fill_value=0))
+    print(f"Stopping attempts: {events['is_stop'].sum()}")
     plot_event_summary(events)
     plot_event_paths(events)
+    plot_stop_probability(events)
     plot_motif_enrichment(events)
     plt.show()
 

@@ -4,12 +4,24 @@ This script queries optogui recordings, loads the selected matrices, and runs
 the analysis in gap_cross_track. Edit QUERY_FILTERS before a full data load.
 """
 
+import logging
+from contextlib import contextmanager
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+from tqdm.auto import tqdm
 
-from optogui.analysis import load_experiment_data, query_experiments
+from optogui.analysis import (
+    load_experiment_data,
+    query_experiments,
+    save_experiment_data,
+)
 
-import gap_cross_track as analysis
+try:
+    from gap_crossing import gap_cross_track as analysis
+except ModuleNotFoundError:
+    import gap_cross_track as analysis
 
 
 # %% Database settings
@@ -17,14 +29,24 @@ DATABASE_LOCATION = "server"
 DATA_LOCATION = "server"
 QUERY_FILTERS = {
     "experimenter": "kevin",
-    "year": 2026,
-    "month": [5,6, 7],
     # "day": 18,
     # "vial": [0, 1],
     "genotype_file": "117_GMUCR.yaml",
     "stim_protocol": "users.kevin.intermittent_gaps_ribbon",
 }
+QUERY_PERIODS = [
+    # {"year": 2025, "month": [12]},
+    {"year": 2026, "month": [5,6,7, 8]},
+]
+# QUERY_PERIODS = [
+#     {"year": 2025, "month": [12], "day": 15}, ### debugging error
+# ]
 MAX_EXPERIMENTS = None
+# Set this path to save loaded recordings as an Optogui Joblib file.
+SAVE_LOADED_RECORDINGS_PATH: Path | None = None
+SAVE_LOADED_RECORDINGS_PATH = Path(
+    r"saved_data\gap_cross\kevin_2026_5678_gap_ribbons"
+)
 
 MATRIX_FIELDS = [
     "headx_smooth",
@@ -49,14 +71,31 @@ RECORDING_FIELDS = [
 ]
 
 
+@contextmanager
+def suppress_loader_logs():
+    """Temporarily suppress logs from one-record public loader calls."""
+    previous_disable_level = logging.root.manager.disable
+    logging.disable(logging.CRITICAL)
+    try:
+        yield
+    finally:
+        logging.disable(previous_disable_level)
+
+
 # %% Load tracks
 def select_experiments():
     """Return the database records selected for analysis."""
-    experiments = query_experiments(
-        db_location=DATABASE_LOCATION,
-        order_by="id",
-        **QUERY_FILTERS,
-    )
+    query_results = [
+        query_experiments(
+            db_location=DATABASE_LOCATION,
+            order_by="id",
+            **QUERY_FILTERS,
+            **period,
+        )
+        for period in QUERY_PERIODS
+    ]
+    experiments = pd.concat(query_results, ignore_index=True).drop_duplicates("id")
+    experiments = experiments.sort_values("id").reset_index(drop=True)
     if experiments.empty:
         raise RuntimeError("No database records matched QUERY_FILTERS.")
     if MAX_EXPERIMENTS is not None:
@@ -65,21 +104,62 @@ def select_experiments():
 
 
 def load_recordings(experiments):
-    """Load only the matrix fields required by the gap analysis."""
-    return load_experiment_data(
-        experiments,
-        data_location=DATA_LOCATION,
-        load_obj=False,
-        load_flies=False,
-        load_shapes_proj=False,
-        load_shapes_screen=False,
-        load_data=True,
-        matrix_fields=MATRIX_FIELDS,
-        combine=False,
-        skip_errors=True,
-        n_jobs=1,
-        show_progress=True,
-    )
+    """Load recordings and return failed query rows without stopping the run."""
+    loaded_recordings = []
+    failure_rows = []
+    for _, experiment in tqdm(
+        experiments.iterrows(),
+        total=len(experiments),
+        desc="Loading experiments",
+        unit="experiment",
+    ):
+        experiment_frame = experiment.to_frame().T
+        try:
+            with suppress_loader_logs():
+                loaded = load_experiment_data(
+                    experiment_frame,
+                    data_location=DATA_LOCATION,
+                    load_obj=False,
+                    load_flies=False,
+                    load_shapes_proj=False,
+                    load_shapes_screen=False,
+                    load_data=True,
+                    matrix_fields=MATRIX_FIELDS,
+                    combine=False,
+                    skip_errors=True,
+                    n_jobs=1,
+                    show_progress=False,
+                )
+        except Exception as error:
+            failure_rows.append({
+                **experiment.to_dict(),
+                "error_type": type(error).__name__,
+                "error_message": str(error),
+            })
+            tqdm.write(
+                f"Skipping experiment {experiment.get('id')}: "
+                f"{type(error).__name__}: {error}"
+            )
+            continue
+        if loaded:
+            loaded_recordings.extend(loaded)
+        else:
+            failure_rows.append({
+                **experiment.to_dict(),
+                "error_type": "NoDataLoaded",
+                "error_message": "The loader returned no data.",
+            })
+            tqdm.write(
+                f"Skipping experiment {experiment.get('id')}: no data loaded"
+            )
+    return loaded_recordings, pd.DataFrame(failure_rows)
+
+
+def save_loaded_recordings(loaded_recordings, output_path):
+    """Save loaded recordings when one output path is configured."""
+    if output_path is None:
+        return None
+    return save_experiment_data(loaded_recordings, output_path)
 
 
 def make_recording_metadata(loaded_recordings):
@@ -157,8 +237,12 @@ def run():
     print(f"Database records: {len(experiments)}")
     print(experiments[RECORDING_FIELDS].to_string(index=False))
 
-    loaded_recordings = load_recordings(experiments)
+    loaded_recordings, failed_experiments = load_recordings(experiments)
     print(f"Loaded recordings: {len(loaded_recordings)}")
+    print(f"Failed recordings: {len(failed_experiments)}")
+    if not failed_experiments.empty:
+        print(failed_experiments.to_string(index=False))
+    save_loaded_recordings(loaded_recordings, SAVE_LOADED_RECORDINGS_PATH)
     tracks = make_tracks(loaded_recordings)
     print(f"Valid tracks: {len(tracks)}")
     if not tracks:
@@ -176,10 +260,14 @@ def run():
     analysis.plot_centerline_profiles(tracks, geometry)
     analysis.plot_event_summary(events)
     analysis.plot_within_track_summary(events)
+    analysis.plot_cross_after_regain_by_attempt(events)
+    analysis.plot_regain_transition_durations(events)
     speed_events = analysis.get_post_entry_speed(events)
     print(f"Events with post-entry speed: {len(speed_events)}")
     analysis.plot_post_entry_speed(speed_events)
     analysis.plot_transition_model(events)
+    analysis.plot_second_order_transition_matrices(events)
+    analysis.plot_early_late_transition_matrices(events)
     analysis.plot_motif_enrichment(events)
     analysis.plot_event_paths(events)
     analysis.evaluate_track_model(events)
