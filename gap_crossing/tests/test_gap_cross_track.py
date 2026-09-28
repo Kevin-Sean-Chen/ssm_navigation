@@ -11,6 +11,7 @@ from gap_crossing.gap_cross_track import (
     get_regain_transition_durations,
     get_robust_gap_edges,
     make_second_order_transition_matrices,
+    plot_kinematic_histograms,
 )
 
 
@@ -84,6 +85,32 @@ class PlotSampleTests(unittest.TestCase):
         self.assertEqual(details["displayed_frame_count"], 4)
         self.assertEqual(details["track_ids"], ["track0", "track2"])
         np.testing.assert_array_equal(xy[:, 0], [0, 0, 2, 2])
+
+
+class KinematicHistogramTests(unittest.TestCase):
+    """Check descriptive kinematic plots."""
+
+    def test_plot_kinematic_histograms_compares_signal_frames(self):
+        """Each plot compares all finite frames with finite signal frames."""
+        tracks = [
+            {
+                "signal": np.array([0.0, 1.0, np.nan, 1.0]),
+                "speed_smooth": np.array([1.0, 2.0, 3.0, np.nan]),
+                "velocity": np.array([[4.0, 0.0], [5.0, 0.0], [6.0, 0.0], [7.0, 0.0]]),
+                "theta": np.array([0.0, 90.0, 180.0, 270.0]),
+            }
+        ]
+
+        figure, axes = plot_kinematic_histograms(tracks)
+
+        self.assertEqual(len(axes), 3)
+        self.assertEqual(axes[0].get_xlabel(), "Speed (mm/s)")
+        self.assertEqual(axes[1].get_xlabel(), "Wind-axis velocity (mm/s)")
+        self.assertEqual(axes[2].name, "polar")
+        self.assertEqual(len(axes[0].patches), 48)
+        self.assertEqual(len(axes[1].patches), 98)
+        self.assertEqual(len(axes[2].patches), 120)
+        figure.clf()
 
 
 class CrossAfterRegainTests(unittest.TestCase):

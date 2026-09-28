@@ -30,12 +30,12 @@ root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cr
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-11\kevin' ### gap crossing data
 root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-10-30\kevin' ### gap crossing data
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-25\kevin' ### with control crosses
-root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-26\kevin'
-# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-18\kevin' ### 10,12,15,18
+# root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-11-26\kevin'
+root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2025-12-10\kevin' ### 10,12,15,18
 # root_dir = r'C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\data\gap_cross\2026-06-19\kevin'
 
 target_file = "exp_matrix.joblib"
-exp_type = 'same'#'increasing gap 60s ocl_' #'increasing gap 60s Kir_EPG'
+exp_type = 'ocl_kir_gmr' #'same'#'increasing gap 60s ocl_' #'increasing gap 60s Kir_EPG'
 # exp_type = 'long to gap 60s wind15'
 # forbidden_subs = ['Kir', 'TNT']
 forbidden_subs = []

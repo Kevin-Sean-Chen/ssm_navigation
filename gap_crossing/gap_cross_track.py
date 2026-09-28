@@ -146,6 +146,56 @@ def load_tracks(target_files):
     return tracks
 
 
+def plot_kinematic_histograms(tracks):
+    """Plot speed, wind-axis velocity, and heading by signal state."""
+    figure = plt.figure(figsize=(18, 6))
+    axes = [
+        figure.add_subplot(1, 3, 1),
+        figure.add_subplot(1, 3, 2),
+        figure.add_subplot(1, 3, 3, projection="polar"),
+    ]
+    measures = [
+        ("speed_smooth", "Speed (mm/s)", np.arange(0, 50, 2), (0, 45)),
+        ("vx", "Wind-axis velocity (mm/s)", np.arange(-50, 50, 2), (-37, 37)),
+    ]
+
+    signal = np.concatenate([track["signal"] for track in tracks])
+    for axis, (field, label, bins, limits) in zip(axes[:2], measures):
+        if field == "vx":
+            values = np.concatenate([track["velocity"][:, 0] for track in tracks])
+        else:
+            values = np.concatenate([track[field] for track in tracks])
+        valid = np.isfinite(values) & np.isfinite(signal)
+        axis.hist(values[valid], bins=bins, density=True, label="All frames")
+        axis.hist(
+            values[valid & (signal > 0)],
+            bins=bins,
+            density=True,
+            alpha=0.5,
+            label="Signal present",
+        )
+        axis.set(xlabel=label, ylabel="Density", xlim=limits, yscale="log")
+        axis.legend()
+
+    heading = np.concatenate([track["theta"] for track in tracks])
+    valid = np.isfinite(heading) & np.isfinite(signal)
+    angles = np.mod(np.deg2rad(heading[valid]), 2 * np.pi)
+    signal_angles = np.mod(np.deg2rad(heading[valid & (signal > 0)]), 2 * np.pi)
+    axes[2].hist(angles, bins=60, range=(0, 2 * np.pi), density=True, label="All frames")
+    axes[2].hist(
+        signal_angles,
+        bins=60,
+        range=(0, 2 * np.pi),
+        density=True,
+        alpha=0.5,
+        label="Signal present",
+    )
+    axes[2].set(title="Heading")
+    axes[2].legend(loc="upper right", bbox_to_anchor=(1.25, 1.15))
+    figure.tight_layout()
+    return figure, axes
+
+
 # %% Gap geometry
 def get_odor_xy(tracks):
     """Return finite positions where odor signal is present."""

@@ -31,12 +31,12 @@ QUERY_FILTERS = {
     "experimenter": "kevin",
     # "day": 18,
     # "vial": [0, 1],
-    "genotype_file": "117_GMUCR.yaml",
+    "genotype_file": "117_GMUCR.yaml",  #"GMOCLKir_FC2.yaml", #"GMOCLKir_empty.yaml", #
     "stim_protocol": "users.kevin.intermittent_gaps_ribbon",
 }
 QUERY_PERIODS = [
     # {"year": 2025, "month": [12]},
-    {"year": 2026, "month": [5,6,7, 8]},
+    {"year": 2026, "month": [5,6,7,8,9]},
 ]
 # QUERY_PERIODS = [
 #     {"year": 2025, "month": [12], "day": 15}, ### debugging error
@@ -56,6 +56,7 @@ MATRIX_FIELDS = [
     "vx_smooth",
     "vy_smooth",
     "spd_smooth",
+    "theta",
 ]
 RECORDING_FIELDS = [
     "path",
@@ -202,12 +203,14 @@ def make_tracks(loaded_recordings):
             time_s = np.asarray(data["t"][index]).squeeze().astype(float)
             velocity = np.column_stack((data["vx_smooth"][index], data["vy_smooth"][index]))
             speed_smooth = np.asarray(data["spd_smooth"][index]).squeeze().astype(float)
+            theta = np.asarray(data["theta"][index]).squeeze().astype(float)
 
             if (
                 xy.shape != (len(index), 2)
                 or signal.shape != (len(index),)
                 or time_s.shape != (len(index),)
                 or speed_smooth.shape != (len(index),)
+                or theta.shape != (len(index),)
                 or not np.isfinite(velocity).all()
             ):
                 continue
@@ -225,6 +228,7 @@ def make_tracks(loaded_recordings):
                     "time_s": time_s,
                     "velocity": velocity,
                     "speed_smooth": speed_smooth,
+                    "theta": theta,
                 }
             )
     return tracks
@@ -248,6 +252,7 @@ def run():
     if not tracks:
         raise RuntimeError("No valid tracks. Check QUERY_FILTERS and matrix fields.")
 
+    analysis.plot_kinematic_histograms(tracks)
     geometry = analysis.get_gap_geometry(tracks)
     print(f"Gap regions: {len(geometry)}")
     events = analysis.make_event_table(tracks, geometry)

@@ -36,5 +36,33 @@ class LoadedRecordingSaveTests(unittest.TestCase):
             np.testing.assert_array_equal(loaded[0]["data"]["trjn"], [1, 1])
 
 
+class DatabaseTrackTests(unittest.TestCase):
+    """Check kinematic fields on database-loaded tracks."""
+
+    def test_make_tracks_keeps_recorded_heading(self):
+        """The quality plot receives theta from each accepted track."""
+        frame_count = 601
+        recordings = [
+            {
+                "sql": {"path": "2025/kevin/example"},
+                "data": {
+                    "trjn": np.zeros(frame_count, dtype=int),
+                    "headx_smooth": np.zeros(frame_count),
+                    "heady_smooth": np.zeros(frame_count),
+                    "signal": np.zeros(frame_count),
+                    "t": np.arange(frame_count, dtype=float) / 60,
+                    "vx_smooth": np.ones(frame_count),
+                    "vy_smooth": np.zeros(frame_count),
+                    "spd_smooth": np.ones(frame_count),
+                    "theta": np.linspace(0, 359, frame_count),
+                },
+            }
+        ]
+
+        tracks = database_analysis.make_tracks(recordings)
+
+        np.testing.assert_allclose(tracks[0]["theta"], np.linspace(0, 359, frame_count))
+
+
 if __name__ == "__main__":
     unittest.main()

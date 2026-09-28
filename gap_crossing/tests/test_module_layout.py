@@ -1,6 +1,9 @@
 """Tests for the gap-crossing analysis module layout."""
 
 import importlib
+from pathlib import Path
+import subprocess
+import sys
 import unittest
 
 
@@ -14,3 +17,19 @@ class MemoryAnalysisModuleLayoutTests(unittest.TestCase):
         )
 
         self.assertTrue(callable(entropy_analysis.run))
+
+    def test_memory_module_imports_from_repository_root(self):
+        """The memory module imports in a clean Python process."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import gap_crossing.memory_analysis.gap_cross_db_memory",
+            ],
+            cwd=Path(__file__).parents[2],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
