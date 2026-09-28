@@ -5,8 +5,11 @@ vial is one sample. Error bars are bootstrap 95% confidence intervals across
 these sessions.
 """
 
+from copy import deepcopy
 from itertools import product
+from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
 
@@ -17,6 +20,8 @@ except ModuleNotFoundError:
     import gap_cross_db as pooled
     import gap_cross_track as analysis
 
+
+SAVE_TRACKS_PATH: Path | None = None
 
 SESSION_FIELDS = [
     "recording_year",
@@ -29,6 +34,102 @@ BOOTSTRAP_SAMPLES = 10_000
 MOTIF_LENGTHS = [2, 3]
 MOTIFS_PER_TAIL = 6
 TRIAL_WINDOW_SIZE = 3
+
+
+def make_track_export(tracks: list[dict], events: pd.DataFrame) -> dict:
+    """Return continuous samples and ordered attempts for retained tracks."""
+    events_by_track = {
+        track_id: track_events.sort_values("attempt_time_s", kind="stable")
+        for track_id, track_events in events.groupby("track_id", sort=False)
+    }
+    exported_tracks = []
+    for track in tracks:
+        track_events = events_by_track.get(track["track_id"])
+        if track_events is None:
+            continue
+        xy = np.asarray(track["xy"])
+        exported_tracks.append(
+            {
+                "t_s": np.asarray(track["time_s"]).copy(),
+                "x_mm": xy[:, 0].copy(),
+                "y_mm": xy[:, 1].copy(),
+                "signal": np.asarray(track["signal"]).copy(),
+                "attempt_t_s": track_events["attempt_time_s"].to_numpy(
+                    dtype=float, copy=True
+                ),
+                "attempt_state": track_events["outcome"].to_numpy(
+                    dtype=str, copy=True
+                ),
+            }
+        )
+
+    return {
+        "metadata": {
+            "query": {
+                "database_location": pooled.DATABASE_LOCATION,
+                "data_location": pooled.DATA_LOCATION,
+                "query_filters": deepcopy(pooled.QUERY_FILTERS),
+                "query_periods": deepcopy(pooled.QUERY_PERIODS),
+                "max_experiments": pooled.MAX_EXPERIMENTS,
+            },
+            "analysis_parameters": {
+                "frame_rate_hz": analysis.FRAME_RATE_HZ,
+                "min_track_s": analysis.MIN_TRACK_S,
+                "pre_signal_s": analysis.PRE_SIGNAL_S,
+                "outcome_s": analysis.OUTCOME_S,
+                "distance_mm": analysis.DISTANCE_MM,
+                "min_attempts_per_track": analysis.MIN_ATTEMPTS_PER_TRACK,
+                "attempt_ribbon_half_width_mm": analysis.ATTEMPT_RIBBON_HALF_WIDTH_MM,
+                "gap_geometry_method": analysis.GAP_GEOMETRY_METHOD,
+            },
+        },
+        "tracks": exported_tracks,
+    }
+
+
+def validate_track_export(export: dict) -> None:
+    """Raise an error when a collaborator track export is invalid."""
+    track_fields = {
+        "t_s", "x_mm", "y_mm", "signal", "attempt_t_s", "attempt_state"
+    }
+    for track in export.get("tracks", []):
+        if set(track) != track_fields:
+            raise ValueError("Each exported track must have the six required fields.")
+
+        t_s = np.asarray(track["t_s"])
+        continuous_lengths = {
+            len(t_s),
+            len(track["x_mm"]),
+            len(track["y_mm"]),
+            len(track["signal"]),
+        }
+        if len(continuous_lengths) != 1 or not len(t_s):
+            raise ValueError("Continuous track arrays must have one nonzero length.")
+        if not np.isfinite(t_s).all() or np.any(np.diff(t_s) <= 0):
+            raise ValueError("Continuous track times must strictly increase.")
+
+        attempt_t_s = np.asarray(track["attempt_t_s"])
+        attempt_state = np.asarray(track["attempt_state"])
+        if not len(attempt_t_s) or len(attempt_t_s) != len(attempt_state):
+            raise ValueError("Attempt arrays must have one equal nonzero length.")
+        if not np.isfinite(attempt_t_s).all() or np.any(np.diff(attempt_t_s) <= 0):
+            raise ValueError("Attempt times must strictly increase.")
+        if attempt_t_s[0] < t_s[0] or attempt_t_s[-1] > t_s[-1]:
+            raise ValueError("Attempt times must be inside the continuous track time range.")
+        if not np.isin(attempt_state, analysis.OUTCOME_ORDER).all():
+            raise ValueError("Attempt states must be cross, regain, or abort.")
+
+
+def save_track_export(export: dict, output_path: Path | None) -> Path | None:
+    """Validate the track export and write it when a path is configured."""
+    validate_track_export(export)
+    if output_path is None:
+        return None
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(export, output_path)
+    return output_path
 
 
 def get_session_trial_table(events):
@@ -374,6 +475,8 @@ def run():
     geometry = analysis.get_gap_geometry(tracks)
     events = analysis.make_event_table(tracks, geometry)
     events = events.merge(pooled.make_recording_metadata(loaded_recordings), on="source_file")
+    track_export = make_track_export(tracks, events)
+    save_track_export(track_export, SAVE_TRACKS_PATH)
     summary = make_session_summary(events)
     print(f"Day-vial sessions: {summary['session_id'].nunique()}")
 
