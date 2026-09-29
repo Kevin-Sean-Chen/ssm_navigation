@@ -166,7 +166,12 @@ def plot_kinematic_histograms(tracks):
         else:
             values = np.concatenate([track[field] for track in tracks])
         valid = np.isfinite(values) & np.isfinite(signal)
-        axis.hist(values[valid], bins=bins, density=True, label="All frames")
+        axis.hist(
+            values[valid & (signal <= 0)],
+            bins=bins,
+            density=True,
+            label="No signal",
+        )
         axis.hist(
             values[valid & (signal > 0)],
             bins=bins,
@@ -179,9 +184,17 @@ def plot_kinematic_histograms(tracks):
 
     heading = np.concatenate([track["theta"] for track in tracks])
     valid = np.isfinite(heading) & np.isfinite(signal)
-    angles = np.mod(np.deg2rad(heading[valid]), 2 * np.pi)
+    no_signal_angles = np.mod(
+        np.deg2rad(heading[valid & (signal <= 0)]), 2 * np.pi
+    )
     signal_angles = np.mod(np.deg2rad(heading[valid & (signal > 0)]), 2 * np.pi)
-    axes[2].hist(angles, bins=60, range=(0, 2 * np.pi), density=True, label="All frames")
+    axes[2].hist(
+        no_signal_angles,
+        bins=60,
+        range=(0, 2 * np.pi),
+        density=True,
+        label="No signal",
+    )
     axes[2].hist(
         signal_angles,
         bins=60,

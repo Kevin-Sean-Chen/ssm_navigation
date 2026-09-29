@@ -90,8 +90,8 @@ class PlotSampleTests(unittest.TestCase):
 class KinematicHistogramTests(unittest.TestCase):
     """Check descriptive kinematic plots."""
 
-    def test_plot_kinematic_histograms_compares_signal_frames(self):
-        """Each plot compares all finite frames with finite signal frames."""
+    def test_plot_kinematic_histograms_compares_signal_and_no_signal_frames(self):
+        """Each plot compares exclusive finite signal-state groups."""
         tracks = [
             {
                 "signal": np.array([0.0, 1.0, np.nan, 1.0]),
@@ -110,6 +110,14 @@ class KinematicHistogramTests(unittest.TestCase):
         self.assertEqual(len(axes[0].patches), 48)
         self.assertEqual(len(axes[1].patches), 98)
         self.assertEqual(len(axes[2].patches), 120)
+        self.assertEqual(
+            [text.get_text() for text in axes[0].get_legend().get_texts()],
+            ["No signal", "Signal present"],
+        )
+        no_signal_heights = [patch.get_height() for patch in axes[0].containers[0]]
+        signal_heights = [patch.get_height() for patch in axes[0].containers[1]]
+        np.testing.assert_allclose(no_signal_heights[:2], [0.5, 0.0])
+        np.testing.assert_allclose(signal_heights[:2], [0.0, 0.5])
         figure.clf()
 
 

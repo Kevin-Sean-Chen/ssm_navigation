@@ -6,6 +6,7 @@ these sessions.
 """
 
 from copy import deepcopy
+from datetime import datetime
 from itertools import product
 from pathlib import Path
 
@@ -21,7 +22,15 @@ except ModuleNotFoundError:
     import gap_cross_track as analysis
 
 
-SAVE_TRACKS_PATH: Path | None = None
+def make_timestamped_track_path(timestamp: datetime | None = None) -> Path:
+    """Return the track-export path with the run date and time."""
+    timestamp = datetime.now() if timestamp is None else timestamp
+    filename = f"gap_crossing_tracks_{timestamp:%Y-%m-%d_%H-%M-%S}.joblib"
+    return Path("saved_data") / "gap_cross" / filename
+
+
+# SAVE_TRACKS_PATH: Path | None = None
+SAVE_TRACKS_PATH = make_timestamped_track_path()
 
 SESSION_FIELDS = [
     "recording_year",

@@ -1,6 +1,7 @@
 """Tests for session-scale gap-crossing learning summaries."""
 
 from copy import deepcopy
+from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -88,6 +89,19 @@ class TrialLearningTests(unittest.TestCase):
 
 class TrackExportTests(unittest.TestCase):
     """Check the collaborator track export."""
+
+    def test_timestamped_track_path_keeps_date_and_time(self):
+        """A new run gets a readable timestamp in its export name."""
+        timestamp = datetime(2026, 9, 29, 14, 35, 6)
+
+        output_path = vial_analysis.make_timestamped_track_path(timestamp)
+
+        self.assertEqual(
+            output_path,
+            Path("saved_data")
+            / "gap_cross"
+            / "gap_crossing_tracks_2026-09-29_14-35-06.joblib",
+        )
 
     @staticmethod
     def make_valid_export():

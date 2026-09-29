@@ -31,7 +31,7 @@ QUERY_FILTERS = {
     "experimenter": "kevin",
     # "day": 18,
     # "vial": [0, 1],
-    "genotype_file": "117_GMUCR.yaml",  #"GMOCLKir_FC2.yaml", #"GMOCLKir_empty.yaml", #
+    "genotype_file": "GMOCLKir_86861.yaml", #"117_GMUCR.yaml",  #"GMOCLKir_FC2.yaml", #"GMOCLKir_empty.yaml", #
     "stim_protocol": "users.kevin.intermittent_gaps_ribbon",
 }
 QUERY_PERIODS = [
