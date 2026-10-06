@@ -31,12 +31,13 @@ QUERY_FILTERS = {
     "experimenter": "kevin",
     # "day": 18,
     # "vial": [0, 1],
-    "genotype_file": "GMOCLKir_86861.yaml", #"117_GMUCR.yaml",  #"GMOCLKir_FC2.yaml", #"GMOCLKir_empty.yaml", #
+    "genotype_file": "GMOCLKir_empty.yaml", #"GMOCLKir_empty.yaml", #"117_GMUCR.yaml",  #"OCLKir_GMUCR.yaml",  #"GMOCLKir_FC2.yaml", #"GMOCLKir_86861.yaml", #"GMOCLKir_FC2.yaml", #"GMOCLKir_empty.yaml", #
     "stim_protocol": "users.kevin.intermittent_gaps_ribbon",
 }
 QUERY_PERIODS = [
     # {"year": 2025, "month": [12]},
     {"year": 2026, "month": [5,6,7,8,9]},
+    # {"year": 2026, "month": [8], "day": [19]},
 ]
 # QUERY_PERIODS = [
 #     {"year": 2025, "month": [12], "day": 15}, ### debugging error
@@ -253,6 +254,8 @@ def run():
         raise RuntimeError("No valid tracks. Check QUERY_FILTERS and matrix fields.")
 
     analysis.plot_kinematic_histograms(tracks)
+    analysis.plot_tracks_with_signal(tracks)
+    analysis.plt.show()
     geometry = analysis.get_gap_geometry(tracks)
     print(f"Gap regions: {len(geometry)}")
     events = analysis.make_event_table(tracks, geometry)

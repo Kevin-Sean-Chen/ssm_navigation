@@ -33,3 +33,19 @@ class MemoryAnalysisModuleLayoutTests(unittest.TestCase):
         )
 
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_interval_module_imports_from_repository_root(self):
+        """The interval module imports in a clean Python process."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import gap_crossing.memory_analysis.gap_cross_db_intervals",
+            ],
+            cwd=Path(__file__).parents[2],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)

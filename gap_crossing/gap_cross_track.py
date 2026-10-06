@@ -231,7 +231,7 @@ def get_plot_position_signal(
     max_tracks=PLOT_MAX_TRACKS,
     max_frames_per_track=PLOT_MAX_FRAMES_PER_TRACK,
 ):
-    """Return a bounded, deterministic sample for the geometry plot."""
+    """Return a bounded, deterministic sample for diagnostic plots."""
     if max_tracks < 1 or max_frames_per_track < 1:
         raise ValueError("Plot sample limits must be positive.")
 
@@ -266,6 +266,57 @@ def get_plot_position_signal(
         "track_ids": track_ids,
     }
     return xy, signal, details
+
+
+def plot_tracks_with_signal(tracks):
+    """Plot track positions with signal-present positions on top."""
+    xy, _, details = get_plot_position_signal(tracks)
+    displayed_track_ids = set(details["track_ids"])
+    signal_positions = []
+    for track in tracks:
+        if track["track_id"] not in displayed_track_ids:
+            continue
+        track_xy = np.asarray(track["xy"])
+        track_signal = np.asarray(track["signal"])
+        valid = (
+            np.isfinite(track_xy).all(axis=1)
+            & np.isfinite(track_signal)
+            & (track_signal > 0)
+        )
+        track_signal_xy = track_xy[valid]
+        frame_count = min(len(track_signal_xy), PLOT_MAX_FRAMES_PER_TRACK)
+        if frame_count:
+            frame_indices = np.linspace(
+                0, len(track_signal_xy) - 1, frame_count, dtype=int
+            )
+            signal_positions.append(track_signal_xy[frame_indices])
+    signal_xy = (
+        np.concatenate(signal_positions)
+        if signal_positions
+        else np.empty((0, 2), dtype=float)
+    )
+
+    figure, axis = plt.subplots(figsize=(11, 7))
+    axis.plot(xy[:, 0], xy[:, 1], "k,", alpha=0.2, label="Tracks")
+    axis.plot(
+        signal_xy[:, 0],
+        signal_xy[:, 1],
+        "r,",
+        alpha=0.8,
+        label="Signal present",
+    )
+    axis.set(
+        xlabel="x (mm)",
+        ylabel="y (mm)",
+        title=(
+            "Tracks and signal "
+            f"({details['displayed_frame_count']:,}/{details['raw_frame_count']:,} frames; "
+            f"{details['displayed_track_count']}/{details['raw_track_count']} tracks)"
+        ),
+    )
+    axis.legend(markerscale=8)
+    figure.tight_layout()
+    return figure, axis
 
 
     """Estimate odor probability along one ribbon centerline strip."""

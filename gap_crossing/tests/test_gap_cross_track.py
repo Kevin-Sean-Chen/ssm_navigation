@@ -5,6 +5,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
+from gap_crossing import gap_cross_track as analysis
 from gap_crossing.gap_cross_track import (
     get_cross_after_regain_by_attempt,
     get_plot_position_signal,
@@ -85,6 +86,48 @@ class PlotSampleTests(unittest.TestCase):
         self.assertEqual(details["displayed_frame_count"], 4)
         self.assertEqual(details["track_ids"], ["track0", "track2"])
         np.testing.assert_array_equal(xy[:, 0], [0, 0, 2, 2])
+
+
+class TrackSignalPlotTests(unittest.TestCase):
+    """Check the track and signal diagnostic plot."""
+
+    def test_plot_overlays_signal_points_on_all_track_points(self):
+        """The signal layer contains only positive-signal positions."""
+        tracks = [
+            {
+                "track_id": "track0",
+                "xy": np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]),
+                "signal": np.array([0.0, 2.0, 0.0]),
+            }
+        ]
+
+        figure, axis = analysis.plot_tracks_with_signal(tracks)
+
+        self.assertEqual(len(axis.lines), 2)
+        np.testing.assert_array_equal(axis.lines[0].get_xydata(), tracks[0]["xy"])
+        np.testing.assert_array_equal(axis.lines[1].get_xydata(), [[3.0, 4.0]])
+        self.assertEqual(
+            [text.get_text() for text in axis.get_legend().get_texts()],
+            ["Tracks", "Signal present"],
+        )
+        figure.clf()
+
+    def test_plot_keeps_signal_point_omitted_from_background_sample(self):
+        """A sparse signal point remains visible after track sampling."""
+        signal = np.zeros(301)
+        signal[299] = 1
+        tracks = [
+            {
+                "track_id": "track0",
+                "xy": np.column_stack((np.arange(301), np.zeros(301))),
+                "signal": signal,
+            }
+        ]
+
+        figure, axis = analysis.plot_tracks_with_signal(tracks)
+
+        np.testing.assert_array_equal(axis.lines[1].get_xydata(), [[299.0, 0.0]])
+        figure.clf()
 
 
 class KinematicHistogramTests(unittest.TestCase):
