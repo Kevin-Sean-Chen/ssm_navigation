@@ -377,8 +377,21 @@ def _read_csv(path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+def upcast_track(track: dict) -> dict:
+    """Return the track with float32 arrays converted to float64.
+
+    Datasets store float32 to save space. Analysis code runs in float64 so
+    results match a float64 load; float32 arithmetic shifts gap edges.
+    """
+    return {
+        name: values.astype(np.float64)
+        if isinstance(values, np.ndarray) and values.dtype == np.float32 else values
+        for name, values in track.items()
+    }
+
+
 def load_dataset(dataset_dir: Path) -> Dataset:
-    """Load one dataset folder."""
+    """Load one dataset folder; float32 track arrays are returned as float64."""
     dataset_dir = Path(dataset_dir)
     required = [TRACKS_FILE, QUERY_FILE, PARAMS_FILE, PROVENANCE_FILE]
     missing = [name for name in required if not (dataset_dir / name).is_file()]
@@ -387,7 +400,7 @@ def load_dataset(dataset_dir: Path) -> Dataset:
     stored = joblib.load(dataset_dir / TRACKS_FILE)
     return Dataset(
         path=dataset_dir,
-        tracks=stored["tracks"],
+        tracks=[upcast_track(track) for track in stored["tracks"]],
         recordings=stored["recordings"],
         experiments=_read_csv(dataset_dir / EXPERIMENTS_FILE),
         failed=_read_csv(dataset_dir / FAILED_FILE),

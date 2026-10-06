@@ -46,6 +46,16 @@ class TrackTests(unittest.TestCase):
         self.assertEqual(tracks[0]["jumps"].dtype, bool)
         self.assertEqual(tracks[0]["track_id"], "2025/kevin/example::track0")
 
+    def test_stored_arrays_use_float32_except_time(self):
+        """Positions and signals are float32; time stays float64; jumps stay bool."""
+        track = load_db.make_tracks([make_recording()])[0]
+
+        for name in ("xy", "velocity", "signal", "speed_smooth", "theta", "theta_smooth", "dtheta_smooth"):
+            self.assertEqual(track[name].dtype, np.float32, name)
+        self.assertEqual(track["time_s"].dtype, np.float64)
+        self.assertEqual(track["jumps"].dtype, bool)
+        self.assertEqual(load_db.make_track_params()["storage_float_dtype"], "float32")
+
     def test_short_and_fast_tracks_are_rejected(self):
         """Track length and speed filters use the named settings."""
         short = make_recording(frame_count=load_db.MIN_TRACK_S * load_db.FRAME_RATE_HZ)
@@ -62,6 +72,28 @@ class TrackTests(unittest.TestCase):
         self.assertEqual(len(load_db.make_tracks([recording])), 1)
         with patch.object(load_db, "DROP_TRACKS_WITH_JUMPS", True):
             self.assertEqual(load_db.make_tracks([recording]), [])
+
+    def test_nan_velocity_on_jump_frames_keeps_the_track(self):
+        """optogui NaN velocity on jump frames does not reject the track."""
+        jumps = np.zeros(601, dtype=bool)
+        jumps[100:160] = True
+        vx = np.ones(601)
+        vx[jumps] = np.nan
+        recording = make_recording(jumps=jumps, vx_smooth=vx)
+
+        tracks = load_db.make_tracks([recording])
+
+        self.assertEqual(len(tracks), 1)
+        self.assertEqual(int(tracks[0]["jumps"].sum()), 60)
+        with patch.object(load_db, "DROP_TRACKS_WITH_JUMPS", True):
+            self.assertEqual(load_db.make_tracks([recording]), [])
+
+    def test_nan_velocity_outside_jumps_rejects_the_track(self):
+        """NaN velocity on a frame that is not a jump still rejects the track."""
+        vx = np.ones(601)
+        vx[50] = np.nan
+
+        self.assertEqual(load_db.make_tracks([make_recording(vx_smooth=vx)]), [])
 
     def test_recording_without_new_fields_is_skipped(self):
         """A recording without a required matrix field gives no tracks."""
@@ -152,6 +184,7 @@ class RunTests(unittest.TestCase):
                 written = list(Path(temporary_directory).iterdir())
 
         self.assertEqual(written, [])
+        self.assertEqual(tracks[0]["xy"].dtype, np.float64)
         self.assertEqual([track["dataset_label"] for track in tracks], ["a", "b"])
         self.assertEqual(recordings["dataset_label"].tolist(), ["a", "b"])
         self.assertEqual(sources["b"]["query"], load_db.make_query_record("b.yaml"))

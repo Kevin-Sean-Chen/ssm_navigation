@@ -9,6 +9,7 @@ import types
 import unittest
 from unittest.mock import patch
 
+import joblib
 import numpy as np
 import pandas as pd
 
@@ -20,7 +21,7 @@ def make_track(source_file, local_id=0, frame_count=5):
     return {
         "track_id": f"{source_file}::track{local_id}",
         "source_file": source_file,
-        "xy": np.zeros((frame_count, 2)),
+        "xy": np.zeros((frame_count, 2), dtype=np.float32),
         "time_s": np.arange(frame_count, dtype=float),
         "signal": np.zeros(frame_count),
     }
@@ -148,6 +149,9 @@ class DatasetTests(OutputRootTestCase):
 
         self.assertEqual(dataset.tracks[0]["track_id"], "2026/kevin/a::track0")
         np.testing.assert_array_equal(dataset.tracks[0]["time_s"], np.arange(5.0))
+        self.assertEqual(dataset.tracks[0]["xy"].dtype, np.float64)
+        stored = joblib.load(run_dir / "tracks.joblib")
+        self.assertEqual(stored["tracks"][0]["xy"].dtype, np.float32)
         self.assertEqual(dataset.recordings["recording_rig_name"].tolist(), ["or42b"])
         self.assertEqual(dataset.query, make_query())
         self.assertTrue(dataset.failed.empty)

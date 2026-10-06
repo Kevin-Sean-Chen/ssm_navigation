@@ -52,10 +52,14 @@ TRIAL_WINDOW_SIZE = 3
 def make_track_export(
     tracks: list[dict], events: pd.DataFrame, dataset_metadata: dict[str, dict]
 ) -> dict:
-    """Return continuous samples and ordered attempts for retained tracks."""
+    """Return continuous samples and ordered attempts for retained tracks.
+
+    Attempt sequences split at tracking jumps are joined again per track.
+    """
+    track_column = "parent_track_id" if "parent_track_id" in events else "track_id"
     events_by_track = {
         track_id: track_events.sort_values("attempt_time_s", kind="stable")
-        for track_id, track_events in events.groupby("track_id", sort=False)
+        for track_id, track_events in events.groupby(track_column, sort=False)
     }
     exported_tracks = []
     for track in tracks:

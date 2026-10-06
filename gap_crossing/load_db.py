@@ -30,7 +30,7 @@ except ModuleNotFoundError:
 DATASET_LABEL = "gap_ribbon"
 GENOTYPE_FILES = [
     "GMOCLKir_empty.yaml",
-    # "GMOCLKir_FC2.yaml",
+    "GMOCLKir_FC2.yaml",
     # "GMOCLKir_86861.yaml",
     # "117_GMUCR.yaml",
     # "OCLKir_GMUCR.yaml",
@@ -45,7 +45,7 @@ QUERY_FILTERS = {
 QUERY_PERIODS = [
     # {"year": 2025, "month": [12]},
     # {"year": 2026, "month": [5, 6, 7, 8, 9]},
-    {"year": 2026, "month": [8], "day": [19]},
+    {"year": 2026, "month": [8], }#"day": [19]},
 ]
 MAX_EXPERIMENTS = None
 
@@ -85,9 +85,14 @@ FRAME_RATE_HZ = 60
 MIN_TRACK_S = 10
 MIN_MEAN_SPEED_MM_S = 0.1
 MAX_SPEED_MM_S = 50
-# About one third of tracks contain at least one jump frame. Tracks keep their
-# jumps array so analyses can mask those frames instead.
+# About one third of tracks over 10 s contain jump frames, where optogui sets
+# velocity, speed, heading, and signal to NaN. False keeps these tracks with
+# their jumps array; analyses mask jump frames and skip gap attempts near them.
+# True drops them, which matches gap analyses before 2026-10-06.
 DROP_TRACKS_WITH_JUMPS = False
+# Saved positions, velocities, and signals use float32 to halve dataset size.
+# Time stays float64. Filters above use the loaded float64 values.
+STORAGE_FLOAT_DTYPE = np.float32
 
 
 @contextmanager
@@ -141,6 +146,7 @@ def make_track_params():
         "min_mean_speed_mm_s": MIN_MEAN_SPEED_MM_S,
         "max_speed_mm_s": MAX_SPEED_MM_S,
         "drop_tracks_with_jumps": DROP_TRACKS_WITH_JUMPS,
+        "storage_float_dtype": np.dtype(STORAGE_FLOAT_DTYPE).name,
     }
 
 
@@ -269,8 +275,12 @@ def make_tracks(loaded_recordings):
             if (
                 xy.shape != (len(index), 2)
                 or any(values.shape != (len(index),) for values in series.values())
-                or not np.isfinite(velocity).all()
             ):
+                continue
+            # optogui sets velocity, speed, heading, and signal to NaN on jump
+            # frames. NaN velocity anywhere else still rejects the track.
+            finite_velocity = np.isfinite(velocity).all(axis=1)
+            if (~finite_velocity & ~series["jumps"]).any() or not finite_velocity.any():
                 continue
             if DROP_TRACKS_WITH_JUMPS and series["jumps"].any():
                 continue
@@ -279,13 +289,17 @@ def make_tracks(loaded_recordings):
             if np.nanmean(speed) <= MIN_MEAN_SPEED_MM_S or np.nanmax(speed) >= MAX_SPEED_MM_S:
                 continue
 
+            stored = {
+                name: values if name in ("time_s", "jumps") else values.astype(STORAGE_FLOAT_DTYPE)
+                for name, values in series.items()
+            }
             tracks.append(
                 {
                     "track_id": f"{source_file}::track{local_id}",
                     "source_file": source_file,
-                    "xy": xy,
-                    "velocity": velocity,
-                    **series,
+                    "xy": xy.astype(STORAGE_FLOAT_DTYPE),
+                    "velocity": velocity.astype(STORAGE_FLOAT_DTYPE),
+                    **stored,
                 }
             )
     return tracks
@@ -338,7 +352,9 @@ def load_tracks_from_database():
     for genotype_file, experiments in select_genotype_experiments().items():
         label = run_io.sanitize_label(Path(genotype_file).stem)
         genotype_tracks, genotype_recordings, _ = load_genotype_tracks(genotype_file, experiments)
-        tracks.extend({**track, "dataset_label": label} for track in genotype_tracks)
+        tracks.extend(
+            {**run_io.upcast_track(track), "dataset_label": label} for track in genotype_tracks
+        )
         recordings.append(genotype_recordings.assign(dataset_label=label))
         sources[label] = {
             "path": None,

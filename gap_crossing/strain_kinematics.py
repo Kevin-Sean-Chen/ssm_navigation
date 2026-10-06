@@ -89,7 +89,7 @@ PROFILE_QUANTITIES = {
     "speed": "Speed (mm/s)",
     "turn_rate": "Turn rate (deg/s)",
     "upwind_alignment": "Upwind alignment (cos)",
-    "in_signal": "P(in signal)",
+    "signal_present": "P(in signal)",
 }
 EVENT_TYPES = ["onset", "offset"]
 
@@ -120,13 +120,26 @@ def find_bouts(in_signal):
     return np.flatnonzero(change == 1), np.flatnonzero(change == -1)
 
 
+def fill_over_jumps(observed, jumps):
+    """Return observed values with each jump run filled by the last valid value."""
+    observed = np.asarray(observed, dtype=bool)
+    last_valid = np.maximum.accumulate(np.where(~jumps, np.arange(len(jumps)), -1))
+    return np.where(last_valid >= 0, observed[np.clip(last_valid, 0, None)], False)
+
+
 def describe_track(track):
-    """Return per-frame quantities for one track; jump frames become NaN."""
-    signal = np.nan_to_num(np.asarray(track["signal"], dtype=float), nan=0.0)
-    in_signal = signal > 0
+    """Return per-frame quantities for one track; jump frames become NaN.
+
+    Signal is NaN on jump frames. in_signal carries the last observed signal
+    state through each jump, so a jump does not create an exit and entry.
+    """
+    signal = np.asarray(track["signal"], dtype=float)
+    jumps = np.asarray(track["jumps"], dtype=bool)
+    observed = np.nan_to_num(signal, nan=0.0) > 0
+    in_signal = fill_over_jumps(observed, jumps)
     time_s = np.asarray(track["time_s"], dtype=float)
     velocity = np.asarray(track["velocity"], dtype=float)
-    valid = ~np.asarray(track["jumps"], dtype=bool)
+    valid = ~jumps
     heading = wrap_degrees(np.asarray(track["theta_smooth"], dtype=float) - UPWIND_HEADING_DEG)
     quantities = {
         "speed": np.asarray(track["speed_smooth"], dtype=float),
@@ -135,6 +148,7 @@ def describe_track(track):
         "heading_from_upwind": heading,
         "upwind_alignment": np.cos(np.radians(heading)),
         "turn_rate": np.abs(np.asarray(track["dtheta_smooth"], dtype=float)),
+        "signal_present": observed.astype(float),
     }
     for values in quantities.values():
         values[~valid] = np.nan
@@ -144,15 +158,20 @@ def describe_track(track):
         "in_signal": in_signal,
         "state": label_states(in_signal, time_s),
         "valid": valid,
-        "jumps": ~valid,
+        "jumps": jumps,
         **quantities,
     }
 
 
 # %% Bouts and intervals
 def make_track_bouts(frames, track_id):
-    """Return in-signal bouts and the out-of-signal intervals after them."""
+    """Return in-signal bouts and the out-of-signal intervals after them.
+
+    A bout edge next to the track end or a jump is censored. An interval stops
+    at the first jump frame and is then censored.
+    """
     starts, ends = find_bouts(frames["in_signal"])
+    jumps = frames["jumps"]
     frame_count = len(frames["in_signal"])
     bouts = [
         {
@@ -160,8 +179,8 @@ def make_track_bouts(frames, track_id):
             "bout_index": index,
             "start_time_s": frames["time_s"][start],
             "duration_s": (end - start) / FRAME_RATE_HZ,
-            "left_censored": start == 0,
-            "right_censored": end == frame_count,
+            "left_censored": start == 0 or bool(jumps[start - 1]),
+            "right_censored": end == frame_count or bool(jumps[end - 1]),
             "has_jump": bool(frames["jumps"][start:end].any()),
             "upwind_displacement_mm": frames["x"][start] - frames["x"][end - 1],
         }
@@ -169,14 +188,16 @@ def make_track_bouts(frames, track_id):
     ]
     intervals = []
     for index, end in enumerate(ends):
-        if end == frame_count:
+        if end == frame_count or jumps[end - 1]:
             continue
         next_start = starts[index + 1] if index + 1 < len(starts) else frame_count
+        jump_frames = np.flatnonzero(jumps[end:next_start])
+        stop = end + jump_frames[0] if len(jump_frames) else next_start
         intervals.append({
             "track_id": track_id,
             "after_bout_index": index,
-            "duration_s": (next_start - end) / FRAME_RATE_HZ,
-            "censored": index + 1 >= len(starts),
+            "duration_s": (stop - end) / FRAME_RATE_HZ,
+            "censored": index + 1 >= len(starts) or len(jump_frames) > 0,
         })
     return bouts, intervals
 
@@ -191,13 +212,20 @@ def get_profile_offsets():
     return offsets, offsets / FRAME_RATE_HZ
 
 
-def find_profile_events(in_signal):
-    """Return onset and offset frame indices used for triggered profiles."""
+def find_profile_events(in_signal, jumps=None):
+    """Return onset and offset frame indices used for triggered profiles.
+
+    Onsets need MIN_PRIOR_BLANK_S without signal or jumps before them. Events
+    whose timing is uncertain because of a jump are left out.
+    """
+    jumps = np.zeros(len(in_signal), dtype=bool) if jumps is None else np.asarray(jumps, dtype=bool)
     starts, ends = find_bouts(in_signal)
     blank_frames = int(round(MIN_PRIOR_BLANK_S * FRAME_RATE_HZ))
     previous_ends = np.r_[0, ends[:-1]]
-    onsets = starts[(starts > 0) & (starts - previous_ends >= blank_frames)]
-    offsets = ends[ends < len(in_signal)]
+    jump_count = np.r_[0, np.cumsum(jumps)]
+    clean_blank = jump_count[starts] - jump_count[np.clip(starts - blank_frames, 0, None)] == 0
+    onsets = starts[(starts > 0) & (starts - previous_ends >= blank_frames) & clean_blank]
+    offsets = ends[(ends < len(in_signal)) & ~jumps[np.clip(ends - 1, 0, None)]]
     return {"onset": onsets, "offset": offsets}
 
 
@@ -247,7 +275,7 @@ def _bout_metrics(frames, bouts, intervals, track_minutes):
     closed = intervals.loc[~intervals["censored"]] if len(intervals) else intervals
     entries = int((~bouts["left_censored"]).sum()) if len(bouts) else 0
     metrics = {
-        "signal_time_fraction": float(np.mean(frames["in_signal"])),
+        "signal_time_fraction": float(np.mean(frames["in_signal"][frames["valid"]])),
         "encounter_rate_per_min": entries / track_minutes if track_minutes > 0 else np.nan,
         "bout_count": len(bouts),
     }
@@ -289,7 +317,7 @@ def analyze_session(session, tracks):
         bouts, intervals = make_track_bouts(frames, track["track_id"])
         bout_rows.extend(bouts)
         interval_rows.extend(intervals)
-        for event, indices in find_profile_events(frames["in_signal"]).items():
+        for event, indices in find_profile_events(frames["in_signal"], frames["jumps"]).items():
             if not len(indices):
                 continue
             event_counts[event] += len(indices)
@@ -302,7 +330,7 @@ def analyze_session(session, tracks):
         name: np.concatenate([part[name] for part in frame_parts])
         for name in frame_parts[0]
     }
-    track_minutes = sum(len(part["time_s"]) for part in frame_parts) / FRAME_RATE_HZ / 60
+    track_minutes = sum(int(part["valid"].sum()) for part in frame_parts) / FRAME_RATE_HZ / 60
 
     state_rows = []
     histogram_rows = []

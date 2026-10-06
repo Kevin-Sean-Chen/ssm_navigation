@@ -50,6 +50,10 @@ MIN_POST_SPEED_SAMPLES = 30
 MOTIF_PERMUTATIONS = 1000
 MOTIF_RANDOM_SEED = 0
 MIN_TRANSITIONS_FOR_PHASE = 3
+# Skip attempts whose pre-signal or outcome window contains a tracking jump
+# (signal is NaN there). Attempt sequences are also split at each jump, so
+# within-track transitions never link attempts across a jump.
+EXCLUDE_ATTEMPTS_NEAR_JUMPS = True
 
 # Detection settings. Use these only with GAP_GEOMETRY_METHOD = "detected".
 GRID_MM = 0.2
@@ -627,6 +631,9 @@ def find_attempts(track, geometry):
     signal[~np.isfinite(signal)] = 0
     time_s = track["time_s"]
     velocity = track["velocity"]
+    jumps = np.asarray(track.get("jumps", np.zeros(len(time_s), dtype=bool)), dtype=bool)
+    # Segment k holds the frames after the k-th jump run starts.
+    segment = np.cumsum(np.r_[jumps[0], jumps[1:] & ~jumps[:-1]])
     rows = []
 
     for _, gap in geometry.iterrows():
@@ -646,13 +653,24 @@ def find_attempts(track, geometry):
             )
             if not len(past) or not np.any(signal[past] > 0):
                 continue
+            if EXCLUDE_ATTEMPTS_NEAR_JUMPS and jumps.any():
+                window = (time_s >= start_time) & (
+                    time_s <= time_s[attempt_index] + OUTCOME_S
+                )
+                if jumps[window].any():
+                    continue
 
             outcome, outcome_index = classify_outcome(
                 xy, signal, time_s, attempt_index, boundary_x
             )
+            sequence_id = (
+                f"{track['track_id']}::seg{segment[attempt_index]}"
+                if jumps.any() else track["track_id"]
+            )
             rows.append(
                 {
-                    "track_id": track["track_id"],
+                    "track_id": sequence_id,
+                    "parent_track_id": track["track_id"],
                     "source_file": track["source_file"],
                     "geometry_id": int(gap["geometry_id"]),
                     "ribbon_id": gap["ribbon_id"],

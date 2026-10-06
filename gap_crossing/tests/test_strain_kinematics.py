@@ -91,6 +91,48 @@ class BoutTests(unittest.TestCase):
         self.assertGreater(bouts[0]["upwind_displacement_mm"], 0)
 
 
+class JumpTests(unittest.TestCase):
+    """Check signal bouts and events around tracking jumps."""
+
+    def test_signal_state_carries_through_a_jump(self):
+        """A jump inside a bout does not split it into an exit and an entry."""
+        signal = np.array([0, 1, 1, np.nan, np.nan, 1, 0, 0], dtype=float)
+        jumps = np.isnan(signal)
+        frames = kinematics.describe_track(make_track(signal, jumps=jumps))
+
+        np.testing.assert_array_equal(frames["in_signal"], [0, 1, 1, 1, 1, 1, 0, 0])
+        self.assertTrue(np.isnan(frames["speed"][3]))
+        self.assertTrue(np.isnan(frames["signal_present"][3]))
+        self.assertEqual(frames["signal_present"][5], 1.0)
+
+    def test_bout_and_interval_edges_at_jumps_are_censored(self):
+        """Bout edges next to a jump are censored; intervals stop at the jump."""
+        signal = np.array([0, 1, 1, 0, 0, np.nan, 0, 1, 0, 0], dtype=float)
+        jumps = np.isnan(signal)
+        frames = kinematics.describe_track(make_track(signal, jumps=jumps))
+
+        bouts, intervals = kinematics.make_track_bouts(frames, "track")
+
+        self.assertEqual([bout["left_censored"] for bout in bouts], [False, False])
+        self.assertEqual(
+            [(interval["duration_s"] * kinematics.FRAME_RATE_HZ, interval["censored"]) for interval in intervals],
+            [(2.0, True), (2.0, True)],
+        )
+
+    def test_profile_events_skip_jumps(self):
+        """Onsets with a jump in the blank period and offsets at jumps are dropped."""
+        blank = int(kinematics.MIN_PRIOR_BLANK_S * kinematics.FRAME_RATE_HZ)
+        in_signal = np.r_[np.zeros(blank), np.ones(5), np.zeros(blank), np.ones(5), np.zeros(5)].astype(bool)
+        jumps = np.zeros(len(in_signal), dtype=bool)
+        jumps[blank + 5 + 3] = True
+        jumps[blank + 4] = True
+
+        events = kinematics.find_profile_events(in_signal, jumps)
+
+        np.testing.assert_array_equal(events["onset"], [blank])
+        np.testing.assert_array_equal(events["offset"], [2 * blank + 10])
+
+
 class DurationBinTests(unittest.TestCase):
     """Check frame-aligned duration bins."""
 

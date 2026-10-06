@@ -16,6 +16,68 @@ from gap_crossing.gap_cross_track import (
 )
 
 
+def make_two_attempt_track(jump_frames=()):
+    """Return a track that crosses a loss edge at x=100 twice, after odor."""
+    frame_count = 3600
+    time_s = np.arange(frame_count) / analysis.FRAME_RATE_HZ
+    x = np.full(frame_count, 105.0)
+    x[600:1200] = 95.0
+    x[2400:3000] = 95.0
+    signal = np.zeros(frame_count)
+    signal[300:600] = 1.0
+    signal[2100:2400] = 1.0
+    jumps = np.zeros(frame_count, dtype=bool)
+    jumps[list(jump_frames)] = True
+    signal[jumps] = np.nan
+    return {
+        "track_id": "rec::track0",
+        "source_file": "rec",
+        "xy": np.column_stack([x, np.zeros(frame_count)]),
+        "signal": signal,
+        "time_s": time_s,
+        "velocity": np.zeros((frame_count, 2)),
+        "speed_smooth": np.ones(frame_count),
+        "jumps": jumps,
+    }
+
+
+TWO_ATTEMPT_GEOMETRY = pd.DataFrame([{
+    "geometry_id": 0, "ribbon_id": 0, "gap_id": 0, "gap_label": "R1-G1",
+    "loss_edge_x_mm": 100.0, "ribbon_center_y_mm": np.nan,
+}])
+
+
+class JumpAttemptTests(unittest.TestCase):
+    """Check attempt handling around tracking jumps."""
+
+    def test_track_without_jumps_keeps_one_sequence(self):
+        """Without jumps, attempts share the original track id."""
+        rows = analysis.find_attempts(make_two_attempt_track(), TWO_ATTEMPT_GEOMETRY)
+
+        self.assertEqual([row["attempt_index"] for row in rows], [599, 2399])
+        self.assertEqual({row["track_id"] for row in rows}, {"rec::track0"})
+
+    def test_jump_between_attempts_splits_the_sequence(self):
+        """Attempts on either side of a jump are not consecutive."""
+        rows = analysis.find_attempts(
+            make_two_attempt_track(range(1500, 1560)), TWO_ATTEMPT_GEOMETRY
+        )
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(
+            [row["track_id"] for row in rows], ["rec::track0::seg0", "rec::track0::seg1"]
+        )
+        self.assertEqual({row["parent_track_id"] for row in rows}, {"rec::track0"})
+
+    def test_jump_inside_an_attempt_window_excludes_the_attempt(self):
+        """An attempt whose outcome window has a jump is skipped."""
+        rows = analysis.find_attempts(
+            make_two_attempt_track(range(700, 710)), TWO_ATTEMPT_GEOMETRY
+        )
+
+        self.assertEqual([row["attempt_index"] for row in rows], [2399])
+
+
 class RobustGapBoundaryTests(unittest.TestCase):
     """Check that sparse signal points do not move a gap boundary."""
 
