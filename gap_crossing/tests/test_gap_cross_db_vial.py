@@ -1,7 +1,6 @@
 """Tests for session-scale gap-crossing learning summaries."""
 
 from copy import deepcopy
-from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -13,6 +12,15 @@ import pandas as pd
 
 
 from gap_crossing import gap_cross_db_vial as vial_analysis
+
+
+DATASET_METADATA = {
+    "empty": {
+        "path": "datasets/2026-10-06_120000_gap_ribbon_empty",
+        "query": {"query_filters": {"genotype_file": "GMOCLKir_empty.yaml"}},
+        "params": {"min_track_s": 10},
+    }
+}
 
 
 def make_events(session_trials):
@@ -90,19 +98,6 @@ class TrialLearningTests(unittest.TestCase):
 class TrackExportTests(unittest.TestCase):
     """Check the collaborator track export."""
 
-    def test_timestamped_track_path_keeps_date_and_time(self):
-        """A new run gets a readable timestamp in its export name."""
-        timestamp = datetime(2026, 9, 29, 14, 35, 6)
-
-        output_path = vial_analysis.make_timestamped_track_path(timestamp)
-
-        self.assertEqual(
-            output_path,
-            Path("saved_data")
-            / "gap_cross"
-            / "gap_crossing_tracks_2026-09-29_14-35-06.joblib",
-        )
-
     @staticmethod
     def make_valid_export():
         """Return one valid export for validation and save tests."""
@@ -121,7 +116,7 @@ class TrackExportTests(unittest.TestCase):
                 "outcome": ["regain", "cross"],
             }
         )
-        return vial_analysis.make_track_export(tracks, events)
+        return vial_analysis.make_track_export(tracks, events, DATASET_METADATA)
 
     def test_export_contains_query_parameters_and_retained_track_arrays(self):
         """The export keeps only tracks that have retained attempts."""
@@ -147,24 +142,14 @@ class TrackExportTests(unittest.TestCase):
             }
         )
 
-        export = vial_analysis.make_track_export(tracks, events)
+        export = vial_analysis.make_track_export(tracks, events, DATASET_METADATA)
 
         self.assertEqual(set(export), {"metadata", "tracks"})
-        self.assertEqual(
-            export["metadata"]["query"],
-            {
-                "database_location": vial_analysis.pooled.DATABASE_LOCATION,
-                "data_location": vial_analysis.pooled.DATA_LOCATION,
-                "query_filters": vial_analysis.pooled.QUERY_FILTERS,
-                "query_periods": vial_analysis.pooled.QUERY_PERIODS,
-                "max_experiments": vial_analysis.pooled.MAX_EXPERIMENTS,
-            },
-        )
+        self.assertEqual(export["metadata"]["datasets"], DATASET_METADATA)
         self.assertEqual(
             export["metadata"]["analysis_parameters"],
             {
                 "frame_rate_hz": vial_analysis.analysis.FRAME_RATE_HZ,
-                "min_track_s": vial_analysis.analysis.MIN_TRACK_S,
                 "pre_signal_s": vial_analysis.analysis.PRE_SIGNAL_S,
                 "outcome_s": vial_analysis.analysis.OUTCOME_S,
                 "distance_mm": vial_analysis.analysis.DISTANCE_MM,

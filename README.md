@@ -38,14 +38,28 @@ $env:OPTOGUI_ROOT = (Resolve-Path ..\optogui).Path
 
 Create the local `parameter_files/computer/settings.yaml` file that selects the computer profile. The profile defines the read-only server database and data paths.
 
-Run the database-backed gap analysis from this repository:
+Gap-crossing analysis has two stages. Each run writes a new timestamped folder under `gap_crossing/` in the Dropbox `projects/optogui` folder (set `GAP_CROSSING_OUTPUT_ROOT` to use another root). Runs never replace or delete files.
+
+**1. Load datasets from the database.** Edit `GENOTYPE_FILES`, `QUERY_FILTERS`, `QUERY_PERIODS`, and the track filters in `gap_crossing/load_db.py`, then run:
 
 ```powershell
 conda activate ssm_navigation
 $env:OPTOGUI_ROOT = (Resolve-Path ..\optogui).Path
-python .\gap_crossing\gap_cross_db.py
+python .\gap_crossing\load_db.py
 ```
 
-For day-vial motif uncertainty, run `python .\gap_crossing\gap_cross_db_vial.py`.
+Each genotype gets one folder in `datasets/` with the processed tracks (`tracks.joblib`), recording and experiment tables, the query (`query.json`), track filters (`params.json`), provenance (git and optogui commits, package versions), a code snapshot with any uncommitted diff, and the console log. The script prints `DATASET_DIRS` lines to paste into analysis scripts.
 
-Edit `QUERY_FILTERS` in `gap_crossing/gap_cross_db.py` before each analysis. The current filters match the July 2026 gap-ribbon query in the Dropbox analysis example.
+**2. Analyze saved datasets.** Set `DATASET_DIRS` (label to dataset folder) at the top of an analysis script, then run it:
+
+```powershell
+python .\gap_crossing\gap_cross_db.py
+python .\gap_crossing\gap_cross_db_vial.py
+python -m gap_crossing.memory_analysis.gap_cross_db_memory
+```
+
+Each analysis writes a folder in `analyses/` with figures, tables, exports, all uppercase settings (`params.json`), and provenance that points to its datasets.
+
+`gap_cross_db.py` and `gap_cross_db_vial.py` also accept `DATA_SOURCE = "database"`. That mode queries and loads with the settings in `load_db.py`, then plots, and saves nothing.
+
+Activate the environment (`conda activate ssm_navigation`) before running. Calling the environment's `python.exe` without activation can load the wrong DLLs and crash Matplotlib. Datasets combine only when their query and track filters match apart from `genotype_file` and their recordings share one camera setup.

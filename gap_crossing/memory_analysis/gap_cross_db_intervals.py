@@ -1,6 +1,8 @@
 """Test serial correlation between gap-crossing decision intervals."""
 
 from dataclasses import dataclass
+from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
@@ -8,6 +10,11 @@ from scipy.stats import spearmanr
 
 from gap_crossing import gap_cross_db as pooled
 from gap_crossing import gap_cross_track as analysis
+from gap_crossing import run_io
+
+
+# Label -> dataset folder written by load_db.py.
+DATASET_DIRS: dict[str, Path] = {}
 
 
 INTERVAL_COLUMNS = ["track_id", "interval_number", "interval_s"]
@@ -304,55 +311,52 @@ def plot_interval_correlation(
 
 
 def run() -> None:
-    """Query recordings and plot decision-interval serial correlation."""
-    experiments = pooled.select_experiments()
-    print(f"Database records: {len(experiments)}")
-    loaded_recordings, failed_experiments = pooled.load_recordings(experiments)
-    print(f"Loaded recordings: {len(loaded_recordings)}")
-    print(f"Failed recordings: {len(failed_experiments)}")
-    if not failed_experiments.empty:
-        print(failed_experiments.to_string(index=False))
+    """Load saved datasets and plot decision-interval serial correlation."""
+    settings_modules = [analysis, sys.modules[__name__]]
+    with run_io.analysis_run(__file__, DATASET_DIRS, settings_modules) as run_info:
+        tracks = run_info.tracks
+        print(f"Valid tracks: {len(tracks)}")
+        if not tracks:
+            raise RuntimeError("No valid tracks in DATASET_DIRS.")
 
-    tracks = pooled.make_tracks(loaded_recordings)
-    print(f"Valid tracks: {len(tracks)}")
-    if not tracks:
-        raise RuntimeError("No valid tracks. Check QUERY_FILTERS and matrix fields.")
+        _, events = pooled.make_events(tracks, run_info.recordings)
+        run_info.save_table("events", events)
+        intervals = make_interval_table(events)
+        pairs = make_adjacent_pair_table(intervals)
+        run_info.save_table("intervals", intervals)
+        run_info.save_table("adjacent_pairs", pairs)
+        print(f"Decision intervals: {len(intervals)}")
+        print(f"Adjacent interval pairs: {len(pairs)}")
 
-    geometry = analysis.get_gap_geometry(tracks)
-    events = analysis.make_event_table(tracks, geometry)
-    intervals = make_interval_table(events)
-    pairs = make_adjacent_pair_table(intervals)
-    print(f"Decision intervals: {len(intervals)}")
-    print(f"Adjacent interval pairs: {len(pairs)}")
-
-    result = analyze_interval_correlation(
-        intervals,
-        permutation_count=PERMUTATION_COUNT,
-        random_seed=RANDOM_SEED,
-    )
-    track_results = analyze_track_correlations(
-        intervals,
-        min_pair_count=MIN_TRACK_PAIR_COUNT,
-        permutation_count=PERMUTATION_COUNT,
-        random_seed=RANDOM_SEED,
-    )
-    print(f"Observed Spearman rho: {result.observed_rho:.6f}")
-    print(f"Shuffled median rho: {result.null_median_rho:.6f}")
-    print(f"Excess rho: {result.excess_rho:.6f}")
-    print(f"Finite permutations: {len(result.null_rho)}")
-    print(f"Permutation p value: {result.p_value:.6f}")
-    print(
-        f"Tracks with valid estimates (at least {MIN_TRACK_PAIR_COUNT} pairs): "
-        f"{len(track_results)}"
-    )
-    if not track_results.empty:
-        print(f"Median track excess rho: {track_results['excess_rho'].median():.6f}")
-        print(
-            "Tracks with positive excess rho: "
-            f"{track_results['excess_rho'].gt(0).mean():.1%}"
+        result = analyze_interval_correlation(
+            intervals,
+            permutation_count=PERMUTATION_COUNT,
+            random_seed=RANDOM_SEED,
         )
-    plot_interval_correlation(intervals, result, track_results)
-    analysis.plt.show()
+        track_results = analyze_track_correlations(
+            intervals,
+            min_pair_count=MIN_TRACK_PAIR_COUNT,
+            permutation_count=PERMUTATION_COUNT,
+            random_seed=RANDOM_SEED,
+        )
+        run_info.save_table("track_correlations", track_results)
+        print(f"Observed Spearman rho: {result.observed_rho:.6f}")
+        print(f"Shuffled median rho: {result.null_median_rho:.6f}")
+        print(f"Excess rho: {result.excess_rho:.6f}")
+        print(f"Finite permutations: {len(result.null_rho)}")
+        print(f"Permutation p value: {result.p_value:.6f}")
+        print(
+            f"Tracks with valid estimates (at least {MIN_TRACK_PAIR_COUNT} pairs): "
+            f"{len(track_results)}"
+        )
+        if not track_results.empty:
+            print(f"Median track excess rho: {track_results['excess_rho'].median():.6f}")
+            print(
+                "Tracks with positive excess rho: "
+                f"{track_results['excess_rho'].gt(0).mean():.1%}"
+            )
+        plot_interval_correlation(intervals, result, track_results)
+        run_info.show()
 
 
 if __name__ == "__main__":

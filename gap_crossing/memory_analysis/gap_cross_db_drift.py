@@ -1,6 +1,8 @@
 """Compare fixed, Markov, and crossing-history gap-crossing models."""
 
 from dataclasses import dataclass
+from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
@@ -8,7 +10,12 @@ from sklearn.linear_model import LogisticRegression
 
 from gap_crossing import gap_cross_db as pooled
 from gap_crossing import gap_cross_track as analysis
+from gap_crossing import run_io
 from gap_crossing.memory_analysis.gap_cross_db_entropy import SESSION_FIELDS
+
+
+# Label -> dataset folder written by load_db.py.
+DATASET_DIRS: dict[str, Path] = {}
 
 
 CURRENT_FEATURE_OUTCOMES = ["regain", "abort"]
@@ -436,29 +443,23 @@ def plot_cross_fraction_probabilities(events):
 
 
 def run():
-    """Query recordings and compare fixed, Markov, and history models."""
-    experiments = pooled.select_experiments()
-    print(f"Database records: {len(experiments)}")
-    loaded_recordings, failed_experiments = pooled.load_recordings(experiments)
-    print(f"Loaded recordings: {len(loaded_recordings)}")
-    print(f"Failed recordings: {len(failed_experiments)}")
-    if not failed_experiments.empty:
-        print(failed_experiments.to_string(index=False))
-    tracks = pooled.make_tracks(loaded_recordings)
-    if not tracks:
-        raise RuntimeError("No valid tracks. Check QUERY_FILTERS and matrix fields.")
+    """Load saved datasets and compare fixed, Markov, and history models."""
+    settings_modules = [analysis, sys.modules[__name__]]
+    with run_io.analysis_run(__file__, DATASET_DIRS, settings_modules) as run_info:
+        tracks = run_info.tracks
+        print(f"Valid tracks: {len(tracks)}")
+        if not tracks:
+            raise RuntimeError("No valid tracks in DATASET_DIRS.")
 
-    geometry = analysis.get_gap_geometry(tracks)
-    events = analysis.make_event_table(tracks, geometry)
-    events = events.merge(
-        pooled.make_recording_metadata(loaded_recordings), on="source_file"
-    )
-    print(f"Day-vial sessions: {events.groupby(SESSION_FIELDS).ngroups}")
-    raw_scores = evaluate_leave_one_session_out(events)
-    plot_model_comparison(raw_scores=raw_scores)
-    plot_fitted_parameters(events)
-    plot_cross_fraction_probabilities(events)
-    analysis.plt.show()
+        _, events = pooled.make_events(tracks, run_info.recordings)
+        run_info.save_table("events", events)
+        print(f"Day-vial sessions: {events.groupby(SESSION_FIELDS).ngroups}")
+        raw_scores = evaluate_leave_one_session_out(events)
+        run_info.save_table("model_scores", raw_scores)
+        plot_model_comparison(raw_scores=raw_scores)
+        plot_fitted_parameters(events)
+        plot_cross_fraction_probabilities(events)
+        run_info.show()
 
 
 if __name__ == "__main__":

@@ -1,14 +1,20 @@
 """Gap-crossing outcome variability across day-vial sessions.
 
-This script uses the same database query as gap_cross_db. Each unique day and
-vial is one sample. Error bars are bootstrap 95% confidence intervals across
-these sessions.
+Each unique day and vial is one sample. Error bars are bootstrap 95% confidence
+intervals across these sessions.
+
+Set DATA_SOURCE to choose where tracks come from:
+    "dataset":  read saved dataset folders in DATASET_DIRS (run load_db.py
+                first). Each run writes an analysis folder with figures,
+                tables, provenance, and the track export.
+    "database": query and load with the settings in load_db.py, then plot.
+                Nothing is saved; the track export is validated only.
 """
 
 from copy import deepcopy
-from datetime import datetime
 from itertools import product
 from pathlib import Path
+import sys
 
 import joblib
 import numpy as np
@@ -22,15 +28,13 @@ except ModuleNotFoundError:
     import gap_cross_track as analysis
 
 
-def make_timestamped_track_path(timestamp: datetime | None = None) -> Path:
-    """Return the track-export path with the run date and time."""
-    timestamp = datetime.now() if timestamp is None else timestamp
-    filename = f"gap_crossing_tracks_{timestamp:%Y-%m-%d_%H-%M-%S}.joblib"
-    return Path("saved_data") / "gap_cross" / filename
-
-
-# SAVE_TRACKS_PATH: Path | None = None
-SAVE_TRACKS_PATH = make_timestamped_track_path()
+# %% Data source settings
+DATA_SOURCE = "dataset"  # "dataset" or "database"
+# Label -> dataset folder written by load_db.py. Used when DATA_SOURCE is "dataset".
+DATASET_DIRS: dict[str, Path] = {}
+# Write the collaborator track export into the analysis exports folder.
+SAVE_TRACK_EXPORT = True
+TRACK_EXPORT_FILENAME = "gap_crossing_tracks.joblib"
 
 SESSION_FIELDS = [
     "recording_year",
@@ -45,7 +49,9 @@ MOTIFS_PER_TAIL = 6
 TRIAL_WINDOW_SIZE = 3
 
 
-def make_track_export(tracks: list[dict], events: pd.DataFrame) -> dict:
+def make_track_export(
+    tracks: list[dict], events: pd.DataFrame, dataset_metadata: dict[str, dict]
+) -> dict:
     """Return continuous samples and ordered attempts for retained tracks."""
     events_by_track = {
         track_id: track_events.sort_values("attempt_time_s", kind="stable")
@@ -74,16 +80,9 @@ def make_track_export(tracks: list[dict], events: pd.DataFrame) -> dict:
 
     return {
         "metadata": {
-            "query": {
-                "database_location": pooled.DATABASE_LOCATION,
-                "data_location": pooled.DATA_LOCATION,
-                "query_filters": deepcopy(pooled.QUERY_FILTERS),
-                "query_periods": deepcopy(pooled.QUERY_PERIODS),
-                "max_experiments": pooled.MAX_EXPERIMENTS,
-            },
+            "datasets": deepcopy(dataset_metadata),
             "analysis_parameters": {
                 "frame_rate_hz": analysis.FRAME_RATE_HZ,
-                "min_track_s": analysis.MIN_TRACK_S,
                 "pre_signal_s": analysis.PRE_SIGNAL_S,
                 "outcome_s": analysis.OUTCOME_S,
                 "distance_mm": analysis.DISTANCE_MM,
@@ -469,31 +468,29 @@ def plot_session_motif_scores(events):
 
 
 def run():
-    """Query, load, and summarize the selected recordings by day-vial session."""
-    experiments = pooled.select_experiments()
-    print(f"Database records: {len(experiments)}")
-    loaded_recordings, failed_experiments = pooled.load_recordings(experiments)
-    print(f"Loaded recordings: {len(loaded_recordings)}")
-    print(f"Failed recordings: {len(failed_experiments)}")
-    if not failed_experiments.empty:
-        print(failed_experiments.to_string(index=False))
-    tracks = pooled.make_tracks(loaded_recordings)
-    if not tracks:
-        raise RuntimeError("No valid tracks. Check QUERY_FILTERS and matrix fields.")
+    """Load tracks and summarize them by day-vial session."""
+    settings_modules = [analysis, sys.modules[__name__]]
+    with pooled.open_run(__file__, DATA_SOURCE, DATASET_DIRS, settings_modules) as run_info:
+        tracks = run_info.tracks
+        if not tracks:
+            raise RuntimeError("No valid tracks.")
 
-    geometry = analysis.get_gap_geometry(tracks)
-    events = analysis.make_event_table(tracks, geometry)
-    events = events.merge(pooled.make_recording_metadata(loaded_recordings), on="source_file")
-    track_export = make_track_export(tracks, events)
-    save_track_export(track_export, SAVE_TRACKS_PATH)
-    summary = make_session_summary(events)
-    print(f"Day-vial sessions: {summary['session_id'].nunique()}")
+        geometry, events = pooled.make_events(tracks, run_info.recordings)
+        track_export = make_track_export(tracks, events, run_info.sources)
+        export_path = (
+            run_info.export_path(TRACK_EXPORT_FILENAME) if SAVE_TRACK_EXPORT else None
+        )
+        save_track_export(track_export, export_path)
+        summary = make_session_summary(events)
+        run_info.save_table("events", events)
+        run_info.save_table("session_summary", summary)
+        print(f"Day-vial sessions: {summary['session_id'].nunique()}")
 
-    analysis.plot_gap_geometry(tracks, geometry)
-    plot_trial_regain_cross_summary(events)
-    plot_first_last_trial_transition_matrices(events)
-    plot_session_motif_scores(events)
-    analysis.plt.show()
+        analysis.plot_gap_geometry(tracks, geometry)
+        plot_trial_regain_cross_summary(events)
+        plot_first_last_trial_transition_matrices(events)
+        plot_session_motif_scores(events)
+        run_info.show()
 
 
 if __name__ == "__main__":
