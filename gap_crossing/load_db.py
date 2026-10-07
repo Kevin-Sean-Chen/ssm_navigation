@@ -31,8 +31,9 @@ DATASET_LABEL = "gap_ribbon"
 GENOTYPE_FILES = [
     "GMOCLKir_empty.yaml",
     "GMOCLKir_FC2.yaml",
-    # "GMOCLKir_86861.yaml",
-    # "117_GMUCR.yaml",
+    "GMOCLKir_86861.yaml",
+    "GMOCLKir_89256.yaml",
+    "117_GMUCR.yaml",
     # "OCLKir_GMUCR.yaml",
 ]
 DATABASE_LOCATION = "server"
@@ -44,8 +45,8 @@ QUERY_FILTERS = {
 }
 QUERY_PERIODS = [
     # {"year": 2025, "month": [12]},
-    # {"year": 2026, "month": [5, 6, 7, 8, 9]},
-    {"year": 2026, "month": [8], }#"day": [19]},
+    {"year": 2026, "month": [7, 8, 9, 10]},
+    # {"year": 2026, "month": [8], "day": [20]},
 ]
 MAX_EXPERIMENTS = None
 

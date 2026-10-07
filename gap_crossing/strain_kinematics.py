@@ -6,8 +6,10 @@ dataset folders. Each frame is in one state:
     post_signal: no signal, at most POST_SIGNAL_S after the last signal exit.
     baseline:    no signal, longer since the last exit or never in signal.
 
-Every metric is computed per day-vial session, then strains are compared
-across sessions. Upwind is -x; theta_smooth of an upwind-moving fly is 180 deg.
+Every metric is computed per sampling unit: a day-vial session, or a block
+of TRIALS_PER_BLOCK consecutive trials within a session (SAMPLE_UNIT). Either
+way, confidence intervals and p values treat sessions as the independent
+samples. Upwind is -x; theta_smooth of an upwind-moving fly is 180 deg.
 """
 
 from pathlib import Path
@@ -27,7 +29,14 @@ except ModuleNotFoundError:
 
 # %% Dataset settings
 # Strain label -> dataset folder written by load_db.py.
-DATASET_DIRS: dict[str, Path] = {}
+# DATASET_DIRS: dict[str, Path] = {}
+DATASET_DIRS: dict[str, Path] = {
+    "GMOCLKir_empty": Path(r"C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\projects\optogui\gap_crossing\datasets\2026-10-06_182613_gap_ribbon_GMOCLKir_empty"),
+    "GMOCLKir_FC2": Path(r"C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\projects\optogui\gap_crossing\datasets\2026-10-06_182613_gap_ribbon_GMOCLKir_FC2"),
+    "GMOCLKir_86861": Path(r"C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\projects\optogui\gap_crossing\datasets\2026-10-06_182613_gap_ribbon_GMOCLKir_86861"),
+    "GMOCLKir_89256": Path(r"C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\projects\optogui\gap_crossing\datasets\2026-10-06_182613_gap_ribbon_GMOCLKir_89256"),
+    "117_GMUCR": Path(r"C:\Users\ksc75\Yale University Dropbox\users\kevin_chen\projects\optogui\gap_crossing\datasets\2026-10-06_182613_gap_ribbon_117_GMUCR"),
+}
 REFERENCE_LABEL = None  # None uses the first DATASET_DIRS label.
 
 # %% Analysis settings
@@ -47,6 +56,16 @@ PROFILE_BOOTSTRAP_SAMPLES = 2_000
 PERMUTATION_COUNT = 10_000
 RANDOM_SEED = 0
 
+# %% Sampling unit
+# "session": one dot per day-vial session, all trials pooled.
+# "block": one dot per TRIALS_PER_BLOCK consecutive trials of a session. Blocks
+# of one session are resampled within that session and keep their strain label
+# together, so they show within-vial spread without adding independent samples.
+SAMPLE_UNIT = "block" #"session"
+TRIALS_PER_BLOCK = 5
+MIN_BLOCK_TRIALS = 3  # A shorter last block joins the block before it (17 trials -> 5, 5, 7).
+SAMPLE_UNITS = ("session", "block")
+
 STATES = ["in_signal", "post_signal", "baseline"]
 FRAME_METRIC_BINS = {
     "speed": ("Speed (mm/s)", np.linspace(0, 30, 61)),
@@ -54,6 +73,8 @@ FRAME_METRIC_BINS = {
     "heading_from_upwind": ("Heading from upwind (deg)", np.linspace(-180, 180, 37)),
     "turn_rate": ("Turn rate (deg/s)", np.linspace(0, 500, 51)),
 }
+# Distribution rows drawn with a log y-axis (empty bins are not drawn).
+LOG_Y_METRICS = ("speed", "upwind_velocity")
 STATE_METRIC_LABELS = {
     "time_fraction": "Fraction of tracked time",
     "speed_median": "Median speed (mm/s)",
@@ -298,9 +319,12 @@ def _bout_metrics(frames, bouts, intervals, track_minutes):
     return metrics
 
 
+UNIT_COLUMNS = [*compare.SESSION_KEYS, "session_id", "unit_id", "block", "block_trials"]
+
+
 def analyze_session(session, tracks):
-    """Return all per-session tables for one session."""
-    session_values = {key: session[key] for key in [*compare.SESSION_KEYS, "session_id"]}
+    """Return all tables for one sampling unit (a session or a trial block)."""
+    session_values = {key: session[key] for key in UNIT_COLUMNS}
     offsets, profile_times = get_profile_offsets()
     frame_parts = []
     bout_rows = []
@@ -404,13 +428,27 @@ def analyze_session(session, tracks):
     }
 
 
-def analyze_sessions(tracks, recordings):
-    """Return per-session tables for every session, concatenated."""
-    sessions = compare.group_tracks_by_session(tracks, recordings)
+def get_trials_per_block():
+    """Return TRIALS_PER_BLOCK in block mode and None in session mode."""
+    if SAMPLE_UNIT not in SAMPLE_UNITS:
+        raise ValueError(f"SAMPLE_UNIT must be one of {SAMPLE_UNITS}, not {SAMPLE_UNIT!r}.")
+    return TRIALS_PER_BLOCK if SAMPLE_UNIT == "block" else None
+
+
+def get_unit_label():
+    """Return the plural name of one plotted dot."""
+    return "sessions" if SAMPLE_UNIT == "session" else f"{TRIALS_PER_BLOCK}-trial blocks"
+
+
+def analyze_units(tracks, recordings):
+    """Return tables for every sampling unit, concatenated."""
+    units = compare.group_tracks_by_unit(
+        tracks, recordings, get_trials_per_block(), MIN_BLOCK_TRIALS
+    )
     parts = {}
-    for session_id, (session, session_tracks) in sessions.items():
-        print(f"Session {session_id}: {len(session_tracks)} tracks")
-        for name, table in analyze_session(session, session_tracks).items():
+    for unit_id, (unit, unit_tracks) in units.items():
+        print(f"{unit_id}: {len(unit_tracks)} tracks, {unit['block_trials']} trials")
+        for name, table in analyze_session(unit, unit_tracks).items():
             parts.setdefault(name, []).append(table)
     return {name: pd.concat(tables, ignore_index=True) for name, tables in parts.items()}
 
@@ -419,22 +457,23 @@ def summarize(tables, rng):
     """Return strain summaries of the session tables."""
     return {
         "state_metrics": compare.summarize_by_strain(
-            tables["state_metrics"], "value", ["state", "metric"], rng, BOOTSTRAP_SAMPLES
+            tables["state_metrics"], "value", ["state", "metric"], rng, BOOTSTRAP_SAMPLES,
+            "session_id",
         ),
         "state_histograms": compare.summarize_by_strain(
             tables["state_histograms"], "fraction", ["state", "metric", "bin_center"],
-            rng, PROFILE_BOOTSTRAP_SAMPLES,
+            rng, PROFILE_BOOTSTRAP_SAMPLES, "session_id",
         ),
         "bout_metrics": compare.summarize_by_strain(
-            tables["bout_metrics"], "value", ["metric"], rng, BOOTSTRAP_SAMPLES
+            tables["bout_metrics"], "value", ["metric"], rng, BOOTSTRAP_SAMPLES, "session_id",
         ),
         "duration_histograms": compare.summarize_by_strain(
             tables["duration_histograms"], "fraction", ["metric", "bin_center"],
-            rng, PROFILE_BOOTSTRAP_SAMPLES,
+            rng, PROFILE_BOOTSTRAP_SAMPLES, "session_id",
         ),
         "profiles": compare.summarize_by_strain(
             tables["profiles"], "value", ["event", "quantity", "time_s"],
-            rng, PROFILE_BOOTSTRAP_SAMPLES,
+            rng, PROFILE_BOOTSTRAP_SAMPLES, "session_id",
         ),
     }
 
@@ -442,12 +481,13 @@ def summarize(tables, rng):
 def compare_strains(tables, reference, rng):
     """Return reference comparisons for the scalar session metrics."""
     state = compare.compare_to_reference(
-        tables["state_metrics"], "value", reference, ["state", "metric"], rng, PERMUTATION_COUNT
+        tables["state_metrics"], "value", reference, ["state", "metric"], rng, PERMUTATION_COUNT,
+        "session_id",
     )
     bout_metrics = tables["bout_metrics"]
     bout = compare.compare_to_reference(
         bout_metrics.loc[~bout_metrics["metric"].isin(UNTESTED_METRICS)],
-        "value", reference, ["metric"], rng, PERMUTATION_COUNT,
+        "value", reference, ["metric"], rng, PERMUTATION_COUNT, "session_id",
     )
     comparisons = pd.concat(
         [state.assign(table="state_metrics"), bout.assign(table="bout_metrics")],
@@ -455,6 +495,16 @@ def compare_strains(tables, reference, rng):
     )
     comparisons["q_value"] = compare.benjamini_hochberg(comparisons["p_value"])
     return comparisons
+
+
+def make_variance_components(tables):
+    """Return between- and within-session spread of the scalar unit metrics."""
+    state = compare.variance_components(tables["state_metrics"], "value", ["state", "metric"])
+    bout = compare.variance_components(tables["bout_metrics"], "value", ["metric"])
+    return pd.concat(
+        [state.assign(table="state_metrics"), bout.assign(table="bout_metrics")],
+        ignore_index=True,
+    )
 
 
 # %% Plots
@@ -465,12 +515,17 @@ def plot_state_distributions(summary, order, colors):
         for column, state in enumerate(STATES):
             axis = axes[row, column]
             subset = summary.loc[(summary["metric"] == metric) & (summary["state"] == state)]
+            if metric in LOG_Y_METRICS:
+                axis.set_yscale("log", nonpositive="mask")
             compare.plot_strain_curves(axis, subset, "bin_center", order, colors)
             axis.set(xlabel=label, ylabel="Fraction of frames" if column == 0 else None)
             if row == 0:
                 axis.set_title(state.replace("_", " "))
     axes[0, 0].legend(fontsize=9)
-    fig.suptitle("Kinematic distributions by signal state (mean of sessions, 95% CI)")
+    fig.suptitle(
+        f"Kinematic distributions by signal state (mean of {get_unit_label()}, 95% CI); "
+        "upwind velocity > 0 is toward the source"
+    )
     fig.tight_layout()
     return fig
 
@@ -491,7 +546,7 @@ def plot_state_metrics(session_metrics, summary, order, colors):
         if metric == "upwind_velocity_mean":
             axis.axhline(0, color="0.6", lw=1)
     axes[0, 0].legend(fontsize=9)
-    fig.suptitle("Session metrics by signal state (dots: sessions; bars: 95% CI)")
+    fig.suptitle(f"Metrics by signal state (dots: {get_unit_label()}; bars: 95% CI over sessions)")
     fig.tight_layout()
     return fig
 
@@ -517,7 +572,7 @@ def plot_bout_metrics(session_metrics, summary, duration_summary, order, colors)
             "value", order, colors,
         )
         axis.set(ylabel=BOUT_METRIC_LABELS[metric])
-    fig.suptitle("Signal bouts and encounters (dots: sessions; bars: 95% CI)")
+    fig.suptitle(f"Signal bouts and encounters (dots: {get_unit_label()}; bars: 95% CI over sessions)")
     fig.tight_layout()
     return fig
 
@@ -531,7 +586,7 @@ def plot_profiles(summary, event, order, colors):
         axis.axvline(0, color="0.5", lw=1, ls="--")
         axis.set(xlabel=f"Time from signal {event} (s)", ylabel=label)
     axes[0, 0].legend(fontsize=9)
-    fig.suptitle(f"Signal {event} response (mean of sessions, 95% CI)")
+    fig.suptitle(f"Signal {event} response (mean of {get_unit_label()}, 95% CI)")
     fig.tight_layout()
     return fig
 
@@ -546,20 +601,31 @@ def run():
         colors = compare.get_strain_colors(order)
         print(f"Strains: {order} (reference: {order[0]})")
 
-        tables = analyze_sessions(run_info.tracks, run_info.recordings)
-        sessions = tables["bout_metrics"].groupby("dataset_label")["session_id"].nunique()
-        print("Sessions per strain:")
-        print(sessions.reindex(order).to_string())
+        print(f"Sampling unit: {get_unit_label()}")
+        tables = analyze_units(run_info.tracks, run_info.recordings)
+        counts = tables["bout_metrics"].groupby("dataset_label").agg(
+            sessions=("session_id", "nunique"), units=("unit_id", "nunique")
+        )
+        print("Sessions and plotted units per strain:")
+        print(counts.reindex(order).to_string())
         summaries = summarize(tables, rng)
         comparisons = compare_strains(tables, order[0], rng)
 
         for name, table in tables.items():
-            run_info.save_table(f"session_{name}" if name not in ("bouts", "intervals") else name, table)
+            run_info.save_table(
+                f"{SAMPLE_UNIT}_{name}" if name not in ("bouts", "intervals") else name, table
+            )
+        if SAMPLE_UNIT == "block":
+            variance = make_variance_components(tables)
+            run_info.save_table("variance_components", variance)
+            print("Share of variance between sessions (1 = sessions differ, 0 = blocks differ):")
+            print(variance.groupby(["table", "state", "metric"], dropna=False)["between_fraction"]
+                  .median().round(2).to_string())
         for name, table in summaries.items():
             run_info.save_table(f"strain_{name}", table)
         run_info.save_table("strain_comparisons", comparisons)
         if not comparisons.empty:
-            print("Differences from the reference strain (session permutation test; "
+            print("Differences from the reference strain (permutation of whole sessions; "
                   "q = Benjamini-Hochberg over all tests in this table):")
             print(comparisons[["table", "state", "metric", "dataset_label", "difference",
                                "p_value", "q_value", "session_count", "reference_session_count"]]

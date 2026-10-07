@@ -190,8 +190,11 @@ class SessionTests(unittest.TestCase):
                 })
         recordings = pd.DataFrame(rows)
 
-        with patch.object(kinematics, "MIN_STATE_FRAMES", 10):
-            tables = kinematics.analyze_sessions(tracks, recordings)
+        with (
+            patch.object(kinematics, "SAMPLE_UNIT", "session"),
+            patch.object(kinematics, "MIN_STATE_FRAMES", 10),
+        ):
+            tables = kinematics.analyze_units(tracks, recordings)
             rng = np.random.default_rng(0)
             with (
                 patch.object(kinematics, "BOOTSTRAP_SAMPLES", 200),
@@ -223,6 +226,55 @@ class SessionTests(unittest.TestCase):
         for event in kinematics.EVENT_TYPES:
             kinematics.plot_profiles(summaries["profiles"], event, order, colors)
         self.assertEqual(len(plt.get_fignums()) - figure_count_before, 5)
+
+    def test_block_mode_splits_sessions_into_trial_blocks(self):
+        """Block mode gives one unit per trial block, nested in sessions."""
+        rate = kinematics.FRAME_RATE_HZ
+        pattern = np.r_[np.zeros(2 * rate), np.ones(rate // 2), np.zeros(3 * rate)]
+        signal = np.tile(pattern, 8)
+        tracks = []
+        rows = []
+        for label, vx, day in [("empty", -5.0, 19), ("empty", -4.0, 20), ("fc2", -2.0, 19), ("fc2", -1.0, 20)]:
+            for trial in range(1, 5):
+                source = f"2026/{label}_{day}_{trial}"
+                tracks.append({**make_track(signal, f"{source}::track0", vx=vx), "dataset_label": label})
+                rows.append({
+                    "source_file": source, "dataset_label": label, "recording_year": 2026,
+                    "recording_month": 8, "recording_day": day, "recording_experimenter": "kevin",
+                    "recording_vial": 0, "recording_trial": trial,
+                })
+        recordings = pd.DataFrame(rows)
+
+        with (
+            patch.object(kinematics, "SAMPLE_UNIT", "block"),
+            patch.object(kinematics, "TRIALS_PER_BLOCK", 2),
+            patch.object(kinematics, "MIN_BLOCK_TRIALS", 2),
+            patch.object(kinematics, "MIN_STATE_FRAMES", 10),
+            patch.object(kinematics, "PERMUTATION_COUNT", 200),
+        ):
+            tables = kinematics.analyze_units(tracks, recordings)
+            comparisons = kinematics.compare_strains(tables, "empty", np.random.default_rng(0))
+            variance = kinematics.make_variance_components(tables)
+
+        bouts = tables["bout_metrics"]
+        self.assertEqual(bouts["session_id"].nunique(), 4)
+        self.assertEqual(bouts["unit_id"].nunique(), 8)
+        self.assertEqual(sorted(bouts["block"].unique()), [1, 2])
+        upwind = comparisons.loc[
+            (comparisons["metric"] == "upwind_velocity_mean") & (comparisons["state"] == "in_signal")
+        ].iloc[0]
+        self.assertEqual((upwind["session_count"], upwind["reference_session_count"]), (2, 2))
+        self.assertAlmostEqual(upwind["difference"], -3.0)
+        upwind_variance = variance.loc[
+            (variance["metric"] == "upwind_velocity_mean") & (variance["state"] == "in_signal")
+        ]
+        np.testing.assert_allclose(upwind_variance["between_fraction"], 1.0)
+
+    def test_unknown_sample_unit_is_an_error(self):
+        """A misspelled SAMPLE_UNIT names the valid choices."""
+        with patch.object(kinematics, "SAMPLE_UNIT", "vial"):
+            with self.assertRaisesRegex(ValueError, "session"):
+                kinematics.get_trials_per_block()
 
 
 if __name__ == "__main__":
